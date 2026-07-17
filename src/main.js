@@ -288,6 +288,39 @@ window.AppRouter = {
 
     AppSidebar.render(AppSidebar.COMPANY_ITEMS, this.currentRoute);
     initIcons();
+
+    switch (this.currentRoute) {
+      case 'company-dashboard':
+        await this.renderCompanyDashboard(main);
+        break;
+      case 'schools':
+        await this.renderSchools(main);
+        break;
+      case 'content-manager':
+        await this.renderContentManager(main);
+        break;
+      case 'drive-manager':
+        await this.renderDriveManager(main);
+        break;
+      case 'media-library':
+        await this.renderMediaLibrary(main);
+        break;
+      case 'school-admins':
+        await this.renderSchoolAdmins(main);
+        break;
+      case 'roles-permissions':
+        await this.renderRolesPermissions(main);
+        break;
+      case 'company-settings':
+        await this.renderCompanySettings(main);
+        break;
+      case 'audit-log':
+        await AppAuditLog.render(main);
+        break;
+      default:
+        await this.renderCompanyDashboard(main);
+        break;
+    }
   },
 
   // --- CONTENT MANAGER ---
@@ -555,6 +588,81 @@ window.AppRouter = {
         </div>
       </div>`;
     }
+    initIcons();
+  },
+
+  // --- COMPANY DASHBOARD ---
+  async renderCompanyDashboard(main) {
+    const data = await AppStorage.load();
+    const counts = await AppUtils.getTotalCounts();
+    const recentContent = data.content.slice(0, 10);
+    main.innerHTML = `<div class="fade-in">
+      <div class="page-header">
+        <div class="page-header-left"><h1 class="page-title">Dashboard</h1><p class="page-subtitle">Overview of the LANXGROW platform.</p></div>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-icon metric-icon-blue"><span class="material-symbols-outlined">business</span></div>
+          <div class="metric-info"><h2>${counts.schools}</h2><p>Schools</p></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon metric-icon-green"><span class="material-symbols-outlined">folder</span></div>
+          <div class="metric-info"><h2>${counts.categories}</h2><p>Categories</p></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon metric-icon-purple"><span class="material-symbols-outlined">auto_stories</span></div>
+          <div class="metric-info"><h2>${counts.subjects}</h2><p>Subjects</p></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon metric-icon-orange"><span class="material-symbols-outlined">videocam</span></div>
+          <div class="metric-info"><h2>${counts.content}</h2><p>Content Items</p></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Recent Content</h3></div>
+        ${recentContent.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">video_library</span><h3>No content yet</h3><p>Content will appear here once added.</p></div>`
+        : `<div class="table-container"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Updated</th></tr></thead><tbody>${recentContent.map(c => `<tr><td><div class="font-semibold">${c.name}</div></td><td style="font-size:13px;">${c.type}</td><td><span class="status-badge ${c.status === 'published' ? 'status-active' : c.status === 'draft' ? 'status-suspended' : 'status-pending'}">${c.status}</span></td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.updated_at)}</td></tr>`).join('')}</tbody></table></div>`}
+      </div>
+    </div>`;
+    initIcons();
+  },
+
+  // --- SCHOOLS (Company level) ---
+  async renderSchools(main) {
+    const data = await AppStorage.load();
+    const q = (document.getElementById('school-search')?.value || '').toLowerCase();
+    let schools = data.schools;
+    if (q) schools = schools.filter(s => s.name.toLowerCase().includes(q) || s.code?.toLowerCase().includes(q));
+    main.innerHTML = `<div class="fade-in">
+      <div class="page-header">
+        <div class="page-header-left"><h1 class="page-title">Schools</h1><p class="page-subtitle">Manage all schools in the platform.</p></div>
+        <button class="btn btn-primary" data-action="add-school"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add School</button>
+      </div>
+      <div class="management-bar">
+        <div class="search-bar" style="max-width:300px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="school-search" placeholder="Search schools..." data-action="school-search-input"></div>
+      </div>
+      ${schools.length === 0 ? `<div class="card"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">business</span><h3>No schools yet</h3><p>Create your first school to get started.</p></div></div>`
+      : `<div class="schools-grid">${schools.map(s => {
+        const stats = { categories: data.categories.filter(c => c.school_id === s.id).length, subjects: data.subjects.filter(sub => sub.school_id === s.id).length, sections: data.sections.filter(sec => sec.school_id === s.id).length };
+        const logoClass = s.status === 'suspended' ? 'school-logo-suspended' : 'school-logo-default';
+        return `<div class="school-card" style="cursor:pointer;" data-action="open-school" data-id="${s.id}">
+          <div class="school-card-top">
+            <div class="school-logo ${logoClass}">${AppUtils.getInitials(s.name)}</div>
+            <div class="school-info">
+              <div class="school-name">${s.name}</div>
+              <div class="school-code">Code: ${s.code}</div>
+              <div class="school-admin"><span class="material-symbols-outlined" style="font-size:14px;">person</span> ${s.admin_name || 'No admin'} (${s.admin_email || '—'})</div>
+            </div>
+            <span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-suspended'}">${s.status}</span>
+          </div>
+          <div class="school-stats">
+            <div class="school-stat"><div class="school-stat-value">${stats.categories}</div><div class="school-stat-label">Categories</div></div>
+            <div class="school-stat"><div class="school-stat-value">${stats.subjects}</div><div class="school-stat-label">Subjects</div></div>
+            <div class="school-stat"><div class="school-stat-value">${stats.sections}</div><div class="school-stat-label">Sections</div></div>
+          </div>
+        </div>`;
+      }).join('')}</div>`}
+    </div>`;
     initIcons();
   }
 }; // End AppRouter
