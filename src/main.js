@@ -471,7 +471,6 @@ window.AppRouter = {
             <span style="font-size:11px;padding:4px 12px;border-radius:20px;background:${avgAttendance >= 85 ? '#f0fdf4' : '#fffbeb'};color:${avgAttendance >= 85 ? '#10b981' : '#f59e0b'};font-weight:600;display:flex;align-items:center;gap:4px;">
               <span style="width:6px;height:6px;border-radius:50%;background:${avgAttendance >= 85 ? '#10b981' : '#f59e0b'};"></span>${avgAttendance}% Attendance Today
             </span>
-            <button class="btn btn-sm" style="background:var(--primary);color:#fff;border:none;height:32px;font-size:12px;" data-action="navigate" data-route="school-intelligence"><span class="material-symbols-outlined" style="font-size:16px;">analytics</span> Insights</button>
           </div>
         </div>
 
@@ -500,7 +499,6 @@ window.AppRouter = {
               <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-categories"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">category</span> Categories</button>
               <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-videos"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">video_library</span> Videos</button>
               <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-notifications"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">notifications</span> Notifications${schoolNotifications.filter(n => !n.is_read).length ? `<span style="background:var(--danger);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;">${schoolNotifications.filter(n => !n.is_read).length}</span>` : ''}</button>
-              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-intelligence"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">analytics</span> Intelligence</button>
             </div>
           </div>
 
@@ -1065,7 +1063,7 @@ window.AppRouter = {
             <div class="school-info">
               <div class="school-name">${s.name}</div>
               <div class="school-code">Code: ${s.code}</div>
-              <div class="school-admin"><span class="material-symbols-outlined" style="font-size:14px;">person</span> ${s.admin_name || 'No admin'} (${s.admin_email || '—'})</div>
+              <div class="school-admin"><span class="material-symbols-outlined" style="font-size:14px;">person</span> ${s.principal_name || 'No principal'}</div>
             </div>
             <span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-suspended'}">${s.status}</span>
           </div>
@@ -1095,6 +1093,7 @@ window.AppSchools = {
     document.getElementById('entity-fields-school').style.display = 'block';
     document.getElementById('input-name').value = school.name;
     document.getElementById('input-code').value = school.code;
+    document.getElementById('input-principal-name').value = school.principal_name || '';
     document.getElementById('input-status').value = school.status;
     document.getElementById('modal-title').textContent = 'Edit School';
     AppModal.open('modal-entity');
@@ -1829,9 +1828,7 @@ function openSchoolModal(schoolId) {
   document.getElementById('entity-fields-school').style.display = 'block';
   document.getElementById('input-name').value = '';
   document.getElementById('input-code').value = '';
-  document.getElementById('input-admin-name').value = '';
-  document.getElementById('input-admin-email').value = '';
-  document.getElementById('input-admin-password').value = '';
+  document.getElementById('input-principal-name').value = '';
   document.getElementById('input-status').value = 'active';
   document.getElementById('modal-title').textContent = 'Add School';
   AppModal.open('modal-entity');
@@ -1847,11 +1844,12 @@ async function handleEntitySubmit() {
       const code = document.getElementById('input-code').value.trim();
       if (!name || !code) { AppToast.show('Name and code are required.', 'error'); return; }
       const status = document.getElementById('input-status')?.value || 'active';
+      const principal_name = document.getElementById('input-principal-name').value.trim();
       if (isEdit) {
-        await SchoolService.update(id, { name, code, status });
+        await SchoolService.update(id, { name, code, status, principal_name });
         AppToast.show('School updated.', 'success');
       } else {
-        await SchoolService.create({ name, code, status });
+        await SchoolService.create({ name, code, status, principal_name });
         AppToast.show('School created.', 'success');
       }
     } else if (type === 'category') {

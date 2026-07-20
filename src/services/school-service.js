@@ -28,7 +28,8 @@ export const SchoolService = {
       .insert({
         name: school.name,
         code: school.code,
-        status: school.status || 'active'
+        status: school.status || 'active',
+        principal_name: school.principal_name || null
       })
       .select()
       .single();
@@ -44,7 +45,8 @@ export const SchoolService = {
       .update({
         name: updates.name,
         code: updates.code,
-        status: updates.status
+        status: updates.status,
+        principal_name: updates.principal_name || null
       })
       .eq('id', id)
       .select()
