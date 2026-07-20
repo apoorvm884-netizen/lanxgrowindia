@@ -1,11 +1,15 @@
 -- ==============================================================
--- LANXGROW COS — Fix Profiles Role Constraint
--- Migration 00007: Add counselor and student roles
+-- LANXGROW COS — P0 Migrations 00007–00010 (Idempotent)
 -- ==============================================================
--- Run after: 00001, 00002, 00003, 00004, 00005, 00006
+-- Each section is idempotent and safe to re-run individually.
+-- Run in order: 00007 → 00008 → 00009 → 00010
+-- If any section fails, fix the issue and re-run that section only.
 -- ==============================================================
 
--- Drop existing CHECK constraint and recreate with all roles
+-- ==============================================================
+-- Migration 00007: Fix Profiles Role Constraint
+-- ==============================================================
+
 alter table public.profiles
   drop constraint if exists profiles_role_check;
 
@@ -13,29 +17,32 @@ alter table public.profiles
   add constraint profiles_role_check
   check (role in ('super_admin', 'school_admin', 'counselor', 'student'));
 
--- Update trigger to handle new roles (first user still becomes super_admin)
--- No change needed to handle_new_user() as it only assigns super_admin/school_admin-- ==============================================================
--- LANXGROW COS — Add Missing School Columns
--- Migration 00008: Add principal_name, ensure drive_folder_id
 -- ==============================================================
--- Run after: 00007
+-- Migration 00008: Add Missing School Columns
 -- ==============================================================
 
--- principal_name: Used in Company Portal school cards
 alter table public.schools
   add column if not exists principal_name text;
 
--- drive_folder_id: Added in 00005, but ensure exists
 alter table public.schools
   add column if not exists drive_folder_id text;
 
--- Index for drive folder lookups
-create index if not exists idx_schools_drive_folder on public.schools(drive_folder_id);-- ==============================================================
--- LANXGROW COS — Company Settings Table
--- Migration 00009: Global platform settings
+create index if not exists idx_schools_drive_folder
+  on public.schools(drive_folder_id);
+
 -- ==============================================================
--- Run after: 00008
+-- Migration 00009: Company Settings Table
 -- ==============================================================
+
+create or replace function public.update_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
 
 create table if not exists public.settings (
   id          uuid primary key default gen_random_uuid(),
@@ -46,30 +53,28 @@ create table if not exists public.settings (
   updated_at  timestamptz not null default now()
 );
 
--- Enable RLS
 alter table public.settings enable row level security;
 
--- Super admins can read all settings
+drop policy if exists "Super admins can read all settings" on public.settings;
 create policy "Super admins can read all settings"
   on public.settings for select
   using (public.is_super_admin());
 
--- Super admins can insert settings
+drop policy if exists "Super admins can insert settings" on public.settings;
 create policy "Super admins can insert settings"
   on public.settings for insert
   with check (public.is_super_admin());
 
--- Super admins can update settings
+drop policy if exists "Super admins can update settings" on public.settings;
 create policy "Super admins can update settings"
   on public.settings for update
   using (public.is_super_admin());
 
--- Trigger for updated_at
+drop trigger if exists trg_settings_updated_at on public.settings;
 create trigger trg_settings_updated_at
   before update on public.settings
   for each row execute function public.update_updated_at();
 
--- Insert default settings
 insert into public.settings (key, value, description) values
   ('companyName', '"LanxGrow Learning"', 'Company display name'),
   ('language', '"en"', 'Default platform language'),
@@ -80,11 +85,10 @@ insert into public.settings (key, value, description) values
   ('smtpPort', '587', 'SMTP server port'),
   ('fromEmail', '"noreply@lanxgrow.com"', 'From email address'),
   ('fromName', '"LanxGrow Learning"', 'From name for emails')
-on conflict (key) do nothing;-- ==============================================================
--- LANXGROW COS — Roles & Permissions Table
--- Migration 00010: Permission management for RBAC
+on conflict (key) do nothing;
+
 -- ==============================================================
--- Run after: 00009
+-- Migration 00010: Roles & Permissions Table
 -- ==============================================================
 
 create table if not exists public.permissions (
@@ -98,37 +102,34 @@ create table if not exists public.permissions (
   unique(role, permission)
 );
 
--- Enable RLS
 alter table public.permissions enable row level security;
 
--- Super admins can read all permissions
+drop policy if exists "Super admins can read all permissions" on public.permissions;
 create policy "Super admins can read all permissions"
   on public.permissions for select
   using (public.is_super_admin());
 
--- School admins can read their own role permissions (when not super_admin)
+drop policy if exists "School admins can read school_admin permissions" on public.permissions;
 create policy "School admins can read school_admin permissions"
   on public.permissions for select
   using (role = 'school_admin' and public.is_super_admin() = false);
 
--- Super admins can insert permissions
+drop policy if exists "Super admins can insert permissions" on public.permissions;
 create policy "Super admins can insert permissions"
   on public.permissions for insert
   with check (public.is_super_admin());
 
--- Super admins can update permissions
+drop policy if exists "Super admins can update permissions" on public.permissions;
 create policy "Super admins can update permissions"
   on public.permissions for update
   using (public.is_super_admin());
 
--- Trigger for updated_at
+drop trigger if exists trg_permissions_updated_at on public.permissions;
 create trigger trg_permissions_updated_at
   before update on public.permissions
   for each row execute function public.update_updated_at();
 
--- Seed default permissions
 insert into public.permissions (role, permission, enabled) values
-  -- Super Admin: all enabled
   ('super_admin', 'manage_schools', true),
   ('super_admin', 'manage_categories', true),
   ('super_admin', 'manage_subjects', true),
@@ -141,8 +142,6 @@ insert into public.permissions (role, permission, enabled) values
   ('super_admin', 'manage_drive', true),
   ('super_admin', 'manage_media_library', true),
   ('super_admin', 'view_audit_log', true),
-
-  -- School Admin: restricted to own school
   ('school_admin', 'manage_school_settings', true),
   ('school_admin', 'manage_categories', true),
   ('school_admin', 'manage_subjects', true),
@@ -151,15 +150,11 @@ insert into public.permissions (role, permission, enabled) values
   ('school_admin', 'view_analytics', false),
   ('school_admin', 'manage_own_profile', true),
   ('school_admin', 'manage_drive_upload', false),
-
-  -- Counselor: student-facing
   ('counselor', 'view_assigned_students', true),
   ('counselor', 'manage_student_progress', true),
   ('counselor', 'view_analytics', true),
   ('counselor', 'send_notifications', true),
   ('counselor', 'manage_own_profile', true),
-
-  -- Student: self-service only
   ('student', 'view_own_courses', true),
   ('student', 'track_own_progress', true),
   ('student', 'view_own_notifications', true),
