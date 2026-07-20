@@ -1182,7 +1182,7 @@ window.SchoolVideos = {
         <div class="search-bar" style="max-width:250px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="sp-video-search" placeholder="Search media..."></div>
         <select class="form-select" id="sp-video-type" style="width:130px;height:40px;font-size:13px;">
           <option value="">All Types</option>
-          <option value="Video">Video</option><option value="PDF">PDF</option><option value="Image">Image</option><option value="Document">Document</option>
+          <option value="Video">Video</option><option value="PDF">PDF</option><option value="Image">Image</option><option value="Document">Document</option><option value="Other">Other</option>
         </select>
       </div>
       ${items.length === 0 ? `<div class="card"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">video_library</span><h3>No media available</h3><p>${content.length === 0 ? 'Upload videos and documents to your courses.' : 'No media matches your search criteria.'}</p></div></div>`

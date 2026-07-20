@@ -498,11 +498,20 @@ tr:hover td { background: var(--surface-low); }
               <option value="">Choose...</option>
               <option value="Video">Video</option>
               <option value="PDF">PDF</option>
-              <option value="Notes">Notes</option>
-              <option value="PPT">PPT</option>
               <option value="Image">Image</option>
+              <option value="Document">Document</option>
+              <option value="Other">Other</option>
             </select>
             <div class="form-error">Type is required.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-content-url">URL / File Link</label>
+            <div style="display:flex;gap:8px;">
+              <input class="form-input" type="url" id="input-content-url" placeholder="https://youtube.com/watch?v=... or Drive link" style="flex:1;">
+              <button class="btn btn-secondary btn-sm" type="button" id="btn-content-upload" data-action="content-upload-file" style="height:44px;white-space:nowrap;"><span class="material-symbols-outlined" style="font-size:16px;">upload</span> Upload</button>
+            </div>
+            <div class="form-error">Valid URL is required for published content.</div>
+            <input type="file" id="input-content-file" style="display:none" accept="video/*,image/*,application/pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt">
           </div>
           <div class="form-group">
             <label class="form-label" for="input-content-school">School</label>
@@ -515,12 +524,25 @@ tr:hover td { background: var(--surface-low); }
             <div class="form-error">Section is required.</div>
           </div>
           <div class="form-group">
-            <label class="form-label" for="input-content-duration">Duration <span style="font-weight:400;color:var(--text-muted);">(for video)</span></label>
-            <input class="form-input" type="text" id="input-content-duration" placeholder="e.g. 12:34">
-          </div>
-          <div class="form-group">
             <label class="form-label" for="input-content-size">Size</label>
             <input class="form-input" type="text" id="input-content-size" placeholder="e.g. 145 MB">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-content-description">Description</label>
+            <textarea class="form-input" id="input-content-description" placeholder="Brief description of this content..." rows="2" style="resize:vertical;min-height:60px;"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-content-tags">Tags <span style="font-weight:400;color:var(--text-muted);">(comma-separated)</span></label>
+            <input class="form-input" type="text" id="input-content-tags" placeholder="e.g. physics, electromagnetism, chapter-4">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-content-status">Status</label>
+            <select class="form-select" id="input-content-status">
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+              <option value="review">In Review</option>
+              <option value="archived">Archived</option>
+            </select>
           </div>
         </div>
       </form>

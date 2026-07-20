@@ -749,7 +749,7 @@ window.AppRouter = {
       </div>
       <div class="management-bar">
         <div class="search-bar" style="max-width:300px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="content-search" placeholder="Search content..." data-action="content-search-input"></div>
-        <select class="form-select" id="content-type-filter" style="width:140px;height:44px;font-size:13px;"><option value="">All Types</option><option value="Video">Video</option><option value="PDF">PDF</option><option value="Image">Image</option><option value="Document">Document</option></select>
+        <select class="form-select" id="content-type-filter" style="width:140px;height:44px;font-size:13px;"><option value="">All Types</option><option value="Video">Video</option><option value="PDF">PDF</option><option value="Image">Image</option><option value="Document">Document</option><option value="Other">Other</option></select>
         <select class="form-select" id="content-school-filter" style="width:160px;height:44px;font-size:13px;"><option value="">All Schools</option>${schools.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
@@ -1887,16 +1887,27 @@ async function handleEntitySubmit() {
     } else if (type === 'content') {
       const name = document.getElementById('input-content-name').value.trim();
       if (!name) { AppToast.show('Content name is required.', 'error'); return; }
+      const rawType = document.getElementById('input-content-type').value;
+      const allowedTypes = ['Video', 'PDF', 'Image', 'Document', 'Other'];
+      if (!allowedTypes.includes(rawType)) { AppToast.show('Valid type is required.', 'error'); return; }
+      const rawUrl = document.getElementById('input-content-url').value.trim() || null;
+      const rawStatus = document.getElementById('input-content-status').value || 'draft';
+      const allowedStatuses = ['draft', 'published', 'archived', 'review'];
+      if (!allowedStatuses.includes(rawStatus)) { AppToast.show('Invalid status.', 'error'); return; }
+      if (rawStatus === 'published' && !rawUrl) { AppToast.show('URL is required for published content.', 'error'); return; }
+      if (rawUrl && !rawUrl.startsWith('http://') && !rawUrl.startsWith('https://') && !rawUrl.startsWith('blob:') && !rawUrl.startsWith('data:')) {
+        AppToast.show('URL must start with http:// or https://', 'error'); return;
+      }
       const item = {
         name,
-        type: document.getElementById('input-content-type').value,
-        url: document.getElementById('input-content-url').value.trim() || null,
+        type: rawType,
+        url: rawUrl,
         size: document.getElementById('input-content-size').value.trim() || null,
         schoolId: document.getElementById('input-content-school').value,
         sectionId: document.getElementById('input-content-section').value || null,
         description: document.getElementById('input-content-description').value.trim() || null,
         tags: (document.getElementById('input-content-tags').value || '').split(',').map(t => t.trim()).filter(Boolean),
-        status: document.getElementById('input-content-status').value
+        status: rawStatus
       };
       if (!item.schoolId) { AppToast.show('School is required.', 'error'); return; }
       if (isEdit) {
@@ -1971,6 +1982,11 @@ document.addEventListener('click', async function (e) {
   if (action === 'delete-content') { AppContent.confirmDelete(id); return; }
   if (action === 'play-video' || action === 'view-content') { AppContent.play(id); return; }
   if (action === 'view-content-file') { AppContent.play(id); return; }
+  if (action === 'content-upload-file') {
+    const fileInput = document.getElementById('input-content-file');
+    if (fileInput) fileInput.click();
+    return;
+  }
 
   // Admin
   // User Management
@@ -2393,7 +2409,37 @@ document.addEventListener('change', function (e) {
 // Content school dropdown populates sections
 document.addEventListener('change', function (e) {
   if (e.target.id === 'input-content-school') { AppContent.populateSections(e.target.value); }
+  if (e.target.id === 'input-content-file') { handleContentFileUpload(e.target); }
 });
+
+// Content file upload via change delegation
+async function handleContentFileUpload(fileInput) {
+  const file = fileInput.files?.[0];
+  if (!file) return;
+  const urlInput = document.getElementById('input-content-url');
+  const sizeInput = document.getElementById('input-content-size');
+  try {
+    const bucketName = 'content-uploads';
+    const filePath = `${Date.now()}-${file.name}`;
+    const { data, error } = await supabase.storage.from(bucketName).upload(filePath, file);
+    if (error) {
+      const bucketErr = error.message?.includes('bucket') || error.message?.includes('not found');
+      if (bucketErr) {
+        AppToast.show('Storage bucket not configured. Paste a URL instead.', 'warn');
+      } else {
+        AppToast.show('Upload failed: ' + error.message, 'error');
+      }
+      return;
+    }
+    const { data: { publicUrl } } = supabase.storage.from(bucketName).getPublicUrl(filePath);
+    if (urlInput) urlInput.value = publicUrl;
+    if (sizeInput) sizeInput.value = file.size > 1048576 ? (file.size / 1048576).toFixed(1) + ' MB' : (file.size / 1024).toFixed(1) + ' KB';
+    AppToast.show('File uploaded successfully.', 'success');
+  } catch (err) {
+    AppToast.show('Upload failed: ' + err.message, 'error');
+  }
+  fileInput.value = '';
+}
 
 // ==============================================================
 // GLOBAL SEARCH KEYBOARD SHORTCUT
