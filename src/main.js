@@ -336,6 +336,9 @@ window.AppRouter = {
   currentSchoolId: null,
   _selectedCategoryId: null,
   _selectedSubjectId: null,
+  SCHOOL_ROUTES: ['school-dashboard','school-categories','school-subjects','school-sections',
+    'school-students','school-counselors','school-courses','school-videos',
+    'school-assignments','school-reports','school-notifications','school-settings','school-profile'],
 
   init() {
     this.navigate(this.currentRoute || 'company-dashboard');
@@ -346,10 +349,7 @@ window.AppRouter = {
     if (params && params.schoolId) this.currentSchoolId = params.schoolId;
     this._selectedCategoryId = (params && params.categoryId) || null;
     this._selectedSubjectId = (params && params.subjectId) || null;
-    const schoolRoutes = ['school-dashboard','school-categories','school-subjects','school-sections',
-      'school-students','school-counselors','school-courses','school-videos',
-      'school-assignments','school-reports','school-notifications','school-settings','school-profile'];
-    if (!schoolRoutes.includes(route)) {
+    if (!this.SCHOOL_ROUTES.includes(route)) {
       this.currentSchoolId = null;
     }
     this.render();
@@ -1108,9 +1108,7 @@ window.AppSchools = {
     document.getElementById('btn-confirm-action').setAttribute('data-entity-type', 'school');
     document.getElementById('btn-confirm-action').setAttribute('data-entity-id', id);
   },
-  filter() {}, sort() {}, toggleFilter() {}, toggleSort() {},
-  currentPage: 1, perPage: 50, allData: [],
-  renderPage() {}
+
 };
 
 // ==============================================================
@@ -1934,10 +1932,7 @@ document.addEventListener('click', async function (e) {
 
   if (action === 'navigate') {
     const companyRoutes = ['content-manager','drive-manager','media-library','school-admins','roles-permissions','company-settings','audit-log'];
-    const schoolRoutes = ['school-dashboard','school-categories','school-subjects','school-sections',
-      'school-students','school-counselors','school-courses','school-videos',
-      'school-assignments','school-reports','school-notifications','school-settings','school-profile'];
-    if (schoolRoutes.includes(route)) {
+    if (AppRouter.SCHOOL_ROUTES.includes(route)) {
       AppRouter.navigate(route, { schoolId: AppRouter.currentSchoolId });
     } else if (companyRoutes.includes(route)) {
       AppRouter.currentSchoolId = null;
@@ -2456,6 +2451,29 @@ async function initApp() {
         document.getElementById('login-error').textContent = result.error;
       }
       // Redirect handled by Supabase OAuth
+    });
+  }
+
+  // Development Access Mode
+  const devAccessContainer = document.getElementById('dev-access-container');
+  const devBtn = document.getElementById('btn-dev-access');
+  if (devAccessContainer && import.meta.env.VITE_DEV_ACCESS === 'true') {
+    devAccessContainer.style.display = '';
+  }
+  if (devBtn) {
+    devBtn.addEventListener('click', async () => {
+      const email = 'dev@lanxgro.com';
+      const password = 'DevAccess2026!';
+      const result = await AuthService.signInWithEmail(email, password);
+      if (!result.success) {
+        document.getElementById('login-error').textContent = result.error;
+        return;
+      }
+      document.getElementById('login-error').textContent = '';
+      document.getElementById('app-login').style.display = 'none';
+      document.getElementById('app-layout').classList.remove('hidden');
+      AppRouter.init();
+      initIcons();
     });
   }
 

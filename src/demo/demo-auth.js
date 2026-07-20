@@ -7,7 +7,7 @@
 // No Supabase Authentication is contacted.
 // ============================================================
 
-import { DEMO_CREDENTIALS, findDemoUser } from './demo-config.js';
+import { findDemoUser } from './demo-config.js';
 
 // Map demo emails to fixed user IDs that match demo-data.js
 const EMAIL_TO_ID = {

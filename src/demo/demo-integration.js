@@ -847,4 +847,4 @@ if (DEMO_MODE) {
   demoIntegration.patchServices = patchServices;
 }
 
-export default demoIntegration;
+
