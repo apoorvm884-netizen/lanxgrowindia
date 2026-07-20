@@ -41,7 +41,9 @@ export const StudentService = {
         email: item.email || null,
         school_id: item.schoolId,
         counselor_id: item.counselorId || null,
-        status: item.status || 'active'
+        status: item.status || 'active',
+        class: item.class || null,
+        section: item.section || null
       })
       .select()
       .single();
@@ -57,6 +59,8 @@ export const StudentService = {
     if (updates.email !== undefined) payload.email = updates.email;
     if (updates.counselorId !== undefined) payload.counselor_id = updates.counselorId;
     if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.class !== undefined) payload.class = updates.class;
+    if (updates.section !== undefined) payload.section = updates.section;
 
     const { data, error } = await supabase
       .from('students')

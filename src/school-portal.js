@@ -182,7 +182,7 @@ window.SchoolStudents = {
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...'; }
     try {
       const schoolId = AppRouter.currentSchoolId;
-      const updates = { name, email, class: studentClass, section, counselor_id: counselorId, status };
+      const updates = { name, email, class: studentClass, section, counselorId, status };
       if (isUpdate) {
         await window.StudentService?.update(studentId, updates);
         AppToast.show('Student updated.', 'success');
