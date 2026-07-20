@@ -11,6 +11,11 @@ values (
 )
 on conflict (id) do nothing;
 
+-- Allow authenticated users to see the bucket
+create policy "Users can see content bucket"
+  on storage.buckets for select
+  using (id = 'content-uploads');
+
 -- Allow public (anon) uploads to the bucket
 create policy "Anyone can upload files"
   on storage.objects for insert
