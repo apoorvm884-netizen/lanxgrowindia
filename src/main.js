@@ -15,8 +15,23 @@ import {
   ContentService as SupabaseContentService,
   AuthService,
   AuditLogService,
-  DriveService
+  DriveService,
+  StudentService,
+  CourseService,
+  EnrollmentService,
+  NotificationService,
+  SettingsService,
+  PermissionsService
 } from './services/index.js';
+
+// Import School Portal rendering module
+import './school-portal.js';
+
+// Conditional Demo Mode — only loads when VITE_DEMO_MODE=true
+import { DEMO_MODE } from './demo/demo-config.js';
+if (DEMO_MODE) {
+  import('./demo/demo-integration.js');
+}
 
 // Attach services to window — these override the old localStorage stubs
 window.SchoolService = SupabaseSchoolService;
@@ -27,6 +42,12 @@ window.ContentService = SupabaseContentService;
 window.AuthService = AuthService;
 window.AuditLogService = AuditLogService;
 window.DriveService = DriveService;
+window.StudentService = StudentService;
+window.CourseService = CourseService;
+window.EnrollmentService = EnrollmentService;
+window.NotificationService = NotificationService;
+window.SettingsService = SettingsService;
+window.PermissionsService = PermissionsService;
 window.supabase = supabase;
 
 // ==============================================================
@@ -78,6 +99,44 @@ window.AppStorage = {
 };
 
 // ==============================================================
+// SKELETON LOADING
+// ==============================================================
+const SKELETON_STYLE = 'background:linear-gradient(90deg,var(--border) 25%,var(--border-light) 50%,var(--border) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;';
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `@keyframes shimmer { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }`;
+document.head.appendChild(styleSheet);
+
+window.AppSkeleton = {
+  dashboard: function() {
+    return `<div class="fade-in" style="padding:24px;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+        <div style="width:48px;height:48px;border-radius:12px;${SKELETON_STYLE}"></div>
+        <div><div style="width:200px;height:22px;${SKELETON_STYLE}"></div><div style="width:140px;height:14px;margin-top:6px;${SKELETON_STYLE}"></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+        ${Array.from({length:4}, () => `<div style="height:80px;${SKELETON_STYLE}"></div>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        ${Array.from({length:2}, () => `<div style="height:200px;${SKELETON_STYLE}"></div>`).join('')}
+      </div>
+    </div>`;
+  },
+  table: function(rows = 5) {
+    return `<div style="padding:24px;">
+      <div style="width:200px;height:28px;margin-bottom:16px;${SKELETON_STYLE}"></div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${Array.from({length:rows}, () => `<div style="height:48px;${SKELETON_STYLE}"></div>`).join('')}
+      </div>
+    </div>`;
+  },
+  cards: function(count = 6) {
+    return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:24px;">
+      ${Array.from({length:count}, () => `<div style="height:180px;${SKELETON_STYLE}"></div>`).join('')}
+    </div>`;
+  }
+};
+
+// ==============================================================
 // UTILITY FUNCTIONS
 // ==============================================================
 window.AppUtils = {
@@ -114,6 +173,20 @@ window.AppUtils = {
   getInitials: function (name) {
     if (!name) return '?';
     return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  },
+
+  timeAgo: function (ts) {
+    if (!ts) return '';
+    const now = Date.now();
+    const diff = now - new Date(ts).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    return AppUtils.formatDate(ts);
   }
 };
 
@@ -192,13 +265,23 @@ window.AppSidebar = {
 
   SCHOOL_ITEMS: [
     { id: 'school-dashboard', label: 'Dashboard', icon: 'layout-dashboard', route: 'school-dashboard' },
+    { id: 'sep-s1', separator: true },
+    { id: 'school-students', label: 'Students', icon: 'groups', route: 'school-students' },
+    { id: 'school-counselors', label: 'Counselors', icon: 'badge', route: 'school-counselors' },
+    { id: 'sep-s2', separator: true },
     { id: 'school-categories', label: 'Categories', icon: 'folder-tree', route: 'school-categories' },
     { id: 'school-subjects', label: 'Subjects', icon: 'book-open', route: 'school-subjects' },
-    { id: 'sep3', separator: true },
     { id: 'school-sections', label: 'Sections', icon: 'folder-kanban', route: 'school-sections' },
-    { id: 'school-content', label: 'Content', icon: 'video', disabled: true },
-    { id: 'school-analytics', label: 'Analytics', icon: 'bar-chart-3', disabled: true },
-    { id: 'school-settings', label: 'Settings', icon: 'settings', disabled: true },
+    { id: 'sep-s3', separator: true },
+    { id: 'school-courses', label: 'Courses', icon: 'school', route: 'school-courses' },
+    { id: 'school-videos', label: 'Video Library', icon: 'video-library', route: 'school-videos' },
+    { id: 'school-assignments', label: 'Assignments', icon: 'assignment', route: 'school-assignments' },
+    { id: 'sep-s4', separator: true },
+    { id: 'school-reports', label: 'Reports', icon: 'bar-chart-3', route: 'school-reports' },
+    { id: 'school-notifications', label: 'Notifications', icon: 'notifications', route: 'school-notifications' },
+    { id: 'sep-s5', separator: true },
+    { id: 'school-settings', label: 'Settings', icon: 'settings', route: 'school-settings' },
+    { id: 'school-profile', label: 'Profile', icon: 'person', route: 'school-profile' },
   ],
 
   ITEM_ICONS: {
@@ -215,6 +298,13 @@ window.AppSidebar = {
     'video': '<span class="material-symbols-outlined" style="font-size:20px;">videocam</span>',
     'bar-chart-3': '<span class="material-symbols-outlined" style="font-size:20px;">bar_chart</span>',
     'history': '<span class="material-symbols-outlined" style="font-size:20px;">history</span>',
+    'groups': '<span class="material-symbols-outlined" style="font-size:20px;">groups</span>',
+    'badge': '<span class="material-symbols-outlined" style="font-size:20px;">badge</span>',
+    'school': '<span class="material-symbols-outlined" style="font-size:20px;">school</span>',
+    'video-library': '<span class="material-symbols-outlined" style="font-size:20px;">video_library</span>',
+    'assignment': '<span class="material-symbols-outlined" style="font-size:20px;">assignment</span>',
+    'notifications': '<span class="material-symbols-outlined" style="font-size:20px;">notifications</span>',
+    'person': '<span class="material-symbols-outlined" style="font-size:20px;">person</span>',
   },
 
   render(items, activeId, backLink) {
@@ -254,8 +344,12 @@ window.AppRouter = {
   navigate(route, params) {
     this.currentRoute = route;
     if (params && params.schoolId) this.currentSchoolId = params.schoolId;
-    if (route !== 'school-dashboard' && route !== 'school-categories' &&
-        route !== 'school-subjects' && route !== 'school-sections') {
+    this._selectedCategoryId = (params && params.categoryId) || null;
+    this._selectedSubjectId = (params && params.subjectId) || null;
+    const schoolRoutes = ['school-dashboard','school-categories','school-subjects','school-sections',
+      'school-students','school-counselors','school-courses','school-videos',
+      'school-assignments','school-reports','school-notifications','school-settings','school-profile'];
+    if (!schoolRoutes.includes(route)) {
       this.currentSchoolId = null;
     }
     this.render();
@@ -265,13 +359,20 @@ window.AppRouter = {
     const main = document.getElementById('main-content');
     if (!main) return;
     const user = await AuthService.getUser();
-    main.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:400px;"><div class="spinner"></div></div>';
+    if (this.currentRoute === 'school-dashboard') {
+      main.innerHTML = AppSkeleton.dashboard();
+    } else if (['school-students','school-counselors','school-courses','school-assignments'].includes(this.currentRoute)) {
+      main.innerHTML = AppSkeleton.table();
+    } else if (['school-videos'].includes(this.currentRoute)) {
+      main.innerHTML = AppSkeleton.cards();
+    }
 
     if (this.currentRoute && this.currentRoute.startsWith('school-')) {
       if (this.currentSchoolId) {
         const data = await AppStorage.load();
         const school = data.schools.find(s => s.id === this.currentSchoolId);
         if (school) {
+          document.getElementById('sidebar').classList.remove('sidebar-hq');
           AppSidebar.render(AppSidebar.SCHOOL_ITEMS, this.currentRoute,
             `<div class="nav-item" data-action="navigate" data-route="schools">
               <span class="material-symbols-outlined" style="font-size:20px;">chevron_left</span><span class="nav-label">Back to Schools</span>
@@ -286,6 +387,7 @@ window.AppRouter = {
       return;
     }
 
+    document.getElementById('sidebar').classList.add('sidebar-hq');
     AppSidebar.render(AppSidebar.COMPANY_ITEMS, this.currentRoute);
     initIcons();
 
@@ -321,6 +423,318 @@ window.AppRouter = {
         await this.renderCompanyDashboard(main);
         break;
     }
+  },
+
+  // --- SCHOOL WORKSPACE (dispatcher) ---
+  async renderSchoolWorkspace(main, user, school, data) {
+    const profile = await AuthService.getProfile();
+    const isSuperAdmin = profile && profile.role === 'super_admin';
+    const schoolName = school?.name || 'School';
+    const schoolId = this.currentSchoolId;
+
+    if (this.currentRoute === 'school-dashboard') {
+      const cats = data.categories.filter(c => c.school_id === schoolId);
+      const subjects = data.subjects.filter(s => s.school_id === schoolId);
+      const sections = data.sections.filter(sec => sec.school_id === schoolId);
+      const content = data.content.filter(c => c.school_id === schoolId);
+      const schoolStudents = (data.students || []).filter(s => s.school_id === schoolId);
+      const schoolCourses = (data.courses || []).filter(c => c.school_id === schoolId);
+      const schoolCounselors = (data.counselors || []).filter(c => c.school_id === schoolId);
+      const schoolEnrollments = (data.enrollments || []).filter(e => schoolStudents.some(s => s.id === e.student_id));
+      const schoolNotifications = (data.notifications || []).filter(n => n.user_id === (profile ? profile.id : ''));
+      const avgAttendance = schoolStudents.length ? Math.round(schoolStudents.reduce((s, st) => s + st.attendance, 0) / schoolStudents.length) : 0;
+      const completionRate = schoolEnrollments.length ? Math.round(schoolEnrollments.filter(e => e.status === 'completed').length / schoolEnrollments.length * 100) : 0;
+      const today = new Date();
+      const dateStr = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      const greeting = today.getHours() < 12 ? 'Good morning' : today.getHours() < 18 ? 'Good afternoon' : 'Good evening';
+      const recentContent = content.slice(0, 4);
+      const recentEnrollments = schoolEnrollments.slice(-4).reverse();
+      const atRiskStudents = schoolStudents.filter(s => s.attendance < 80 || s.progress < 50);
+
+      main.innerHTML = `<div class="fade-in">
+        ${isSuperAdmin ? `<div style="background:#111827;color:#d1d5db;padding:10px 16px;border-radius:var(--radius-md);margin-bottom:16px;display:flex;align-items:center;gap:12px;font-size:12px;">
+          <span class="material-symbols-outlined" style="font-size:16px;">admin_panel_settings</span>
+          <span style="flex:1;">SUPER ADMIN MODE — You are viewing the isolated workspace for <strong>${schoolName}</strong></span>
+          <button class="btn btn-sm" style="background:#374151;color:#fff;border:none;height:28px;font-size:11px;" data-action="navigate" data-route="schools">Exit Workspace</button>
+        </div>` : ''}
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+              <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1e3a8a,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;">${AppUtils.getInitials(schoolName)}</div>
+              <div>
+                <h1 style="font-size:22px;font-weight:700;margin:0;">${greeting}, ${profile?.name || 'Admin'}!</h1>
+                <p style="margin:2px 0 0;font-size:13px;color:var(--text-secondary);">${schoolName} · ${dateStr}</p>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span style="font-size:11px;padding:4px 12px;border-radius:20px;background:${avgAttendance >= 85 ? '#f0fdf4' : '#fffbeb'};color:${avgAttendance >= 85 ? '#10b981' : '#f59e0b'};font-weight:600;display:flex;align-items:center;gap:4px;">
+              <span style="width:6px;height:6px;border-radius:50%;background:${avgAttendance >= 85 ? '#10b981' : '#f59e0b'};"></span>${avgAttendance}% Attendance Today
+            </span>
+            <button class="btn btn-sm" style="background:var(--primary);color:#fff;border:none;height:32px;font-size:12px;" data-action="navigate" data-route="school-intelligence"><span class="material-symbols-outlined" style="font-size:16px;">analytics</span> Insights</button>
+          </div>
+        </div>
+
+        <div class="metrics-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px;">
+          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-green" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">groups</span></div><div class="metric-info"><h2 style="font-size:20px;">${schoolStudents.length}</h2><p>Total Students</p></div></div>
+          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-blue" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">person_play</span></div><div class="metric-info"><h2 style="font-size:20px;">${Math.min(schoolStudents.length, 5)}</h2><p>Active Today</p></div></div>
+          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-red" style="width:36px;height:36px;background:#fef2f2;"><span class="material-symbols-outlined" style="font-size:18px;color:#ef4444;">warning</span></div><div class="metric-info"><h2 style="font-size:20px;color:#ef4444;">${atRiskStudents.length}</h2><p>Need Attention</p></div></div>
+          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-purple" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">badge</span></div><div class="metric-info"><h2 style="font-size:20px;">${schoolCounselors.length}</h2><p>Counselors</p></div></div>
+          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-orange" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">school</span></div><div class="metric-info"><h2 style="font-size:20px;">${schoolCourses.length}</h2><p>Courses</p></div></div>
+          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-blue" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">video_library</span></div><div class="metric-info"><h2 style="font-size:20px;">${content.length}</h2><p>Videos</p></div></div>
+          <div class="metric-card" style="padding:14px;"><div class="metric-icon" style="width:36px;height:36px;background:#f0fdf4;"><span class="material-symbols-outlined" style="font-size:18px;color:#10b981;">check_circle</span></div><div class="metric-info"><h2 style="font-size:20px;">${completionRate}%</h2><p>Completion</p></div></div>
+          <div class="metric-card" style="padding:14px;"><div class="metric-icon" style="width:36px;height:36px;background:#eff6ff;"><span class="material-symbols-outlined" style="font-size:18px;color:#3b82f6;">assignment</span></div><div class="metric-info"><h2 style="font-size:20px;">${schoolEnrollments.length}</h2><p>Enrollments</p></div></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+          <div class="card" style="padding:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <h3 style="margin:0;font-size:14px;font-weight:600;">Quick Actions</h3>
+              <span style="font-size:11px;color:var(--text-muted);">What would you like to do?</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-students"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">person_add</span> Add Student</button>
+              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-courses"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">playlist_add</span> New Course</button>
+              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-assignments"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">assignment</span> Assign Course</button>
+              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-reports"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">bar_chart</span> View Reports</button>
+              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-categories"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">category</span> Categories</button>
+              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-videos"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">video_library</span> Videos</button>
+              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-notifications"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">notifications</span> Notifications${schoolNotifications.filter(n => !n.is_read).length ? `<span style="background:var(--danger);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;">${schoolNotifications.filter(n => !n.is_read).length}</span>` : ''}</button>
+              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-intelligence"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">analytics</span> Intelligence</button>
+            </div>
+          </div>
+
+          <div class="card" style="padding:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <h3 style="margin:0;font-size:14px;font-weight:600;">Today's Summary</h3>
+              <span style="font-size:11px;color:var(--text-muted);">${schoolStudents.length} students</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="padding:10px;background:#f0fdf4;border-radius:8px;text-align:center;">
+                <div style="font-size:18px;font-weight:700;color:#10b981;">${avgAttendance}%</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Attendance</div>
+              </div>
+              <div style="padding:10px;background:#eff6ff;border-radius:8px;text-align:center;">
+                <div style="font-size:18px;font-weight:700;color:#3b82f6;">${schoolEnrollments.filter(e => e.status === 'completed').length}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Completed</div>
+              </div>
+              <div style="padding:10px;background:#f5f3ff;border-radius:8px;text-align:center;">
+                <div style="font-size:18px;font-weight:700;color:#8b5cf6;">${recentContent.length}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">New Videos</div>
+              </div>
+              <div style="padding:10px;background:#fffbeb;border-radius:8px;text-align:center;">
+                <div style="font-size:18px;font-weight:700;color:#f59e0b;">${schoolNotifications.filter(n => !n.is_read).length}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Notifications</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
+          <div class="card" style="padding:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <h3 style="margin:0;font-size:14px;font-weight:600;">Latest Enrollments</h3>
+              <button class="btn btn-ghost btn-sm" style="font-size:11px;height:28px;" data-action="navigate" data-route="school-assignments">View All</button>
+            </div>
+            ${recentEnrollments.length === 0 ? `<div class="empty-state" style="padding:24px;"><span class="material-symbols-outlined" style="font-size:32px;">assignment</span><h3 style="font-size:14px;">No enrollments yet</h3></div>`
+            : `<div style="display:flex;flex-direction:column;">${recentEnrollments.map(e => {
+              const student = schoolStudents.find(s => s.id === e.student_id);
+              const course = schoolCourses.find(c => c.id === e.course_id);
+              return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);">
+                <div style="width:28px;height:28px;border-radius:50%;background:var(--primary)12;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--primary);flex-shrink:0;">${AppUtils.getInitials(student?.name || '')}</div>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:13px;font-weight:500;">${student?.name || 'Unknown'} → ${course?.name || 'Unknown'}</div>
+                  <div style="font-size:11px;color:var(--text-secondary);">${e.status}</div>
+                </div>
+                <span class="status-badge ${e.status === 'active' ? 'status-active' : e.status === 'completed' ? 'status-active' : 'status-suspended'}" style="font-size:10px;">${e.status}</span>
+              </div>`;
+            }).join('')}</div>`}
+          </div>
+
+          <div class="card" style="padding:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <h3 style="margin:0;font-size:14px;font-weight:600;">Recent Notifications</h3>
+              <button class="btn btn-ghost btn-sm" style="font-size:11px;height:28px;" data-action="navigate" data-route="school-notifications">View All</button>
+            </div>
+            ${schoolNotifications.length === 0 ? `<div class="empty-state" style="padding:24px;"><span class="material-symbols-outlined" style="font-size:32px;">notifications</span><h3 style="font-size:14px;">No notifications</h3></div>`
+            : `<div style="display:flex;flex-direction:column;">${schoolNotifications.slice(0, 5).map(n => `
+              <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border-light);${!n.is_read ? '' : 'opacity:0.6;'}">
+                <span class="material-symbols-outlined" style="font-size:16px;color:${!n.is_read ? 'var(--primary)' : 'var(--text-muted)'};">${!n.is_read ? 'notifications_active' : 'notifications'}</span>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:12px;font-weight:${!n.is_read ? '600' : '400'};">${n.title}</div>
+                  <div style="font-size:11px;color:var(--text-secondary);">${n.message || ''}</div>
+                </div>
+              </div>`).join('')}</div>`}
+          </div>
+        </div>
+      </div>`;
+      initIcons();
+      return;
+    }
+
+    if (this.currentRoute === 'school-categories') {
+      const cats = data.categories.filter(c => c.school_id === schoolId);
+      main.innerHTML = `<div class="fade-in">
+        <div class="page-header">
+          <div class="page-header-left">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
+              <span style="font-size:12px;color:var(--text-secondary);">${schoolName}</span>
+            </div>
+            <h1 class="page-title">Categories</h1>
+            <p class="page-subtitle">Manage grade levels and classes for ${schoolName}.</p>
+          </div>
+          <button class="btn btn-primary" data-action="add-category"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add Category</button>
+        </div>
+        <div class="management-bar" style="margin-bottom:16px;">
+          <div class="search-bar" style="max-width:280px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="cat-search" placeholder="Search categories..." data-action="cat-search-input"></div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div class="table-container"><table><thead><tr><th>Name</th><th>Subjects</th><th>Created</th><th style="width:120px;"></th></tr></thead><tbody>
+            ${cats.length === 0 ? `<tr><td colspan="4"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">folder</span><h3>No categories yet</h3><p>Create your first category.</p></div></td></tr>`
+            : cats.map(c => {
+              const count = data.subjects.filter(s => s.category_id === c.id).length;
+              return `<tr><td><div class="font-semibold">${c.name}</div></td><td>${count}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.created_at)}</td>
+                <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
+                  <button class="btn btn-ghost btn-sm" data-action="open-category" data-id="${c.id}" title="Open"><span class="material-symbols-outlined" style="font-size:16px;">open_in_new</span></button>
+                  <button class="btn btn-ghost btn-sm" data-action="edit-category" data-id="${c.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
+                  <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-category" data-id="${c.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
+                </td></tr>`;
+            }).join('')}
+          </tbody></table></div>
+        </div>
+      </div>`;
+      initIcons();
+      return;
+    }
+
+    if (this.currentRoute === 'school-subjects') {
+      const catId = this._selectedCategoryId;
+      const subjects = catId ? data.subjects.filter(s => s.category_id === catId) : data.subjects.filter(s => s.school_id === schoolId);
+      const cats = data.categories.filter(c => c.school_id === schoolId);
+      main.innerHTML = `<div class="fade-in">
+        <div class="page-header">
+          <div class="page-header-left">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-categories"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
+              <span style="font-size:12px;color:var(--text-secondary);">${schoolName} / ${catId ? (cats.find(c => c.id === catId)?.name || '') : 'Subjects'}</span>
+            </div>
+            <h1 class="page-title">Subjects</h1>
+            <p class="page-subtitle">Manage subjects within ${schoolName}.</p>
+          </div>
+          <button class="btn btn-primary" data-action="add-subject"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add Subject</button>
+        </div>
+        <div class="management-bar" style="margin-bottom:16px;">
+          <div class="search-bar" style="max-width:280px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="subject-search" placeholder="Search subjects..." data-action="subject-search-input"></div>
+          <select class="form-select" id="subject-category-filter" style="width:160px;height:40px;font-size:13px;">
+            <option value="">All Categories</option>
+            ${cats.map(c => `<option value="${c.id}" ${c.id === catId ? 'selected' : ''}>${c.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div class="table-container"><table><thead><tr><th>Name</th><th>Category</th><th>Sections</th><th>Created</th><th style="width:120px;"></th></tr></thead><tbody>
+            ${subjects.length === 0 ? `<tr><td colspan="5"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">auto_stories</span><h3>No subjects yet</h3><p>Create your first subject.</p></div></td></tr>`
+            : subjects.map(s => {
+              const cat = cats.find(c => c.id === s.category_id);
+              const secCount = data.sections.filter(sec => sec.subject_id === s.id).length;
+              return `<tr><td><div class="font-semibold">${s.name}</div></td><td style="font-size:13px;">${cat?.name || '—'}</td><td>${secCount}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(s.created_at)}</td>
+                <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
+                  <button class="btn btn-ghost btn-sm" data-action="open-subject" data-id="${s.id}" title="Open"><span class="material-symbols-outlined" style="font-size:16px;">open_in_new</span></button>
+                  <button class="btn btn-ghost btn-sm" data-action="edit-subject" data-id="${s.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
+                  <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-subject" data-id="${s.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
+                </td></tr>`;
+            }).join('')}
+          </tbody></table></div>
+        </div>
+      </div>`;
+      initIcons();
+      return;
+    }
+
+    if (this.currentRoute === 'school-sections') {
+      const subjId = this._selectedSubjectId;
+      const sections = subjId ? data.sections.filter(s => s.subject_id === subjId) : data.sections.filter(s => s.school_id === schoolId);
+      const subjects = data.subjects.filter(s => s.school_id === schoolId);
+      const cats = data.categories.filter(c => c.school_id === schoolId);
+      main.innerHTML = `<div class="fade-in">
+        <div class="page-header">
+          <div class="page-header-left">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-subjects"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
+              <span style="font-size:12px;color:var(--text-secondary);">${schoolName} / ${subjId ? (subjects.find(s => s.id === subjId)?.name || '') : 'Sections'}</span>
+            </div>
+            <h1 class="page-title">Sections</h1>
+            <p class="page-subtitle">Manage sections within ${schoolName}.</p>
+          </div>
+          <button class="btn btn-primary" data-action="add-section"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add Section</button>
+        </div>
+        <div class="management-bar" style="margin-bottom:16px;">
+          <div class="search-bar" style="max-width:280px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="section-search" placeholder="Search sections..." data-action="section-search-input"></div>
+          <select class="form-select" id="section-subject-filter" style="width:160px;height:40px;font-size:13px;">
+            <option value="">All Subjects</option>
+            ${subjects.map(s => `<option value="${s.id}" ${s.id === subjId ? 'selected' : ''}>${s.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div class="table-container"><table><thead><tr><th>Name</th><th>Subject</th><th>Category</th><th>Content</th><th>Created</th><th style="width:80px;"></th></tr></thead><tbody>
+            ${sections.length === 0 ? `<tr><td colspan="6"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">folder</span><h3>No sections yet</h3><p>Create your first section.</p></div></td></tr>`
+            : sections.map(sec => {
+              const subj = subjects.find(s => s.id === sec.subject_id);
+              const cat = cats.find(c => c.id === subj?.category_id);
+              const conCount = data.content.filter(c => c.section_id === sec.id).length;
+              return `<tr><td><div class="font-semibold">${sec.name}</div></td><td style="font-size:13px;">${subj?.name || '—'}</td><td style="font-size:13px;color:var(--text-secondary);">${cat?.name || '—'}</td><td>${conCount}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(sec.created_at)}</td>
+                <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
+                  <button class="btn btn-ghost btn-sm" data-action="edit-section" data-id="${sec.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
+                  <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-section" data-id="${sec.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
+                </td></tr>`;
+            }).join('')}
+          </tbody></table></div>
+        </div>
+      </div>`;
+      initIcons();
+      return;
+    }
+
+    // School Portal routes (delegated to school-portal.js modules)
+    if (this.currentRoute === 'school-students') {
+      window.SchoolStudents.render(main, data, school);
+      return;
+    }
+    if (this.currentRoute === 'school-counselors') {
+      window.SchoolCounselors.render(main, data, school);
+      return;
+    }
+    if (this.currentRoute === 'school-courses') {
+      window.SchoolCourses.render(main, data, school);
+      return;
+    }
+    if (this.currentRoute === 'school-videos') {
+      window.SchoolVideos.render(main, data, school);
+      return;
+    }
+    if (this.currentRoute === 'school-assignments') {
+      window.SchoolAssignments.render(main, data, school);
+      return;
+    }
+    if (this.currentRoute === 'school-reports') {
+      window.SchoolReports.render(main, data, school);
+      return;
+    }
+    if (this.currentRoute === 'school-notifications') {
+      window.SchoolNotifications.render(main, data, school);
+      return;
+    }
+    if (this.currentRoute === 'school-settings') {
+      window.SchoolSettings.render(main, data, school);
+      return;
+    }
+    if (this.currentRoute === 'school-profile') {
+      window.SchoolProfile.render(main, data, school);
+      return;
+    }
+
+    main.innerHTML = `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">school</span><h3>School Workspace</h3><p>Navigate using the sidebar.</p></div>`;
+    initIcons();
   },
 
   // --- CONTENT MANAGER ---
@@ -414,38 +828,9 @@ window.AppRouter = {
     initIcons();
   },
 
-  // --- SCHOOL ADMINS ---
+  // --- USER MANAGEMENT ---
   async renderSchoolAdmins(main) {
-    const data = await AppStorage.load();
-    let admins = data.users.filter(u => u.role === 'school_admin').map(u => {
-      const school = data.schools.find(s => s.id === u.schoolId);
-      return { ...u, schoolName: school?.name || '—', schoolCode: school?.code || '—', schoolStatus: school?.status || 'inactive' };
-    });
-    main.innerHTML = `<div class="fade-in">
-      <div class="page-header">
-        <div class="page-header-left"><h1 class="page-title">School Admins</h1><p class="page-subtitle">Manage school administrators across all schools.</p></div>
-        <div class="search-bar" style="max-width:260px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="admin-search" placeholder="Search admins..." data-action="admin-search"></div>
-      </div>
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div id="admin-table-container">${admins.length === 0
-          ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">manage_accounts</span><h3>No school admins yet</h3><p>Admins are created automatically when you add a new school.</p></div>`
-          : `<div class="table-container"><table><thead><tr><th>Name</th><th>Email</th><th>School</th><th>Code</th><th>Status</th><th style="width:100px;"></th></tr></thead><tbody>${admins.map(a => {
-              return `<tr>
-                <td><div class="flex-center gap-12" style="justify-content:flex-start;"><div class="user-avatar" style="width:32px;height:32px;font-size:11px;">${AppUtils.getInitials(a.name)}</div><div class="font-semibold">${a.name}</div></div></td>
-                <td style="font-size:13px;">${a.email}</td>
-                <td style="font-size:13px;">${a.schoolName}</td>
-                <td style="font-size:13px;color:var(--text-secondary);">${a.schoolCode}</td>
-                <td><span class="status-badge ${a.schoolStatus === 'active' ? 'status-active' : 'status-suspended'}">${a.schoolStatus === 'active' ? 'Active' : 'Suspended'}</span></td>
-                <td class="td-actions">
-                  <button class="btn btn-ghost btn-sm" data-action="edit-admin" data-id="${a.id}" style="height:32px;padding:0 10px;font-size:12px;"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button>
-                  <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-admin" data-id="${a.id}" data-school-id="${a.schoolId}" style="height:32px;padding:0 10px;font-size:12px;"><span class="material-symbols-outlined" style="font-size:18px;">delete</span></button>
-                </td>
-              </tr>`;
-            }).join('')}</tbody></table></div>`
-        }</div>
-      </div>
-    </div>`;
-    initIcons();
+    await AppUserManagement.render(main);
   },
 
   // --- ROLES & PERMISSIONS ---
@@ -595,33 +980,62 @@ window.AppRouter = {
   async renderCompanyDashboard(main) {
     const data = await AppStorage.load();
     const counts = await AppUtils.getTotalCounts();
-    const recentContent = data.content.slice(0, 10);
+    const recentContent = data.content.slice(0, 8);
+    const recentLogs = (data.auditLog || []).sort((a, b) => (new Date(b.created_at) - new Date(a.created_at))).slice(0, 5);
     main.innerHTML = `<div class="fade-in">
       <div class="page-header">
-        <div class="page-header-left"><h1 class="page-title">Dashboard</h1><p class="page-subtitle">Overview of the LANXGROW platform.</p></div>
+        <div class="page-header-left"><h1 class="page-title">Dashboard</h1><p class="page-subtitle">Platform overview at a glance.</p></div>
       </div>
       <div class="metrics-grid">
-        <div class="metric-card">
+        <div class="metric-card" data-action="navigate" data-route="schools" style="cursor:pointer;">
           <div class="metric-icon metric-icon-blue"><span class="material-symbols-outlined">business</span></div>
           <div class="metric-info"><h2>${counts.schools}</h2><p>Schools</p></div>
         </div>
-        <div class="metric-card">
-          <div class="metric-icon metric-icon-green"><span class="material-symbols-outlined">folder</span></div>
+        <div class="metric-card" data-action="navigate" data-route="content-manager" style="cursor:pointer;">
+          <div class="metric-icon metric-icon-green"><span class="material-symbols-outlined">category</span></div>
           <div class="metric-info"><h2>${counts.categories}</h2><p>Categories</p></div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card" data-action="navigate" data-route="content-manager" style="cursor:pointer;">
           <div class="metric-icon metric-icon-purple"><span class="material-symbols-outlined">auto_stories</span></div>
           <div class="metric-info"><h2>${counts.subjects}</h2><p>Subjects</p></div>
         </div>
-        <div class="metric-card">
+        <div class="metric-card" data-action="navigate" data-route="media-library" style="cursor:pointer;">
           <div class="metric-icon metric-icon-orange"><span class="material-symbols-outlined">videocam</span></div>
           <div class="metric-info"><h2>${counts.content}</h2><p>Content Items</p></div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-header"><h3 class="card-title">Recent Content</h3></div>
-        ${recentContent.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">video_library</span><h3>No content yet</h3><p>Content will appear here once added.</p></div>`
-        : `<div class="table-container"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Updated</th></tr></thead><tbody>${recentContent.map(c => `<tr><td><div class="font-semibold">${c.name}</div></td><td style="font-size:13px;">${c.type}</td><td><span class="status-badge ${c.status === 'published' ? 'status-active' : c.status === 'draft' ? 'status-suspended' : 'status-pending'}">${c.status}</span></td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.updated_at)}</td></tr>`).join('')}</tbody></table></div>`}
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Recent Content</h3></div>
+          ${recentContent.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">video_library</span><h3>No content yet</h3><p>Content will appear here once added.</p></div>`
+          : `<div class="table-container"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Updated</th></tr></thead><tbody>${recentContent.map(c => {
+            const typeIcon = { Video: 'videocam', PDF: 'description', Image: 'image', Document: 'description' };
+            return `<tr>
+              <td><div style="display:flex;align-items:center;gap:8px;"><span class="material-symbols-outlined" style="font-size:16px;color:var(--text-muted);">${typeIcon[c.type] || 'insert_drive_file'}</span><span class="font-semibold">${c.name}</span></div></td>
+              <td><span class="status-badge" style="background:var(--primary-subtle);color:var(--primary);">${c.type}</span></td>
+              <td><span class="status-badge ${c.status === 'published' ? 'status-active' : c.status === 'draft' ? 'status-suspended' : 'status-pending'}">${c.status}</span></td>
+              <td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.updated_at)}</td>
+            </tr>`;
+          }).join('')}</tbody></table></div>`}
+          <div style="padding:12px 0 0;text-align:right;">
+            <button class="btn btn-secondary btn-sm" data-action="navigate" data-route="content-manager">View All</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Recent Activity</h3></div>
+          ${recentLogs.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">history</span><h3>No activity yet</h3></div>`
+          : `<div style="display:flex;flex-direction:column;gap:0;">${recentLogs.map(l => {
+            const actionColors = { created: '#10b981', edited: '#3b82f6', uploaded: '#8b5cf6', deleted: '#ef4444', suspended: '#f59e0b' };
+            return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+              <div style="width:8px;height:8px;border-radius:50%;background:${actionColors[l.action] || '#94a3b8'};margin-top:6px;flex-shrink:0;"></div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:500;color:var(--on-surface);">${l.user_name}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">${l.action} ${l.entity} — ${l.entity_name}</div>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${AppUtils.formatDate(l.created_at)}</div>
+            </div>`;
+          }).join('')}</div>`}
+        </div>
       </div>
     </div>`;
     initIcons();
@@ -700,6 +1114,186 @@ window.AppSchools = {
 };
 
 // ==============================================================
+// USER MANAGEMENT MODULE (Sprint 2.3)
+// ==============================================================
+window.AppUserManagement = {
+  currentTab: 'all',
+  currentPage: 1,
+  perPage: 20,
+  searchQuery: '',
+
+  async render(main) {
+    const data = await AppStorage.load();
+    const q = this.searchQuery.toLowerCase();
+
+    let users = data.users.map(u => {
+      const school = data.schools.find(s => s.id === u.schoolId);
+      return { ...u, schoolName: school?.name || '—', schoolStatus: school?.status || 'inactive' };
+    });
+
+    if (this.currentTab === 'super_admin') users = users.filter(u => u.role === 'super_admin');
+    else if (this.currentTab === 'school_admin') users = users.filter(u => u.role === 'school_admin');
+
+    if (q) users = users.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+
+    const startIdx = (this.currentPage - 1) * this.perPage;
+    const pageUsers = users.slice(startIdx, startIdx + this.perPage);
+    const totalPages = Math.max(1, Math.ceil(users.length / this.perPage));
+
+    main.innerHTML = `<div class="fade-in">
+      <div class="page-header">
+        <div class="page-header-left"><h1 class="page-title">User Management</h1><p class="page-subtitle">Manage all platform users and their roles.</p></div>
+        <button class="btn btn-primary" data-action="add-user"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span> Add User</button>
+      </div>
+      <div class="tab-bar" style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);background:transparent;">
+        ${['all', 'super_admin', 'school_admin'].map(t => `
+          <button class="tab-item ${this.currentTab === t ? 'active' : ''}" data-action="um-tab" data-tab="${t}" style="padding:10px 20px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid ${this.currentTab === t ? 'var(--primary)' : 'transparent'};color:${this.currentTab === t ? 'var(--text)' : 'var(--text-secondary)'};">
+            ${t === 'all' ? 'All Users' : t === 'super_admin' ? 'Super Admins' : 'School Admins'}
+            <span style="margin-left:6px;font-size:11px;color:var(--text-muted);">(${users.length})</span>
+          </button>
+        `).join('')}
+      </div>
+      <div class="management-bar" style="margin-bottom:16px;">
+        <div class="search-bar" style="max-width:280px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="um-search" placeholder="Search users..." value="${this.searchQuery}" data-action="um-search-input"></div>
+        <select class="form-select" id="um-role-filter" style="width:160px;height:40px;font-size:13px;" data-action="um-filter-role">
+          <option value="">All Roles</option>
+          <option value="super_admin" ${this.currentTab === 'super_admin' ? 'selected' : ''}>Super Admin</option>
+          <option value="school_admin" ${this.currentTab === 'school_admin' ? 'selected' : ''}>School Admin</option>
+        </select>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        ${users.length === 0
+          ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">manage_accounts</span><h3>No users found</h3><p>${q ? 'Try a different search term.' : 'No users match this filter.'}</p></div>`
+          : `<div class="table-container"><table><thead><tr>
+              <th style="width:32px;"><input type="checkbox" id="um-select-all" style="width:16px;height:16px;cursor:pointer;"></th>
+              <th>User</th>
+              <th>Role</th>
+              <th>School</th>
+              <th>Status</th>
+              <th style="width:140px;"></th>
+            </tr></thead><tbody>${pageUsers.map(u => {
+              const isActive = u.schoolStatus === 'active';
+              return `<tr>
+                <td><input type="checkbox" class="um-row-check" data-id="${u.id}" style="width:16px;height:16px;cursor:pointer;"></td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <div class="user-avatar" style="width:32px;height:32px;font-size:11px;">${AppUtils.getInitials(u.name)}</div>
+                    <div>
+                      <div class="font-semibold" style="font-size:13px;">${u.name}</div>
+                      <div style="font-size:12px;color:var(--text-secondary);">${u.email || '—'}</div>
+                    </div>
+                  </div>
+                </td>
+                <td><span class="status-badge" style="background:${u.role === 'super_admin' ? 'var(--primary-subtle)' : 'var(--warning-light)'};color:${u.role === 'super_admin' ? 'var(--primary)' : '#92400e'};">${u.role === 'super_admin' ? 'Super Admin' : 'School Admin'}</span></td>
+                <td style="font-size:13px;">${u.schoolName}</td>
+                <td><span class="status-badge ${isActive ? 'status-active' : 'status-suspended'}">${isActive ? 'Active' : 'Suspended'}</span></td>
+                <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
+                  <button class="btn btn-ghost btn-sm" data-action="edit-user" data-id="${u.id}" title="Edit user"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
+                  <button class="btn btn-ghost btn-sm ${isActive ? 'btn-danger-ghost' : ''}" data-action="${isActive ? 'deactivate-user' : 'activate-user'}" data-id="${u.id}" title="${isActive ? 'Deactivate' : 'Activate'}"><span class="material-symbols-outlined" style="font-size:16px;">${isActive ? 'block' : 'check_circle'}</span></button>
+                  <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-user" data-id="${u.id}" title="Delete user"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
+                </td>
+              </tr>`;
+            }).join('')}</tbody></table></div>`
+        }
+      </div>
+      ${totalPages > 1 ? `<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:16px;">
+        <button class="btn btn-secondary btn-sm" data-action="um-page" data-page="${this.currentPage - 1}" ${this.currentPage <= 1 ? 'disabled' : ''} style="height:34px;font-size:12px;">Previous</button>
+        ${Array.from({length: totalPages}, (_, i) => i + 1).map(p => `
+          <button class="btn ${p === this.currentPage ? 'btn-primary' : 'btn-secondary'} btn-sm" data-action="um-page" data-page="${p}" style="height:34px;min-width:34px;font-size:12px;">${p}</button>
+        `).join('')}
+        <button class="btn btn-secondary btn-sm" data-action="um-page" data-page="${this.currentPage + 1}" ${this.currentPage >= totalPages ? 'disabled' : ''} style="height:34px;font-size:12px;">Next</button>
+      </div>` : ''}
+    </div>`;
+    initIcons();
+  },
+
+  switchTab(tab) {
+    this.currentTab = tab;
+    this.currentPage = 1;
+    this.searchQuery = '';
+    AppRouter.render();
+  },
+
+  async filter() {
+    const q = (document.getElementById('um-search')?.value || '').trim();
+    this.searchQuery = q;
+    this.currentPage = 1;
+    AppRouter.render();
+  },
+
+  async openEditModal(userId) {
+    const data = await AppStorage.load();
+    const user = data.users.find(u => u.id === userId);
+    if (!user) return;
+    const existing = document.getElementById('modal-edit-user');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'modal-edit-user';
+    overlay.innerHTML = `<div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Edit User</h3>
+        <button class="modal-close" data-close-modal="modal-edit-user"><span class="material-symbols-outlined">close</span></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">User Name</label>
+          <input type="text" class="form-input" id="edit-user-name" value="${user.name}" placeholder="Enter user name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-input" value="${user.email || ''}" disabled style="color:var(--text-muted);">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Email cannot be changed.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <input type="text" class="form-input" value="${user.role === 'super_admin' ? 'Super Admin' : 'School Admin'}" disabled style="color:var(--text-muted);">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close-modal="modal-edit-user">Cancel</button>
+        <button class="btn btn-primary" data-action="save-edit-user" data-id="${user.id}" id="btn-save-edit-user">Save Changes</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.classList.add('active');
+    document.addEventListener('keydown', AppModal._keyHandler);
+    setTimeout(() => document.getElementById('edit-user-name')?.focus(), 100);
+  },
+
+  async saveEditUser(userId) {
+    const nameInput = document.getElementById('edit-user-name');
+    if (!nameInput) return;
+    const name = nameInput.value.trim();
+    if (!name) { AppToast.show('Name is required.', 'error'); return; }
+    const btn = document.getElementById('btn-save-edit-user');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...'; }
+    try {
+      const { error } = await supabase.from('profiles').update({ name }).eq('id', userId);
+      if (error) throw error;
+      AppToast.show('User name updated.', 'success');
+      AppModal.close('modal-edit-user');
+      AppRouter.render();
+    } catch (err) {
+      AppToast.show(err.message || 'Failed to update user.', 'error');
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
+  },
+
+  async confirmDeactivate(userId) {
+    AppToast.show('User deactivation requires a profile status field (planned migration).', 'info');
+  },
+
+  async confirmActivate(userId) {
+    AppToast.show('User activation requires a profile status field (planned migration).', 'info');
+  },
+
+  async confirmDelete(userId) {
+    AppToast.show('User account deletion requires the invite-admin Edge Function (planned).', 'info');
+  }
+};
+
+// ==============================================================
 // CATEGORIES CRUD MODULE
 // ==============================================================
 window.AppCategories = {
@@ -707,8 +1301,8 @@ window.AppCategories = {
     document.getElementById('entity-type').value = 'category';
     document.getElementById('entity-id').value = '';
     document.querySelectorAll('.entity-fields').forEach(el => el.style.display = 'none');
-    document.getElementById('entity-fields-name-only').style.display = 'block';
-    document.getElementById('input-name').value = '';
+    document.getElementById('entity-fields-category').style.display = 'block';
+    document.getElementById('input-name-cat').value = '';
     document.getElementById('modal-title').textContent = 'Add Category';
     AppModal.open('modal-entity');
   },
@@ -719,8 +1313,8 @@ window.AppCategories = {
     document.getElementById('entity-type').value = 'category';
     document.getElementById('entity-id').value = id;
     document.querySelectorAll('.entity-fields').forEach(el => el.style.display = 'none');
-    document.getElementById('entity-fields-name-only').style.display = 'block';
-    document.getElementById('input-name').value = cat.name;
+    document.getElementById('entity-fields-category').style.display = 'block';
+    document.getElementById('input-name-cat').value = cat.name;
     document.getElementById('modal-title').textContent = 'Edit Category';
     AppModal.open('modal-entity');
   },
@@ -762,8 +1356,13 @@ window.AppSubjects = {
     document.getElementById('entity-type').value = 'subject';
     document.getElementById('entity-id').value = '';
     document.querySelectorAll('.entity-fields').forEach(el => el.style.display = 'none');
-    document.getElementById('entity-fields-name-only').style.display = 'block';
-    document.getElementById('input-name').value = '';
+    document.getElementById('entity-fields-subject').style.display = 'block';
+    document.getElementById('input-subject-name').value = '';
+    const data = await AppStorage.load();
+    const catSelect = document.getElementById('input-subject-category');
+    const schoolId = AppRouter.currentSchoolId;
+    const cats = data.categories.filter(c => c.school_id === schoolId);
+    catSelect.innerHTML = `<option value="">Choose...</option>${cats.map(c => `<option value="${c.id}" ${c.id === categoryId ? 'selected' : ''}>${c.name}</option>`).join('')}`;
     document.getElementById('modal-title').textContent = 'Add Subject';
     AppModal.open('modal-entity');
   },
@@ -774,8 +1373,12 @@ window.AppSubjects = {
     document.getElementById('entity-type').value = 'subject';
     document.getElementById('entity-id').value = id;
     document.querySelectorAll('.entity-fields').forEach(el => el.style.display = 'none');
-    document.getElementById('entity-fields-name-only').style.display = 'block';
-    document.getElementById('input-name').value = subj.name;
+    document.getElementById('entity-fields-subject').style.display = 'block';
+    document.getElementById('input-subject-name').value = subj.name;
+    const catSelect = document.getElementById('input-subject-category');
+    const schoolId = AppRouter.currentSchoolId;
+    const cats = data.categories.filter(c => c.school_id === schoolId);
+    catSelect.innerHTML = `<option value="">Choose...</option>${cats.map(c => `<option value="${c.id}" ${c.id === subj.category_id ? 'selected' : ''}>${c.name}</option>`).join('')}`;
     document.getElementById('modal-title').textContent = 'Edit Subject';
     AppModal.open('modal-entity');
   },
@@ -820,8 +1423,13 @@ window.AppSections = {
     document.getElementById('entity-type').value = 'section';
     document.getElementById('entity-id').value = '';
     document.querySelectorAll('.entity-fields').forEach(el => el.style.display = 'none');
-    document.getElementById('entity-fields-name-only').style.display = 'block';
-    document.getElementById('input-name').value = '';
+    document.getElementById('entity-fields-section').style.display = 'block';
+    document.getElementById('input-section-name').value = '';
+    const data = await AppStorage.load();
+    const subjSelect = document.getElementById('input-section-subject');
+    const schoolId = AppRouter.currentSchoolId;
+    const subjects = data.subjects.filter(s => s.school_id === schoolId);
+    subjSelect.innerHTML = `<option value="">Choose...</option>${subjects.map(s => `<option value="${s.id}" ${s.id === subjectId ? 'selected' : ''}>${s.name}</option>`).join('')}`;
     document.getElementById('modal-title').textContent = 'Add Section';
     AppModal.open('modal-entity');
   },
@@ -832,8 +1440,12 @@ window.AppSections = {
     document.getElementById('entity-type').value = 'section';
     document.getElementById('entity-id').value = id;
     document.querySelectorAll('.entity-fields').forEach(el => el.style.display = 'none');
-    document.getElementById('entity-fields-name-only').style.display = 'block';
-    document.getElementById('input-name').value = sec.name;
+    document.getElementById('entity-fields-section').style.display = 'block';
+    document.getElementById('input-section-name').value = sec.name;
+    const subjSelect = document.getElementById('input-section-subject');
+    const schoolId = AppRouter.currentSchoolId;
+    const subjects = data.subjects.filter(s => s.school_id === schoolId);
+    subjSelect.innerHTML = `<option value="">Choose...</option>${subjects.map(s => `<option value="${s.id}" ${s.id === sec.subject_id ? 'selected' : ''}>${s.name}</option>`).join('')}`;
     document.getElementById('modal-title').textContent = 'Edit Section';
     AppModal.open('modal-entity');
   },
@@ -1245,7 +1857,7 @@ async function handleEntitySubmit() {
         AppToast.show('School created.', 'success');
       }
     } else if (type === 'category') {
-      const name = document.getElementById('input-name').value.trim();
+      const name = document.getElementById('input-name-cat').value.trim();
       if (!name) { AppToast.show('Name is required.', 'error'); return; }
       if (isEdit) {
         await CategoryService.update(id, { name });
@@ -1255,24 +1867,25 @@ async function handleEntitySubmit() {
         AppToast.show('Category created.', 'success');
       }
     } else if (type === 'subject') {
-      const name = document.getElementById('input-name').value.trim();
+      const name = document.getElementById('input-subject-name').value.trim();
       if (!name) { AppToast.show('Name is required.', 'error'); return; }
-      const catId = AppRouter._selectedCategoryId;
+      const catId = document.getElementById('input-subject-category').value || AppRouter._selectedCategoryId;
       if (isEdit) {
-        await SubjectService.update(id, { name });
+        await SubjectService.update(id, { name, categoryId: catId });
         AppToast.show('Subject updated.', 'success');
       } else {
         await SubjectService.create({ name, schoolId: AppRouter.currentSchoolId, categoryId: catId });
         AppToast.show('Subject created.', 'success');
       }
     } else if (type === 'section') {
-      const name = document.getElementById('input-name').value.trim();
+      const name = document.getElementById('input-section-name').value.trim();
       if (!name) { AppToast.show('Name is required.', 'error'); return; }
+      const subjectId = document.getElementById('input-section-subject').value || AppRouter._selectedSubjectId;
       if (isEdit) {
         await SectionService.update(id, { name });
         AppToast.show('Section updated.', 'success');
       } else {
-        await SectionService.create({ name, schoolId: AppRouter.currentSchoolId, subjectId: AppRouter._selectedSubjectId });
+        await SectionService.create({ name, schoolId: AppRouter.currentSchoolId, subjectId });
         AppToast.show('Section created.', 'success');
       }
     } else if (type === 'content') {
@@ -1321,7 +1934,10 @@ document.addEventListener('click', async function (e) {
 
   if (action === 'navigate') {
     const companyRoutes = ['content-manager','drive-manager','media-library','school-admins','roles-permissions','company-settings','audit-log'];
-    if (route === 'school-dashboard' || route === 'school-categories' || route === 'school-subjects') {
+    const schoolRoutes = ['school-dashboard','school-categories','school-subjects','school-sections',
+      'school-students','school-counselors','school-courses','school-videos',
+      'school-assignments','school-reports','school-notifications','school-settings','school-profile'];
+    if (schoolRoutes.includes(route)) {
       AppRouter.navigate(route, { schoolId: AppRouter.currentSchoolId });
     } else if (companyRoutes.includes(route)) {
       AppRouter.currentSchoolId = null;
@@ -1346,10 +1962,10 @@ document.addEventListener('click', async function (e) {
   if (action === 'open-category') { AppRouter.navigate('school-subjects', { schoolId: AppRouter.currentSchoolId, categoryId: id }); return; }
 
   // Subjects
-  if (action === 'add-subject') { AppCategories.openCreate(); return; }
+  if (action === 'add-subject') { AppSubjects.openCreate(AppRouter._selectedCategoryId); return; }
   if (action === 'edit-subject') { AppSubjects.edit(id); return; }
   if (action === 'delete-subject') { AppSubjects.confirmDelete(id); return; }
-  if (action === 'open-subject') { AppRouter._selectedSubjectId = id; AppRouter.navigate('school-sections', { schoolId: AppRouter.currentSchoolId }); return; }
+  if (action === 'open-subject') { AppRouter.navigate('school-sections', { schoolId: AppRouter.currentSchoolId, subjectId: id }); return; }
 
   // Sections
   if (action === 'add-section') { AppSections.openCreate(); return; }
@@ -1364,6 +1980,16 @@ document.addEventListener('click', async function (e) {
   if (action === 'view-content-file') { AppContent.play(id); return; }
 
   // Admin
+  // User Management
+  if (action === 'add-user') { AppToast.show('User invitation requires the invite-admin Edge Function (planned).', 'info'); return; }
+  if (action === 'edit-user') { AppUserManagement.openEditModal(id); return; }
+  if (action === 'save-edit-user') { AppUserManagement.saveEditUser(id); return; }
+  if (action === 'deactivate-user') { AppUserManagement.confirmDeactivate(id); return; }
+  if (action === 'activate-user') { AppUserManagement.confirmActivate(id); return; }
+  if (action === 'delete-user') { AppUserManagement.confirmDelete(id); return; }
+  if (action === 'um-tab') { AppUserManagement.switchTab(el.dataset.tab); return; }
+  if (action === 'um-page') { AppUserManagement.currentPage = parseInt(el.dataset.page); AppUserManagement.render(document.getElementById('main-content')); return; }
+  // Legacy admin handlers (kept for backward compat)
   if (action === 'delete-admin') {
     const schoolId = el.dataset.schoolId;
     document.getElementById('confirm-text').textContent = 'Remove this school admin? The school itself will not be deleted.';
@@ -1375,15 +2001,7 @@ document.addEventListener('click', async function (e) {
     return;
   }
   if (action === 'edit-admin') {
-    const data = await AppStorage.load();
-    const admin = data.users.find(u => u.id === id);
-    if (!admin) return;
-    const newName = prompt('Admin name:', admin.name);
-    if (newName && newName.trim() && newName.trim() !== admin.name) {
-      admin.name = newName.trim();
-      AppToast.show('Admin name updated.', 'success');
-      AppRouter.render();
-    }
+    AppUserManagement.openEditModal(id);
     return;
   }
 
@@ -1512,13 +2130,172 @@ document.addEventListener('click', async function (e) {
 
   // Settings
   if (action === 'settings-tab') { AppRouter.renderSettingsTab(el.dataset.tab); return; }
-  if (action === 'save-settings') { AppToast.show('Settings saved.', 'success'); return; }
-  if (action === 'test-email') { AppToast.show('Test email sent.', 'success'); return; }
+  if (action === 'save-settings') {
+    const container = document.getElementById('settings-content');
+    if (!container) return;
+    const inputs = container.querySelectorAll('[data-action="save-setting"]');
+    const settings = {};
+    inputs.forEach(input => {
+      const key = input.dataset.key;
+      if (!key) return;
+      if (input.type === 'checkbox') settings[key] = input.checked;
+      else if (input.type === 'number') settings[key] = parseFloat(input.value) || 0;
+      else settings[key] = input.value;
+    });
+    try {
+      for (const [key, value] of Object.entries(settings)) {
+        await window.SettingsService.set(key, value);
+      }
+      AppToast.show('Settings saved.', 'success');
+    } catch (err) {
+      AppToast.show(err.message || 'Failed to save settings.', 'error');
+    }
+    return;
+  }
+  if (action === 'test-email') {
+    AppToast.show('Test email feature requires Edge Function (not implemented).', 'info');
+    return;
+  }
+  if (action === 'reset-settings') {
+    if (!confirm('Reset all settings to defaults?')) return;
+    try {
+      await window.SettingsService.reset();
+      AppToast.show('Settings reset to defaults.', 'success');
+      AppRouter.render();
+    } catch (err) {
+      AppToast.show(err.message || 'Failed to reset settings.', 'error');
+    }
+    return;
+  }
 
   // Toggle permissions
   if (action === 'toggle-permission') {
     const key = el.dataset.key;
-    AppToast.show(`${el.checked ? 'Enabled' : 'Disabled'} ${key.replace(/_/g, ' ')}`, 'success');
+    const role = 'school_admin'; // Default role being edited in Company Portal
+    try {
+      await window.PermissionsService.set(role, key, el.checked);
+      AppToast.show(`${el.checked ? 'Enabled' : 'Disabled'} ${key.replace(/_/g, ' ')}`, 'success');
+    } catch (err) {
+      AppToast.show(err.message || 'Failed to update permission.', 'error');
+      el.checked = !el.checked; // Revert on failure
+    }
+    return;
+  }
+
+  // ==============================================================
+  // SCHOOL PORTAL ACTIONS
+  // ==============================================================
+  // Students
+  if (action === 'sp-add-student') {
+    const data = await AppStorage.load();
+    const school = data.schools.find(s => s.id === AppRouter.currentSchoolId);
+    if (school) window.SchoolStudents.openAdd(data, school);
+    return;
+  }
+  if (action === 'sp-save-student') { window.SchoolStudents.save(false, id); return; }
+  if (action === 'sp-update-student') { window.SchoolStudents.save(true, id); return; }
+  if (action === 'sp-edit-student') { window.SchoolStudents.openEdit(id); return; }
+  if (action === 'sp-delete-student') { window.SchoolStudents.confirmDelete(id); return; }
+  if (action === 'sp-confirm-delete-student') {
+    try { await window.StudentService?.delete(id); AppToast.show('Student deleted.', 'success'); AppModal.close('modal-confirm-student'); AppRouter.render(); }
+    catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
+    return;
+  }
+  if (action === 'sp-student-page') { window.SchoolStudents.currentPage = parseInt(el.dataset.page); AppRouter.render(); return; }
+  if (action === 'sp-view-student') { window.SchoolStudents.viewStudent(id); return; }
+  if (action === 'sp-download-profile') { AppToast.show('Download Profile — Available in Production Version', 'info'); return; }
+  if (action === 'sp-print-profile') { AppToast.show('Print — Available in Production Version', 'info'); return; }
+  if (action === 'sp-student-courses') {
+    AppToast.show('Course assignment management will be available in the next update.', 'info');
+    return;
+  }
+
+  // Counselors
+  if (action === 'sp-view-counselor') { window.SchoolCounselors.viewCounselor(id); return; }
+
+  // Courses
+  if (action === 'sp-add-course') { window.SchoolCourses.openAdd(AppRouter.currentSchoolId); return; }
+  if (action === 'sp-save-course') { window.SchoolCourses.save(false, id); return; }
+  if (action === 'sp-update-course') { window.SchoolCourses.save(true, id); return; }
+  if (action === 'sp-edit-course') { window.SchoolCourses.openEdit(id); return; }
+  if (action === 'sp-manage-course') { window.SchoolCourses.manage(id); return; }
+  if (action === 'sp-view-course') { window.SchoolCourses.viewCourse(id); return; }
+  if (action === 'sp-delete-course') { window.SchoolCourses.confirmDelete(id); return; }
+  if (action === 'sp-confirm-delete-course') {
+    try { await window.CourseService?.delete(id); AppToast.show('Course deleted.', 'success'); AppModal.close('modal-confirm-course'); AppRouter.render(); }
+    catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
+    return;
+  }
+  if (action === 'sp-course-page') { window.SchoolCourses.currentPage = parseInt(el.dataset.page); AppRouter.render(); return; }
+  if (action === 'sp-toggle-section') {
+    const courseId = el.dataset.courseId;
+    const sectionId = el.dataset.sectionId;
+    try {
+      if (el.checked) { await window.CourseService?.addSection(courseId, sectionId); AppToast.show('Section added to course.', 'success'); }
+      else { await window.CourseService?.removeSection(courseId, sectionId); AppToast.show('Section removed from course.', 'success'); }
+    } catch (err) { AppToast.show(err.message || 'Failed to update section.', 'error'); el.checked = !el.checked; }
+    return;
+  }
+
+  // Enrollments
+  if (action === 'sp-remove-enrollment') { window.SchoolAssignments.confirmRemoveEnrollment(id); return; }
+  if (action === 'sp-confirm-remove-enrollment') {
+    try { await window.EnrollmentService?.delete(id); AppToast.show('Enrollment removed.', 'success'); AppModal.close('modal-confirm-enrollment'); AppRouter.render(); }
+    catch (err) { AppToast.show(err.message || 'Failed to remove enrollment.', 'error'); }
+    return;
+  }
+
+  // Notifications
+  if (action === 'sp-mark-all-read') {
+    try { const p = await AuthService.getProfile(); if (p) { await window.NotificationService?.markAllAsRead(p.id); AppToast.show('All marked as read.', 'success'); AppRouter.render(); } }
+    catch (err) { AppToast.show(err.message, 'error'); }
+    return;
+  }
+  if (action === 'sp-mark-notification-read') {
+    try { await window.NotificationService?.markAsRead(id); AppRouter.render(); }
+    catch (err) { AppToast.show(err.message, 'error'); }
+    return;
+  }
+  if (action === 'sp-delete-notification') {
+    try { await window.NotificationService?.delete(id); AppRouter.render(); }
+    catch (err) { AppToast.show(err.message, 'error'); }
+    return;
+  }
+  if (action === 'sp-delete-all-notifications') {
+    try { const p = await AuthService.getProfile(); if (p) { await window.NotificationService?.deleteAll(p.id); AppToast.show('All notifications cleared.', 'success'); AppRouter.render(); } }
+    catch (err) { AppToast.show(err.message, 'error'); }
+    return;
+  }
+  // Notification filter change
+  if (action === 'sp-notif-filter') { AppRouter.render(); return; }
+  // Video actions
+  if (action === 'sp-view-video') { window.SchoolVideos.viewVideo(id); return; }
+  if (action === 'sp-delete-content') { window.SchoolVideos.confirmDelete(id); return; }
+  if (action === 'sp-confirm-delete-content') {
+    try { await window.ContentService?.delete(id); AppToast.show('Content deleted.', 'success'); AppModal.close('modal-confirm-video'); AppRouter.render(); }
+    catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
+    return;
+  }
+
+  // Export (Demo)
+  if (action === 'sp-export-csv') { AppToast.show('Export CSV — Available in Production Version', 'info'); return; }
+  // Settings
+  if (action === 'sp-save-settings') { window.SchoolSettings.save(AppRouter.currentSchoolId); return; }
+
+  // Profile
+  if (action === 'sp-edit-profile') {
+    const newName = prompt('Enter your name:');
+    if (newName && newName.trim()) {
+      try {
+        const profile = await AuthService.getProfile();
+        if (profile) {
+          const { error } = await supabase.from('profiles').update({ name: newName.trim() }).eq('id', profile.id);
+          if (error) throw error;
+          AppToast.show('Name updated.', 'success');
+          AppRouter.render();
+        }
+      } catch (err) { AppToast.show(err.message, 'error'); }
+    }
     return;
   }
 
@@ -1577,36 +2354,47 @@ document.addEventListener('input', debounce(async function (e) {
     initIcons();
     return;
   }
+  if (e.target.id === 'um-search') { AppUserManagement.filter(); return; }
   if (e.target.id === 'admin-search') {
-    const q = e.target.value.toLowerCase();
-    const data = await AppStorage.load();
-    const admins = data.users.filter(u => u.role === 'school_admin');
-    const container = document.getElementById('admin-table-container');
-    if (!container) return;
-    const filtered = q ? admins.filter(a => a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)) : admins;
-    if (filtered.length === 0) {
-      container.innerHTML = `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">manage_accounts</span><h3>No matching admins</h3></div>`;
-    } else {
-      container.innerHTML = `<div class="table-container"><table><thead><tr><th>Name</th><th>Email</th><th>School</th><th>Code</th><th>Status</th><th style="width:100px;"></th></tr></thead><tbody>${filtered.map(a => {
-        const school = data.schools.find(s => s.id === a.schoolId);
-        return `<tr><td><div class="flex-center gap-12" style="justify-content:flex-start;"><div class="user-avatar">${AppUtils.getInitials(a.name)}</div><div class="font-semibold">${a.name}</div></div></td>
-          <td style="font-size:13px;">${a.email}</td><td style="font-size:13px;">${school?.name || '—'}</td>
-          <td style="font-size:13px;color:var(--text-secondary);">${school?.code || '—'}</td>
-          <td><span class="status-badge ${school?.status === 'active' ? 'status-active' : 'status-suspended'}">${school?.status === 'active' ? 'Active' : 'Suspended'}</span></td>
-          <td class="td-actions"><button class="btn btn-ghost btn-sm" data-action="edit-admin" data-id="${a.id}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button><button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-admin" data-id="${a.id}" data-school-id="${a.schoolId}"><span class="material-symbols-outlined" style="font-size:18px;">delete</span></button></td></tr>`;
-      }).join('')}</tbody></table></div>`;
-    }
-    initIcons();
+    AppUserManagement.searchQuery = e.target.value;
+    AppUserManagement.render(document.getElementById('main-content'));
     return;
   }
   if (e.target.id === 'global-search-input') { AppGlobalSearch.search(e.target.value); return; }
   if (e.target.id === 'audit-search') { AppAuditLog.filter(); return; }
+  // School Portal input searches
+  if (e.target.id === 'sp-student-search') { window.SchoolStudents?.filter(); return; }
+  if (e.target.id === 'sp-course-search') { window.SchoolCourses?.filter(); return; }
+  if (e.target.id === 'sp-counselor-search') { window.SchoolCounselors?.filter(); return; }
+  if (e.target.id === 'sp-video-search') { window.SchoolVideos?.filter(); return; }
 }, 250));
 
 // Filter change events
 document.addEventListener('change', function (e) {
   if (e.target.id === 'content-type-filter' || e.target.id === 'content-school-filter') { AppContent.render(); }
   if (e.target.id === 'audit-action-filter' || e.target.id === 'audit-entity-filter') { AppAuditLog.filter(); }
+  if (e.target.id === 'um-select-all') {
+    const checked = e.target.checked;
+    document.querySelectorAll('.um-row-check').forEach(cb => cb.checked = checked);
+  }
+  if (e.target.id === 'um-role-filter') {
+    const val = e.target.value;
+    AppUserManagement.currentTab = val || 'all';
+    AppUserManagement.currentPage = 1;
+    AppUserManagement.searchQuery = '';
+    const searchInput = document.getElementById('um-search');
+    if (searchInput) searchInput.value = '';
+    AppRouter.render();
+  }
+  // School Portal filter changes
+  if (['sp-student-counselor','sp-student-status','sp-student-class'].includes(e.target.id)) {
+    window.SchoolStudents?.filter?.();
+    return;
+  }
+  if (e.target.id === 'sp-notif-filter') {
+    AppRouter.render();
+    return;
+  }
 });
 
 // Content school dropdown populates sections

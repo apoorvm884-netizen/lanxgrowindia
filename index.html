@@ -6,6 +6,7 @@
 <title>LANXGROW COS</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
 <style>
 :root {
   --primary: #142cae;
@@ -272,6 +273,17 @@ tr:hover td { background: var(--surface-low); }
 .fade-in { animation: fade-in 200ms ease forwards; }
 
 /* ====== RESPONSIVE ====== */
+/* ====== DARK SIDEBAR (HQ / Company) ====== */
+.sidebar-hq { background: #111827; border-right-color: #1f2937; }
+.sidebar-hq .sidebar-brand { color: #f9fafb; border-bottom-color: #1f2937; }
+.sidebar-hq .sidebar-brand svg { color: #3b82f6; }
+.sidebar-hq .nav-item { color: #d1d5db; }
+.sidebar-hq .nav-item:hover { background: #1f2937; color: #f9fafb; }
+.sidebar-hq .nav-item.active { background: rgba(37,99,235,0.15); color: #60a5fa; }
+.sidebar-hq .nav-item.active span { color: #60a5fa; }
+.sidebar-hq .sidebar-sep { background: #1f2937; }
+.sidebar-hq .nav-badge { background: rgba(37,99,235,0.2); color: #60a5fa; }
+
 @media (max-width: 1200px) { .metrics-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 1024px) {
   .sidebar { width: 64px; }
