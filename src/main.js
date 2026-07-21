@@ -188,6 +188,13 @@ window.AppUtils = {
     }
   },
 
+  escapeHtml: function (str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  },
+
   formatDate: function (ts) {
     if (!ts) return '—';
     const d = new Date(ts);
@@ -428,6 +435,8 @@ window.AppRouter = {
 
     if (this.currentRoute === 'company-dashboard') {
       main.innerHTML = AppSkeleton.dashboard();
+    } else if (this.currentRoute === 'schools') {
+      main.innerHTML = AppSkeleton.cards();
     }
 
     switch (this.currentRoute) {
@@ -1095,41 +1104,69 @@ window.AppRouter = {
 
   // --- SCHOOLS (Company level) ---
   async renderSchools(main) {
-    const data = await AppStorage.load();
-    const q = (document.getElementById('school-search')?.value || '').toLowerCase();
-    let schools = data.schools;
-    if (q) schools = schools.filter(s => s.name.toLowerCase().includes(q) || s.code?.toLowerCase().includes(q));
-    main.innerHTML = `<div class="fade-in">
-      <div class="page-header">
-        <div class="page-header-left"><h1 class="page-title">Schools</h1><p class="page-subtitle">Manage all schools in the platform.</p></div>
-        <button class="btn btn-primary" data-action="add-school"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add School</button>
-      </div>
-      <div class="management-bar">
-        <div class="search-bar" style="max-width:300px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="school-search" placeholder="Search schools..." data-action="school-search-input"></div>
-      </div>
-      ${schools.length === 0 ? `<div class="card"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">business</span><h3>No schools yet</h3><p>Create your first school to get started.</p></div></div>`
-      : `<div class="schools-grid">${schools.map(s => {
-        const stats = { categories: data.categories.filter(c => c.school_id === s.id).length, subjects: data.subjects.filter(sub => sub.school_id === s.id).length, sections: data.sections.filter(sec => sec.school_id === s.id).length };
-        const logoClass = s.status === 'suspended' ? 'school-logo-suspended' : 'school-logo-default';
-        return `<div class="school-card" style="cursor:pointer;" data-action="open-school" data-id="${s.id}">
-          <div class="school-card-top">
-            <div class="school-logo ${logoClass}">${AppUtils.getInitials(s.name)}</div>
-            <div class="school-info">
-              <div class="school-name">${s.name}</div>
-              <div class="school-code">Code: ${s.code}</div>
-              <div class="school-admin"><span class="material-symbols-outlined" style="font-size:14px;">person</span> ${s.principal_name || 'No principal'}</div>
+    try {
+      const data = await AppStorage.load();
+      const q = (this._schoolSearchQuery || '').toLowerCase();
+      let schools = data.schools;
+      if (q) schools = schools.filter(s => s.name.toLowerCase().includes(q) || s.code?.toLowerCase().includes(q));
+
+      const perPage = 12;
+      const totalPages = Math.max(1, Math.ceil(schools.length / perPage));
+      const page = Math.min(Math.max(1, this._schoolsPage || 1), totalPages);
+      const start = (page - 1) * perPage;
+      const pageSchools = schools.slice(start, start + perPage);
+
+      const adminCountBySchool = {};
+      for (const p of data.users) {
+        if (p.role === 'school_admin' && p.schoolId) {
+          adminCountBySchool[p.schoolId] = (adminCountBySchool[p.schoolId] || 0) + 1;
+        }
+      }
+
+      main.innerHTML = `<div class="fade-in">
+        <div class="page-header">
+          <div class="page-header-left"><h1 class="page-title">Schools</h1><p class="page-subtitle">Manage all schools in the platform.</p></div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary" data-action="refresh-schools"><span class="material-symbols-outlined" style="font-size:18px;">refresh</span></button>
+            <button class="btn btn-primary" data-action="add-school"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add School</button>
+          </div>
+        </div>
+        <div class="management-bar">
+          <div class="search-bar" style="max-width:300px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="school-search" placeholder="Search schools..." data-action="school-search-input" value="${AppUtils.escapeHtml(q)}"></div>
+        </div>
+        ${schools.length === 0 ? `<div class="card"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">business</span><h3>No schools yet</h3><p>Create your first school to get started.</p></div></div>`
+        : `<div class="schools-grid">${pageSchools.map(s => {
+          const stats = { categories: data.categories.filter(c => c.school_id === s.id).length, subjects: data.subjects.filter(sub => sub.school_id === s.id).length, sections: data.sections.filter(sec => sec.school_id === s.id).length };
+          const logoClass = s.status === 'suspended' ? 'school-logo-suspended' : 'school-logo-default';
+          const adminCount = adminCountBySchool[s.id] || 0;
+          return `<div class="school-card" style="cursor:pointer;" data-action="open-school" data-id="${s.id}">
+            <div class="school-card-top">
+              <div class="school-logo ${logoClass}">${AppUtils.getInitials(s.name)}</div>
+              <div class="school-info">
+                <div class="school-name">${s.name}</div>
+                <div class="school-code">Code: ${s.code}</div>
+                <div class="school-admin"><span class="material-symbols-outlined" style="font-size:14px;">person</span> ${s.principal_name || 'No principal'}</div>
+              </div>
+              <span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-suspended'}">${s.status}</span>
             </div>
-            <span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-suspended'}">${s.status}</span>
-          </div>
-          <div class="school-stats">
-            <div class="school-stat"><div class="school-stat-value">${stats.categories}</div><div class="school-stat-label">Categories</div></div>
-            <div class="school-stat"><div class="school-stat-value">${stats.subjects}</div><div class="school-stat-label">Subjects</div></div>
-            <div class="school-stat"><div class="school-stat-value">${stats.sections}</div><div class="school-stat-label">Sections</div></div>
-          </div>
-        </div>`;
-      }).join('')}</div>`}
-    </div>`;
-    initIcons();
+            <div class="school-stats">
+              <div class="school-stat"><div class="school-stat-value">${stats.categories}</div><div class="school-stat-label">Categories</div></div>
+              <div class="school-stat"><div class="school-stat-value">${stats.subjects}</div><div class="school-stat-label">Subjects</div></div>
+              <div class="school-stat"><div class="school-stat-value">${stats.sections}</div><div class="school-stat-label">Sections</div></div>
+              <div class="school-stat"><div class="school-stat-value">${adminCount}</div><div class="school-stat-label">Admins</div></div>
+            </div>
+          </div>`;
+        }).join('')}</div>
+        ${totalPages > 1 ? `<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:16px;">
+          <button class="btn btn-sm btn-secondary" data-action="schools-page" data-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}>Previous</button>
+          <span style="font-size:13px;color:var(--text-secondary);">Page ${page} of ${totalPages}</span>
+          <button class="btn btn-sm btn-secondary" data-action="schools-page" data-page="${page + 1}" ${page >= totalPages ? 'disabled' : ''}>Next</button>
+        </div>` : ''}`}
+      </div>`;
+      initIcons();
+    } catch (err) {
+      main.innerHTML = `<div class="empty-state" style="padding:60px;"><span class="material-symbols-outlined" style="font-size:48px;color:#ef4444;">error</span><h3>Failed to load schools</h3><p>${err.message}</p><button class="btn btn-primary" onclick="AppRouter.render()">Retry</button></div>`;
+    }
   }
 }; // End AppRouter
 
@@ -1138,9 +1175,8 @@ window.AppRouter = {
 // ==============================================================
 window.AppSchools = {
   async edit(id) {
-    const data = await AppStorage.load();
-    const school = data.schools.find(s => s.id === id);
-    if (!school) return;
+    const school = await SchoolService.getById(id);
+    if (!school) { AppToast.show('School not found.', 'error'); return; }
     document.getElementById('entity-type').value = 'school';
     document.getElementById('entity-id').value = id;
     document.querySelectorAll('.entity-fields').forEach(el => el.style.display = 'none');
@@ -1155,7 +1191,20 @@ window.AppSchools = {
   async confirmDelete(id) {
     const data = await AppStorage.load();
     const school = data.schools.find(s => s.id === id);
-    document.getElementById('confirm-text').textContent = school ? `Delete "${school.name}"? This will also remove all associated categories, subjects, sections, and content.` : 'Delete this school?';
+    if (!school) { AppToast.show('School not found.', 'error'); return; }
+    const cats = data.categories.filter(c => c.school_id === id).length;
+    const subs = data.subjects.filter(s => s.school_id === id).length;
+    const secs = data.sections.filter(s => s.school_id === id).length;
+    const cnt = data.content.filter(c => c.school_id === id).length;
+    const students = data.students.filter(s => s.school_id === id).length;
+    const deps = [];
+    if (cats) deps.push(`${cats} categories`);
+    if (subs) deps.push(`${subs} subjects`);
+    if (secs) deps.push(`${secs} sections`);
+    if (cnt) deps.push(`${cnt} content items`);
+    if (students) deps.push(`${students} students`);
+    const depText = deps.length ? ` This will also delete: ${deps.join(', ')}.` : '';
+    document.getElementById('confirm-text').textContent = `Delete "${school.name}"?${depText} This action cannot be undone.`;
     AppModal.open('modal-confirm');
     document.getElementById('btn-confirm-action').setAttribute('data-action', 'confirm-delete-entity');
     document.getElementById('btn-confirm-action').setAttribute('data-entity-type', 'school');
@@ -1897,6 +1946,10 @@ async function handleEntitySubmit() {
       const name = document.getElementById('input-name').value.trim();
       const code = document.getElementById('input-code').value.trim();
       if (!name || !code) { AppToast.show('Name and code are required.', 'error'); return; }
+      if (!isEdit) {
+        const existing = await SchoolService.getByCode(code);
+        if (existing) { AppToast.show(`School with code "${code}" already exists.`, 'error'); return; }
+      }
       const status = document.getElementById('input-status')?.value || 'active';
       const principal_name = document.getElementById('input-principal-name').value.trim();
       if (isEdit) {
@@ -2012,6 +2065,9 @@ document.addEventListener('click', async function (e) {
   if (action === 'edit-school') { AppSchools.edit(id); return; }
   if (action === 'delete-school') { AppSchools.confirmDelete(id); return; }
   if (action === 'open-school') { AppRouter.navigate('school-dashboard', { schoolId: id }); return; }
+  if (action === 'refresh-schools') { AppRouter._schoolSearchQuery = ''; AppRouter._schoolsPage = 1; AppRouter.render(); return; }
+  if (action === 'schools-page') { AppRouter._schoolsPage = parseInt(el.dataset.page); AppRouter.render(); return; }
+  if (action === 'school-search-input') { return; }
 
   // Categories
   if (action === 'add-category') { AppCategories.openCreate(); return; }
@@ -2726,6 +2782,22 @@ document.addEventListener('keydown', function (e) {
     const searchModal = document.getElementById('modal-global-search');
     if (searchModal && searchModal.classList.contains('active')) { AppModal.close('modal-global-search'); }
     else { AppGlobalSearch.open(); }
+  }
+});
+
+// ==============================================================
+// SCHOOL SEARCH — debounced keyup handler
+// ==============================================================
+let schoolSearchTimer;
+document.addEventListener('keyup', function (e) {
+  const input = e.target.closest('#school-search');
+  if (input) {
+    clearTimeout(schoolSearchTimer);
+    schoolSearchTimer = setTimeout(() => {
+      AppRouter._schoolSearchQuery = input.value;
+      AppRouter._schoolsPage = 1;
+      AppRouter.render();
+    }, 300);
   }
 });
 

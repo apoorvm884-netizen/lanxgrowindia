@@ -22,6 +22,16 @@ export const SchoolService = {
     return data;
   },
 
+  async getByCode(code) {
+    const { data, error } = await supabase
+      .from('schools')
+      .select('id')
+      .eq('code', code)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
   async create(school) {
     const { data, error } = await supabase
       .from('schools')
