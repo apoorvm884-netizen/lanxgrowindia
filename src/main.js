@@ -182,7 +182,8 @@ window.AppUtils = {
         sections: sections.count || 0,
         content: content.count || 0
       };
-    } catch {
+    } catch (e) {
+      console.error('Failed to fetch counts:', e);
       return { schools: 0, categories: 0, subjects: 0, sections: 0, content: 0 };
     }
   },
@@ -425,6 +426,10 @@ window.AppRouter = {
     AppSidebar.render(AppSidebar.COMPANY_ITEMS, this.currentRoute);
     initIcons();
 
+    if (this.currentRoute === 'company-dashboard') {
+      main.innerHTML = AppSkeleton.dashboard();
+    }
+
     switch (this.currentRoute) {
       case 'company-dashboard':
         await this.renderCompanyDashboard(main);
@@ -476,14 +481,15 @@ window.AppRouter = {
       const schoolCounselors = (data.users || []).filter(c => c.schoolId === schoolId && c.role === 'school_admin');
       const schoolEnrollments = (data.enrollments || []).filter(e => schoolStudents.some(s => s.id === e.student_id));
       const schoolNotifications = (data.notifications || []).filter(n => n.user_id === (profile ? profile.id : ''));
-      const avgAttendance = schoolStudents.length ? Math.round(schoolStudents.reduce((s, st) => s + st.attendance, 0) / schoolStudents.length) : 0;
+      const avgAttendance = schoolStudents.length ? Math.round(schoolStudents.reduce((s, st) => s + (st.attendance || 0), 0) / schoolStudents.length) : 0;
       const completionRate = schoolEnrollments.length ? Math.round(schoolEnrollments.filter(e => e.status === 'completed').length / schoolEnrollments.length * 100) : 0;
       const today = new Date();
       const dateStr = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       const greeting = today.getHours() < 12 ? 'Good morning' : today.getHours() < 18 ? 'Good afternoon' : 'Good evening';
       const recentContent = content.slice(0, 4);
       const recentEnrollments = schoolEnrollments.slice(-4).reverse();
-      const atRiskStudents = schoolStudents.filter(s => s.attendance < 80 || s.progress < 50);
+      const studentsStarted = schoolStudents.filter(s => (s.progress || 0) > 0 || (s.attendance || 0) > 0).length;
+      const atRiskStudents = schoolStudents.filter(s => s.status === 'active' && ((s.attendance || 0) > 0 && s.attendance < 80 || (s.progress || 0) > 0 && s.progress < 50));
 
       main.innerHTML = `<div class="fade-in">
         ${isSuperAdmin ? `<div style="background:#111827;color:#d1d5db;padding:10px 16px;border-radius:var(--radius-md);margin-bottom:16px;display:flex;align-items:center;gap:12px;font-size:12px;">
@@ -509,12 +515,12 @@ window.AppRouter = {
         </div>
 
         <div class="metrics-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px;">
-          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-green" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">groups</span></div><div class="metric-info"><h2 style="font-size:20px;">${schoolStudents.length}</h2><p>Total Students</p></div></div>
-          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-blue" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">person_play</span></div><div class="metric-info"><h2 style="font-size:20px;">${Math.min(schoolStudents.length, 5)}</h2><p>Active Today</p></div></div>
+          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-green" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">groups</span></div><div class="metric-info"><h2 style="font-size:20px;">${schoolStudents.length}</h2><p>Students</p></div></div>
+          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-blue" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">trending_up</span></div><div class="metric-info"><h2 style="font-size:20px;">${studentsStarted}</h2><p>Active Learners</p></div></div>
           <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-red" style="width:36px;height:36px;background:#fef2f2;"><span class="material-symbols-outlined" style="font-size:18px;color:#ef4444;">warning</span></div><div class="metric-info"><h2 style="font-size:20px;color:#ef4444;">${atRiskStudents.length}</h2><p>Need Attention</p></div></div>
           <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-purple" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">badge</span></div><div class="metric-info"><h2 style="font-size:20px;">${schoolCounselors.length}</h2><p>Counselors</p></div></div>
           <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-orange" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">school</span></div><div class="metric-info"><h2 style="font-size:20px;">${schoolCourses.length}</h2><p>Courses</p></div></div>
-          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-blue" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">video_library</span></div><div class="metric-info"><h2 style="font-size:20px;">${content.length}</h2><p>Videos</p></div></div>
+          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-blue" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">video_library</span></div><div class="metric-info"><h2 style="font-size:20px;">${content.length}</h2><p>Content</p></div></div>
           <div class="metric-card" style="padding:14px;"><div class="metric-icon" style="width:36px;height:36px;background:#f0fdf4;"><span class="material-symbols-outlined" style="font-size:18px;color:#10b981;">check_circle</span></div><div class="metric-info"><h2 style="font-size:20px;">${completionRate}%</h2><p>Completion</p></div></div>
           <div class="metric-card" style="padding:14px;"><div class="metric-icon" style="width:36px;height:36px;background:#eff6ff;"><span class="material-symbols-outlined" style="font-size:18px;color:#3b82f6;">assignment</span></div><div class="metric-info"><h2 style="font-size:20px;">${schoolEnrollments.length}</h2><p>Enrollments</p></div></div>
         </div>
@@ -1010,67 +1016,81 @@ window.AppRouter = {
 
   // --- COMPANY DASHBOARD ---
   async renderCompanyDashboard(main) {
-    const data = await AppStorage.load();
-    const counts = await AppUtils.getTotalCounts();
-    const recentContent = data.content.slice(0, 8);
-    const recentLogs = (data.auditLog || []).sort((a, b) => (new Date(b.created_at) - new Date(a.created_at))).slice(0, 5);
-    main.innerHTML = `<div class="fade-in">
-      <div class="page-header">
-        <div class="page-header-left"><h1 class="page-title">Dashboard</h1><p class="page-subtitle">Platform overview at a glance.</p></div>
-      </div>
-      <div class="metrics-grid">
-        <div class="metric-card" data-action="navigate" data-route="schools" style="cursor:pointer;">
-          <div class="metric-icon metric-icon-blue"><span class="material-symbols-outlined">business</span></div>
-          <div class="metric-info"><h2>${counts.schools}</h2><p>Schools</p></div>
+    try {
+      const data = await AppStorage.load();
+      const counts = {
+        schools: data.schools.length,
+        categories: data.categories.length,
+        subjects: data.subjects.length,
+        sections: data.sections.length,
+        content: data.content.length
+      };
+      const recentContent = data.content.slice(0, 8);
+      const recentLogs = (data.auditLog || []).slice(0, 5);
+      const profileMap = {};
+      for (const p of data.users) { profileMap[p.id] = p; }
+
+      main.innerHTML = `<div class="fade-in">
+        <div class="page-header">
+          <div class="page-header-left"><h1 class="page-title">Dashboard</h1><p class="page-subtitle">Platform overview at a glance.</p></div>
         </div>
-        <div class="metric-card" data-action="navigate" data-route="content-manager" style="cursor:pointer;">
-          <div class="metric-icon metric-icon-green"><span class="material-symbols-outlined">category</span></div>
-          <div class="metric-info"><h2>${counts.categories}</h2><p>Categories</p></div>
-        </div>
-        <div class="metric-card" data-action="navigate" data-route="content-manager" style="cursor:pointer;">
-          <div class="metric-icon metric-icon-purple"><span class="material-symbols-outlined">auto_stories</span></div>
-          <div class="metric-info"><h2>${counts.subjects}</h2><p>Subjects</p></div>
-        </div>
-        <div class="metric-card" data-action="navigate" data-route="media-library" style="cursor:pointer;">
-          <div class="metric-icon metric-icon-orange"><span class="material-symbols-outlined">videocam</span></div>
-          <div class="metric-info"><h2>${counts.content}</h2><p>Content Items</p></div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
-        <div class="card">
-          <div class="card-header"><h3 class="card-title">Recent Content</h3></div>
-          ${recentContent.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">video_library</span><h3>No content yet</h3><p>Content will appear here once added.</p></div>`
-          : `<div class="table-container"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Updated</th></tr></thead><tbody>${recentContent.map(c => {
-            const typeIcon = { Video: 'videocam', PDF: 'description', Image: 'image', Document: 'description' };
-            return `<tr>
-              <td><div style="display:flex;align-items:center;gap:8px;"><span class="material-symbols-outlined" style="font-size:16px;color:var(--text-muted);">${typeIcon[c.type] || 'insert_drive_file'}</span><span class="font-semibold">${c.name}</span></div></td>
-              <td><span class="status-badge" style="background:var(--primary-subtle);color:var(--primary);">${c.type}</span></td>
-              <td><span class="status-badge ${c.status === 'published' ? 'status-active' : c.status === 'draft' ? 'status-suspended' : 'status-pending'}">${c.status}</span></td>
-              <td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.updated_at)}</td>
-            </tr>`;
-          }).join('')}</tbody></table></div>`}
-          <div style="padding:12px 0 0;text-align:right;">
-            <button class="btn btn-secondary btn-sm" data-action="navigate" data-route="content-manager">View All</button>
+        <div class="metrics-grid">
+          <div class="metric-card" data-action="navigate" data-route="schools" style="cursor:pointer;">
+            <div class="metric-icon metric-icon-blue"><span class="material-symbols-outlined">business</span></div>
+            <div class="metric-info"><h2>${counts.schools}</h2><p>Schools</p></div>
+          </div>
+          <div class="metric-card" data-action="navigate" data-route="schools" style="cursor:pointer;">
+            <div class="metric-icon metric-icon-green"><span class="material-symbols-outlined">category</span></div>
+            <div class="metric-info"><h2>${counts.categories}</h2><p>Categories</p></div>
+          </div>
+          <div class="metric-card" data-action="navigate" data-route="schools" style="cursor:pointer;">
+            <div class="metric-icon metric-icon-purple"><span class="material-symbols-outlined">auto_stories</span></div>
+            <div class="metric-info"><h2>${counts.subjects}</h2><p>Subjects</p></div>
+          </div>
+          <div class="metric-card" data-action="navigate" data-route="media-library" style="cursor:pointer;">
+            <div class="metric-icon metric-icon-orange"><span class="material-symbols-outlined">videocam</span></div>
+            <div class="metric-info"><h2>${counts.content}</h2><p>Content Items</p></div>
           </div>
         </div>
-        <div class="card">
-          <div class="card-header"><h3 class="card-title">Recent Activity</h3></div>
-          ${recentLogs.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">history</span><h3>No activity yet</h3></div>`
-          : `<div style="display:flex;flex-direction:column;gap:0;">${recentLogs.map(l => {
-            const actionColors = { created: '#10b981', edited: '#3b82f6', uploaded: '#8b5cf6', deleted: '#ef4444', suspended: '#f59e0b' };
-            return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
-              <div style="width:8px;height:8px;border-radius:50%;background:${actionColors[l.action] || '#94a3b8'};margin-top:6px;flex-shrink:0;"></div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:500;color:var(--on-surface);">${l.user_name}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">${l.action} ${l.entity} — ${l.entity_name}</div>
-              </div>
-              <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${AppUtils.formatDate(l.created_at)}</div>
-            </div>`;
-          }).join('')}</div>`}
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
+          <div class="card">
+            <div class="card-header"><h3 class="card-title">Recent Content</h3></div>
+            ${recentContent.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">video_library</span><h3>No content yet</h3><p>Content will appear here once added.</p></div>`
+            : `<div class="table-container"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Updated</th></tr></thead><tbody>${recentContent.map(c => {
+              const typeIcon = { Video: 'videocam', PDF: 'description', Image: 'image', Document: 'description' };
+              return `<tr style="cursor:pointer;" data-action="navigate" data-route="content-manager">
+                <td><div style="display:flex;align-items:center;gap:8px;"><span class="material-symbols-outlined" style="font-size:16px;color:var(--text-muted);">${typeIcon[c.type] || 'insert_drive_file'}</span><span class="font-semibold">${c.name}</span></div></td>
+                <td><span class="status-badge" style="background:var(--primary-subtle);color:var(--primary);">${c.type}</span></td>
+                <td><span class="status-badge ${c.status === 'published' ? 'status-active' : c.status === 'draft' ? 'status-suspended' : 'status-pending'}">${c.status}</span></td>
+                <td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.updated_at)}</td>
+              </tr>`;
+            }).join('')}</tbody></table></div>`}
+            <div style="padding:12px 0 0;text-align:right;">
+              <button class="btn btn-secondary btn-sm" data-action="navigate" data-route="content-manager">View All</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3 class="card-title">Recent Activity</h3></div>
+            ${recentLogs.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">history</span><h3>No activity yet</h3></div>`
+            : `<div style="display:flex;flex-direction:column;gap:0;">${recentLogs.map(l => {
+              const actionColors = { created: '#10b981', edited: '#3b82f6', uploaded: '#8b5cf6', deleted: '#ef4444', suspended: '#f59e0b' };
+              const userName = profileMap[l.created_by]?.name || 'System';
+              return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+                <div style="width:8px;height:8px;border-radius:50%;background:${actionColors[l.action] || '#94a3b8'};margin-top:6px;flex-shrink:0;"></div>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:13px;font-weight:500;color:var(--on-surface);">${userName}</div>
+                  <div style="font-size:12px;color:var(--text-secondary);">${l.action} ${l.entity} — ${l.entity_name}</div>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${AppUtils.formatDate(l.created_at)}</div>
+              </div>`;
+            }).join('')}</div>`}
+          </div>
         </div>
-      </div>
-    </div>`;
-    initIcons();
+      </div>`;
+      initIcons();
+    } catch (err) {
+      main.innerHTML = `<div class="empty-state" style="padding:60px;"><span class="material-symbols-outlined" style="font-size:48px;color:#ef4444;">error</span><h3>Failed to load dashboard</h3><p>${err.message}</p><button class="btn btn-primary" onclick="AppRouter.render()">Retry</button></div>`;
+    }
   },
 
   // --- SCHOOLS (Company level) ---
