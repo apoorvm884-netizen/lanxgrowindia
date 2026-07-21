@@ -2878,6 +2878,7 @@ document.addEventListener('change', function (e) {
     window.SchoolStudents?.filter?.();
     return;
   }
+  if (e.target.id === 'sp-video-type') { window.SchoolVideos?.filter?.(); return; }
   if (e.target.id === 'subject-category-filter') {
     AppRouter._selectedCategoryId = e.target.value || null;
     AppRouter.render();

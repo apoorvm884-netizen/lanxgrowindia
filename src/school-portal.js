@@ -125,8 +125,7 @@ window.SchoolStudents = {
       </div>
     </div>`;
     document.body.appendChild(overlay);
-    overlay.classList.add('active');
-    document.addEventListener('keydown', AppModal._keyHandler);
+    AppModal.open(overlay.id);
     setTimeout(() => document.getElementById('sp-input-student-name')?.focus(), 100);
   },
 
@@ -162,8 +161,7 @@ window.SchoolStudents = {
         </div>
       </div>`;
       document.body.appendChild(overlay);
-      overlay.classList.add('active');
-      document.addEventListener('keydown', AppModal._keyHandler);
+      AppModal.open(overlay.id);
       setTimeout(() => document.getElementById('sp-input-student-name')?.focus(), 100);
     } catch (err) {
       AppToast.show(err.message || 'Failed to load student.', 'error');
@@ -220,8 +218,7 @@ window.SchoolStudents = {
         </div>
       </div>`;
       document.body.appendChild(overlay);
-      overlay.classList.add('active');
-      document.addEventListener('keydown', AppModal._keyHandler);
+      AppModal.open(overlay.id);
       initIcons();
     } catch { AppToast.show('Failed to load student.', 'error'); }
   },
@@ -374,8 +371,7 @@ window.SchoolStudents = {
         </div>
       </div>`;
       document.body.appendChild(overlay);
-      overlay.classList.add('active');
-      document.addEventListener('keydown', AppModal._keyHandler);
+      AppModal.open(overlay.id);
       initIcons();
     } catch (err) {
       AppToast.show(err.message || 'Failed to load student.', 'error');
@@ -508,8 +504,7 @@ window.SchoolCounselors = {
         </div>
       </div>`;
       document.body.appendChild(overlay);
-      overlay.classList.add('active');
-      document.addEventListener('keydown', AppModal._keyHandler);
+      AppModal.open(overlay.id);
       initIcons();
     } catch (err) {
       AppToast.show(err.message || 'Failed to load counselor profile.', 'error');
@@ -685,8 +680,7 @@ window.SchoolCourses = {
         </div>
       </div>`;
       document.body.appendChild(overlay);
-      overlay.classList.add('active');
-      document.addEventListener('keydown', AppModal._keyHandler);
+      AppModal.open(overlay.id);
       initIcons();
     } catch (err) { AppToast.show(err.message || 'Failed to load course.', 'error'); }
   },
@@ -707,8 +701,7 @@ window.SchoolCourses = {
       </div>
     </div>`;
     document.body.appendChild(overlay);
-    overlay.classList.add('active');
-    document.addEventListener('keydown', AppModal._keyHandler);
+    AppModal.open(overlay.id);
     setTimeout(() => document.getElementById('sp-input-course-name')?.focus(), 100);
   },
 
@@ -733,8 +726,7 @@ window.SchoolCourses = {
         </div>
       </div>`;
       document.body.appendChild(overlay);
-      overlay.classList.add('active');
-      document.addEventListener('keydown', AppModal._keyHandler);
+      AppModal.open(overlay.id);
       setTimeout(() => document.getElementById('sp-input-course-name')?.focus(), 100);
     } catch (err) { AppToast.show(err.message, 'error'); }
   },
@@ -793,8 +785,7 @@ window.SchoolCourses = {
       </div>
     </div>`;
     document.body.appendChild(overlay);
-    overlay.classList.add('active');
-    document.addEventListener('keydown', AppModal._keyHandler);
+    AppModal.open(overlay.id);
     initIcons();
   },
 
@@ -818,8 +809,7 @@ window.SchoolCourses = {
       </div>
     </div>`;
     document.body.appendChild(overlay);
-    overlay.classList.add('active');
-    document.addEventListener('keydown', AppModal._keyHandler);
+    AppModal.open(overlay.id);
     initIcons();
   },
 
@@ -858,8 +848,7 @@ window.SchoolCourses = {
         </div>
       </div>`;
       document.body.appendChild(overlay);
-      overlay.classList.add('active');
-      document.addEventListener('keydown', AppModal._keyHandler);
+      AppModal.open(overlay.id);
       initIcons();
     } catch (err) { AppToast.show(err.message || 'Failed to load courses.', 'error'); }
   },
@@ -923,8 +912,7 @@ window.SchoolCourses = {
         </div>
       </div>`;
       document.body.appendChild(overlay);
-      overlay.classList.add('active');
-      document.addEventListener('keydown', AppModal._keyHandler);
+      AppModal.open(overlay.id);
       initIcons();
     } catch (err) { AppToast.show(err.message || 'Failed to load course structure.', 'error'); }
   },
@@ -952,8 +940,7 @@ window.SchoolCourses = {
       </div>
     </div>`;
     document.body.appendChild(overlay);
-    overlay.classList.add('active');
-    document.addEventListener('keydown', AppModal._keyHandler);
+    AppModal.open(overlay.id);
     setTimeout(() => document.getElementById('sp-input-module-title')?.focus(), 100);
   },
 
@@ -986,8 +973,7 @@ window.SchoolCourses = {
       </div>
     </div>`;
     document.body.appendChild(overlay);
-    overlay.classList.add('active');
-    document.addEventListener('keydown', AppModal._keyHandler);
+    AppModal.open(overlay.id);
     setTimeout(() => document.getElementById('sp-input-lesson-title')?.focus(), 100);
   },
 
@@ -1058,8 +1044,7 @@ window.SchoolAssignments = {
       </div>
     </div>`;
     document.body.appendChild(overlay);
-    overlay.classList.add('active');
-    document.addEventListener('keydown', AppModal._keyHandler);
+    AppModal.open(overlay.id);
     initIcons();
   }
 };
@@ -1431,8 +1416,7 @@ window.SchoolVideos = {
         </div>
       </div>`;
       document.body.appendChild(overlay);
-      overlay.classList.add('active');
-      document.addEventListener('keydown', AppModal._keyHandler);
+      AppModal.open(overlay.id);
       initIcons();
     } catch (err) { AppToast.show(err.message || 'Failed to load video details.', 'error'); }
   },
@@ -1457,8 +1441,7 @@ window.SchoolVideos = {
       </div>
     </div>`;
     document.body.appendChild(overlay);
-    overlay.classList.add('active');
-    document.addEventListener('keydown', AppModal._keyHandler);
+    AppModal.open(overlay.id);
     initIcons();
   },
 
