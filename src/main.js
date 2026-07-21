@@ -61,7 +61,8 @@ window.AppStorage = {
   },
 
   async load() {
-    const [schoolsRes, categoriesRes, subjectsRes, sectionsRes, contentRes, profilesRes, logsRes] =
+    const [schoolsRes, categoriesRes, subjectsRes, sectionsRes, contentRes, profilesRes, logsRes,
+           studentsRes, coursesRes, enrollmentsRes, courseSectionsRes, notificationsRes] =
       await Promise.all([
         supabase.from('schools').select('*').order('name'),
         supabase.from('categories').select('*').order('name'),
@@ -69,7 +70,12 @@ window.AppStorage = {
         supabase.from('sections').select('*').order('name'),
         supabase.from('content').select('*').order('created_at', { ascending: false }),
         supabase.from('profiles').select('*'),
-        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200)
+        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200),
+        supabase.from('students').select('*').order('name'),
+        supabase.from('courses').select('*').order('name'),
+        supabase.from('enrollments').select('*'),
+        supabase.from('course_sections').select('*'),
+        supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(50)
       ]);
 
     const schools = schoolsRes.data || [];
@@ -79,6 +85,11 @@ window.AppStorage = {
     const content = contentRes.data || [];
     const profiles = profilesRes.data || [];
     const auditLog = logsRes.data || [];
+    const students = studentsRes.data || [];
+    const courses = coursesRes.data || [];
+    const enrollments = enrollmentsRes.data || [];
+    const courseSections = courseSectionsRes.data || [];
+    const notifications = notificationsRes.data || [];
 
     // Map profiles to old 'users' shape for backward compat
     const users = profiles.map(p => ({
@@ -90,7 +101,7 @@ window.AppStorage = {
       schoolId: p.school_id
     }));
 
-    return { schools, categories, subjects, sections, content, users, auditLog };
+    return { schools, categories, subjects, sections, content, users, auditLog, students, courses, enrollments, courseSections, notifications };
   },
 
   async save() {
@@ -359,6 +370,14 @@ window.AppRouter = {
     const main = document.getElementById('main-content');
     if (!main) return;
     const user = await AuthService.getUser();
+    const isSchoolRoute = this.currentRoute && this.currentRoute.startsWith('school-');
+    if (!isSchoolRoute && user?.authenticated) {
+      const profile = await AuthService.getProfile();
+      if (profile?.role === 'school_admin' && profile.school_id) {
+        this.navigate('school-dashboard', { schoolId: profile.school_id });
+        return;
+      }
+    }
     if (this.currentRoute === 'school-dashboard') {
       main.innerHTML = AppSkeleton.dashboard();
     } else if (['school-students','school-counselors','school-courses','school-assignments'].includes(this.currentRoute)) {
@@ -439,7 +458,7 @@ window.AppRouter = {
       const content = data.content.filter(c => c.school_id === schoolId);
       const schoolStudents = (data.students || []).filter(s => s.school_id === schoolId);
       const schoolCourses = (data.courses || []).filter(c => c.school_id === schoolId);
-      const schoolCounselors = (data.counselors || []).filter(c => c.school_id === schoolId);
+      const schoolCounselors = (data.users || []).filter(c => c.schoolId === schoolId && c.role === 'school_admin');
       const schoolEnrollments = (data.enrollments || []).filter(e => schoolStudents.some(s => s.id === e.student_id));
       const schoolNotifications = (data.notifications || []).filter(n => n.user_id === (profile ? profile.id : ''));
       const avgAttendance = schoolStudents.length ? Math.round(schoolStudents.reduce((s, st) => s + st.attendance, 0) / schoolStudents.length) : 0;
@@ -2025,9 +2044,8 @@ document.addEventListener('click', async function (e) {
       else if (etype === 'section') { await SectionService.delete(eid); AppToast.show('Section deleted.', 'success'); }
       else if (etype === 'content') { await ContentService.delete(eid); AppToast.show('Content deleted.', 'success'); }
       else if (etype === 'admin') {
-        // Admin deletion removes the school (original behavior preserved)
-        const schoolId = el.getAttribute('data-school-id');
-        await SchoolService.delete(schoolId);
+        const { error } = await supabase.from('profiles').delete().eq('id', eid);
+        if (error) throw error;
         AppToast.show('School admin removed.', 'success');
       }
       AppModal.close('modal-confirm');
@@ -2215,7 +2233,7 @@ document.addEventListener('click', async function (e) {
   if (action === 'sp-download-profile') { AppToast.show('Download Profile — Available in Production Version', 'info'); return; }
   if (action === 'sp-print-profile') { AppToast.show('Print — Available in Production Version', 'info'); return; }
   if (action === 'sp-student-courses') {
-    AppToast.show('Course assignment management will be available in the next update.', 'info');
+    window.SchoolStudents.assignCourses(id);
     return;
   }
 
@@ -2251,6 +2269,25 @@ document.addEventListener('click', async function (e) {
   if (action === 'sp-confirm-remove-enrollment') {
     try { await window.EnrollmentService?.delete(id); AppToast.show('Enrollment removed.', 'success'); AppModal.close('modal-confirm-enrollment'); AppRouter.render(); }
     catch (err) { AppToast.show(err.message || 'Failed to remove enrollment.', 'error'); }
+    return;
+  }
+
+  if (action === 'sp-toggle-enrollment') {
+    const studentId = el.dataset.studentId;
+    const courseId = el.dataset.courseId;
+    try {
+      if (el.checked) {
+        const p = await AuthService.getProfile();
+        await window.EnrollmentService?.create(studentId, courseId, p?.id || null);
+        AppToast.show('Student enrolled.', 'success');
+      } else {
+        const enrollments = await window.EnrollmentService?.getByStudent(studentId) || [];
+        const enrollment = enrollments.find(e => e.course_id === courseId);
+        if (enrollment) await window.EnrollmentService?.delete(enrollment.id);
+        AppToast.show('Enrollment removed.', 'success');
+      }
+    } catch (err) { AppToast.show(err.message || 'Failed to update enrollment.', 'error'); el.checked = !el.checked; }
+    AppRouter.render();
     return;
   }
 
@@ -2398,6 +2435,16 @@ document.addEventListener('change', function (e) {
   // School Portal filter changes
   if (['sp-student-counselor','sp-student-status','sp-student-class'].includes(e.target.id)) {
     window.SchoolStudents?.filter?.();
+    return;
+  }
+  if (e.target.id === 'subject-category-filter') {
+    AppRouter._selectedCategoryId = e.target.value || null;
+    AppRouter.render();
+    return;
+  }
+  if (e.target.id === 'section-subject-filter') {
+    AppRouter._selectedSubjectId = e.target.value || null;
+    AppRouter.render();
     return;
   }
   if (e.target.id === 'sp-notif-filter') {

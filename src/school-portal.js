@@ -445,15 +445,10 @@ window.SchoolCounselors = {
       const users = data.users || [];
       const counselor = users.find(u => u.id === counselorId);
       if (!counselor) { AppToast.show('Counselor not found.', 'error'); return; }
-      const demoCounselors = data.counselors || [];
-      const demo = demoCounselors.find(c => c.id === counselorId) || {};
       const students = (data.students || []).filter(s => s.counselor_id === counselorId);
       const enrollments = (data.enrollments || []).filter(e => students.some(s => s.id === e.student_id));
       const completedEnrollments = enrollments.filter(e => e.status === 'completed');
       const completionRate = enrollments.length ? Math.round(completedEnrollments.length / enrollments.length * 100) : 0;
-      const perf = window.COUNSELOR_PERF?.[counselorId] || { pendingFollowups: 0 };
-      const activities = (data.activities || []).filter(act => act.counselor_id === counselorId).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 8);
-      const actIconMap = { counseling_session: 'support', progress_review: 'trending_up', course_recommendation: 'school' };
 
       const existing = document.getElementById('modal-counselor-profile');
       if (existing) existing.remove();
@@ -467,16 +462,11 @@ window.SchoolCounselors = {
             <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#8b5cf6,#a78bfa);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;flex-shrink:0;">${AppUtils.getInitials(counselor.name)}</div>
             <div style="flex:1;">
               <div style="font-size:18px;font-weight:700;">${counselor.name}</div>
-              <div style="display:flex;gap:12px;margin-top:4px;font-size:12px;color:var(--text-secondary);">
-                <span>${demo.department || '—'}</span>
-                <span>${demo.qualification || ''}</span>
-                <span>${demo.experience || 0} yrs experience</span>
-              </div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${counselor.email || '—'}</div>
             </div>
-            <button class="btn btn-secondary btn-sm" style="height:32px;font-size:12px;" data-action="edit-admin" data-id="${counselor.id}"><span class="material-symbols-outlined" style="font-size:16px;">edit</span> Edit</button>
           </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:20px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;">
             <div style="padding:12px;background:#f0fdf4;border-radius:8px;text-align:center;">
               <div style="font-size:20px;font-weight:700;color:#10b981;">${students.length}</div>
               <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Students</div>
@@ -485,61 +475,36 @@ window.SchoolCounselors = {
               <div style="font-size:20px;font-weight:700;color:#3b82f6;">${completionRate}%</div>
               <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Completion</div>
             </div>
-            <div style="padding:12px;background:#fffbeb;border-radius:8px;text-align:center;">
-              <div style="font-size:20px;font-weight:700;color:#f59e0b;">${perf.pendingFollowups || 0}</div>
-              <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Pending Tasks</div>
-            </div>
             <div style="padding:12px;background:#f5f3ff;border-radius:8px;text-align:center;">
-              <div style="font-size:20px;font-weight:700;color:#8b5cf6;">${demo.assigned_classes?.length || 0}</div>
-              <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Classes</div>
+              <div style="font-size:20px;font-weight:700;color:#8b5cf6;">${students.filter(s => s.status === 'active').length}</div>
+              <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Active</div>
             </div>
           </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
             <div>
-              <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Details</div>
-              <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Email</span><span style="font-weight:500;">${counselor.email || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Phone</span><span style="font-weight:500;">${demo.phone || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Department</span><span style="font-weight:500;">${demo.department || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Qualification</span><span style="font-weight:500;">${demo.qualification || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Experience</span><span style="font-weight:500;">${demo.experience || 0} years</span></div>
+              <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Assigned Students</div>
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                ${students.length > 0 ? students.slice(0, 5).map(s => `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border-light);">
+                  <div style="width:24px;height:24px;border-radius:50%;background:var(--primary)12;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--primary);">${AppUtils.getInitials(s.name)}</div>
+                  <span>${s.name}</span>
+                  <span style="margin-left:auto;font-size:10px;color:var(--text-muted);">${s.class || ''}</span>
+                </div>`).join('') : '<span style="font-size:12px;color:var(--text-muted);">No students assigned</span>'}
+                ${students.length > 5 ? `<div style="font-size:11px;color:var(--primary);text-align:center;margin-top:4px;">+${students.length - 5} more</div>` : ''}
               </div>
             </div>
             <div>
-              <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Assigned Classes</div>
-              <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                ${(demo.assigned_classes || []).length > 0 ? demo.assigned_classes.map(cls => `
-                  <span style="padding:4px 10px;background:var(--primary)12;color:var(--primary);border-radius:6px;font-size:12px;font-weight:500;">${cls}</span>
-                `).join('') : '<span style="font-size:13px;color:var(--text-muted);">No classes assigned</span>'}
-              </div>
-              <div style="margin-top:12px;">
-                <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:6px;">Assigned Students</div>
-                <div style="display:flex;flex-direction:column;gap:4px;">
-                  ${students.length > 0 ? students.slice(0, 5).map(s => `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border-light);">
-                    <div style="width:24px;height:24px;border-radius:50%;background:var(--primary)12;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--primary);">${AppUtils.getInitials(s.name)}</div>
-                    <span>${s.name}</span>
-                    <span style="margin-left:auto;font-size:10px;color:var(--text-muted);">${s.class || ''}</span>
-                  </div>`).join('') : '<span style="font-size:12px;color:var(--text-muted);">No students assigned</span>'}
-                  ${students.length > 5 ? `<div style="font-size:11px;color:var(--primary);text-align:center;margin-top:4px;">+${students.length - 5} more</div>` : ''}
-                </div>
+              <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Enrollment Stats</div>
+              <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Total Enrollments</span><span style="font-weight:600;">${enrollments.length}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Completed</span><span style="font-weight:600;">${completedEnrollments.length}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Active</span><span style="font-weight:600;">${enrollments.filter(e => e.status === 'active').length}</span></div>
               </div>
             </div>
           </div>
-
-          ${activities.length > 0 ? `<div style="margin-bottom:16px;">
-            <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Recent Activity</div>
-            <div style="display:flex;flex-direction:column;gap:0;">${activities.map(act => `
-              <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);">
-                <span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);flex-shrink:0;">${actIconMap[act.action] || 'circle'}</span>
-                <div style="flex:1;font-size:12px;">${act.description}</div>
-                <div style="font-size:10px;color:var(--text-muted);white-space:nowrap;">${AppUtils.timeAgo(act.timestamp)}</div>
-              </div>`).join('')}</div>
-          </div>` : ''}
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-close-modal="modal-counselor-profile">Close</button>
-          <button class="btn btn-ghost btn-sm" style="font-size:11px;" data-action="sp-export-csv" data-entity="counselor" data-id="${counselorId}"><span class="material-symbols-outlined" style="font-size:16px;">download</span> Export</button>
         </div>
       </div>`;
       document.body.appendChild(overlay);
@@ -856,6 +821,47 @@ window.SchoolCourses = {
     overlay.classList.add('active');
     document.addEventListener('keydown', AppModal._keyHandler);
     initIcons();
+  },
+
+  async assignCourses(studentId) {
+    try {
+      const student = await window.StudentService?.getById(studentId);
+      if (!student) { AppToast.show('Student not found.', 'error'); return; }
+      const courses = await window.CourseService?.getBySchool(AppRouter.currentSchoolId) || [];
+      const enrollments = await window.EnrollmentService?.getByStudent(studentId) || [];
+      const enrolledIds = enrollments.map(e => e.course_id);
+
+      const existing = document.getElementById('modal-assign-courses');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.id = 'modal-assign-courses';
+      overlay.innerHTML = `<div class="modal" style="max-width:600px;">
+        <div class="modal-header"><h3 class="modal-title">Assign Courses</h3><button class="modal-close" data-close-modal="modal-assign-courses"><span class="material-symbols-outlined">close</span></button></div>
+        <div class="modal-body">
+          <div style="margin-bottom:16px;font-size:14px;font-weight:600;">${student.name} <span style="font-weight:400;color:var(--text-secondary);">— ${student.class ? student.class + (student.section ? ' · ' + student.section : '') : ''}</span></div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Toggle courses to enroll or unenroll this student.</div>
+          <div style="display:flex;flex-direction:column;gap:2px;max-height:350px;overflow-y:auto;">
+            ${courses.length === 0 ? '<p style="color:var(--text-muted);font-size:13px;">No courses available. Create courses first.</p>'
+            : courses.map(c => {
+              const isEnrolled = enrolledIds.includes(c.id);
+              return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;background:${isEnrolled ? 'var(--primary)08' : 'transparent'};border:1px solid ${isEnrolled ? 'var(--primary)20' : 'var(--border-light)'};font-size:13px;cursor:pointer;">
+                <input type="checkbox" data-action="sp-toggle-enrollment" data-student-id="${studentId}" data-course-id="${c.id}" ${isEnrolled ? 'checked' : ''} style="width:16px;height:16px;">
+                <span style="font-weight:500;">${c.name}</span>
+                <span style="margin-left:auto;font-size:11px;color:${isEnrolled ? 'var(--primary)' : 'var(--text-muted)'};">${isEnrolled ? 'Enrolled' : 'Not enrolled'}</span>
+              </label>`;
+            }).join('')}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close-modal="modal-assign-courses">Done</button>
+        </div>
+      </div>`;
+      document.body.appendChild(overlay);
+      overlay.classList.add('active');
+      document.addEventListener('keydown', AppModal._keyHandler);
+      initIcons();
+    } catch (err) { AppToast.show(err.message || 'Failed to load courses.', 'error'); }
   },
 
   filter() { this.currentPage = 1; AppRouter.render(); }

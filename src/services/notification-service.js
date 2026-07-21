@@ -60,5 +60,13 @@ export const NotificationService = {
       .delete()
       .eq('id', id);
     if (error) throw error;
+  },
+
+  async deleteAll(userId) {
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('user_id', userId);
+    if (error) throw error;
   }
 };
