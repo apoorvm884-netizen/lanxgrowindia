@@ -21,11 +21,20 @@ import {
   EnrollmentService,
   NotificationService,
   SettingsService,
-  PermissionsService
+  PermissionsService,
+  ModuleService,
+  LessonService,
+  ProgressService,
+  AssignmentService,
+  QuizService,
+  CertificateService
 } from './services/index.js';
 
 // Import School Portal rendering module
 import './school-portal.js';
+
+// Import Student Portal rendering module (LMS)
+import './lms-student.js';
 
 // Conditional Demo Mode — only loads when VITE_DEMO_MODE=true
 import { DEMO_MODE } from './demo/demo-config.js';
@@ -48,6 +57,12 @@ window.EnrollmentService = EnrollmentService;
 window.NotificationService = NotificationService;
 window.SettingsService = SettingsService;
 window.PermissionsService = PermissionsService;
+window.ModuleService = ModuleService;
+window.LessonService = LessonService;
+window.ProgressService = ProgressService;
+window.AssignmentService = AssignmentService;
+window.QuizService = QuizService;
+window.CertificateService = CertificateService;
 window.supabase = supabase;
 
 // ==============================================================
@@ -2261,6 +2276,196 @@ document.addEventListener('click', async function (e) {
       if (el.checked) { await window.CourseService?.addSection(courseId, sectionId); AppToast.show('Section added to course.', 'success'); }
       else { await window.CourseService?.removeSection(courseId, sectionId); AppToast.show('Section removed from course.', 'success'); }
     } catch (err) { AppToast.show(err.message || 'Failed to update section.', 'error'); el.checked = !el.checked; }
+    return;
+  }
+
+  // LMS — Course Structure
+  if (action === 'sp-manage-structure') {
+    window.SchoolCourses.manageStructure(id);
+    return;
+  }
+  if (action === 'sp-add-module') {
+    window.SchoolCourses.showModuleForm(null);
+    return;
+  }
+  if (action === 'sp-save-module') {
+    const title = document.getElementById('sp-input-module-title')?.value?.trim();
+    if (!title) { AppToast.show('Module title is required.', 'error'); return; }
+    const description = document.getElementById('sp-input-module-desc')?.value?.trim() || null;
+    const moduleId = document.getElementById('sp-input-module-id')?.value;
+    const courseId = el.dataset.courseId;
+    (async () => {
+      try {
+        if (moduleId) {
+          await window.ModuleService?.update(moduleId, { title, description });
+          AppToast.show('Module updated.', 'success');
+        } else {
+          const modules = await window.ModuleService?.getByCourse(courseId) || [];
+          await window.ModuleService?.create({ course_id: courseId, title, description, sort_order: modules.length });
+          AppToast.show('Module added.', 'success');
+        }
+        AppModal.close('modal-module-form');
+        window.SchoolCourses.manageStructure(courseId);
+      } catch (err) { AppToast.show(err.message || 'Failed to save module.', 'error'); }
+    })();
+    return;
+  }
+  if (action === 'sp-edit-module') {
+    window.SchoolCourses.showModuleForm(id);
+    return;
+  }
+  if (action === 'sp-delete-module') {
+    if (!confirm('Delete this module and all its lessons?')) return;
+    const courseId = el.dataset.courseId;
+    (async () => {
+      try {
+        await window.ModuleService?.delete(id);
+        AppToast.show('Module deleted.', 'success');
+        if (courseId) window.SchoolCourses.manageStructure(courseId);
+      } catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
+    })();
+    return;
+  }
+  if (action === 'sp-add-lesson') {
+    const moduleId = el.dataset.moduleId;
+    window.SchoolCourses.showLessonForm(moduleId, null);
+    return;
+  }
+  if (action === 'sp-save-lesson') {
+    const title = document.getElementById('sp-input-lesson-title')?.value?.trim();
+    if (!title) { AppToast.show('Lesson title is required.', 'error'); return; }
+    const contentType = document.getElementById('sp-input-lesson-type')?.value || 'video';
+    const contentUrl = document.getElementById('sp-input-lesson-url')?.value?.trim() || null;
+    const duration = parseInt(document.getElementById('sp-input-lesson-duration')?.value) || null;
+    const moduleId = document.getElementById('sp-input-lesson-module')?.value;
+    const lessonId = document.getElementById('sp-input-lesson-id')?.value;
+    const courseId = el.dataset.courseId;
+    (async () => {
+      try {
+        if (lessonId) {
+          await window.LessonService?.update(lessonId, { title, content_type: contentType, content_url: contentUrl, duration });
+          AppToast.show('Lesson updated.', 'success');
+        } else {
+          const lessons = await window.LessonService?.getByModule(moduleId) || [];
+          await window.LessonService?.create({ module_id: moduleId, title, content_type: contentType, content_url: contentUrl, sort_order: lessons.length, duration });
+          AppToast.show('Lesson added.', 'success');
+        }
+        AppModal.close('modal-lesson-form');
+        const parentModule = await window.ModuleService?.getById(moduleId);
+        if (parentModule) window.SchoolCourses.manageStructure(parentModule.course_id);
+      } catch (err) { AppToast.show(err.message || 'Failed to save lesson.', 'error'); }
+    })();
+    return;
+  }
+  if (action === 'sp-edit-lesson') {
+    const lesson = await window.LessonService?.getById(id);
+    if (lesson) window.SchoolCourses.showLessonForm(lesson.module_id, id);
+    return;
+  }
+  if (action === 'sp-delete-lesson') {
+    if (!confirm('Delete this lesson?')) return;
+    const courseId = el.dataset.courseId;
+    (async () => {
+      try {
+        const lesson = await window.LessonService?.getById(id);
+        await window.LessonService?.delete(id);
+        AppToast.show('Lesson deleted.', 'success');
+        if (lesson) {
+          const parentModule = await window.ModuleService?.getById(lesson.module_id);
+          if (parentModule) window.SchoolCourses.manageStructure(parentModule.course_id);
+        }
+      } catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
+    })();
+    return;
+  }
+  if (action === 'sp-move-module') {
+    const dir = el.dataset.direction;
+    const courseId = el.dataset.courseId;
+    (async () => {
+      try {
+        const modules = await window.ModuleService?.getByCourse(courseId) || [];
+        const idx = modules.findIndex(m => m.id === id);
+        if (idx < 0) return;
+        const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+        if (swapIdx < 0 || swapIdx >= modules.length) return;
+        const items = modules.map((m, i) => ({ id: m.id, sort_order: i === idx ? modules[swapIdx].sort_order : i === swapIdx ? modules[idx].sort_order : m.sort_order }));
+        for (const item of items) {
+          await window.ModuleService?.update(item.id, { sort_order: item.sort_order });
+        }
+        window.SchoolCourses.manageStructure(courseId);
+      } catch (err) { AppToast.show(err.message, 'error'); }
+    })();
+    return;
+  }
+  if (action === 'sp-move-lesson') {
+    const dir = el.dataset.direction;
+    const lesson = await window.LessonService?.getById(id);
+    if (!lesson) return;
+    (async () => {
+      try {
+        const lessons = await window.LessonService?.getByModule(lesson.module_id) || [];
+        const idx = lessons.findIndex(l => l.id === id);
+        if (idx < 0) return;
+        const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+        if (swapIdx < 0 || swapIdx >= lessons.length) return;
+        const items = lessons.map((l, i) => ({ id: l.id, sort_order: i === idx ? lessons[swapIdx].sort_order : i === swapIdx ? lessons[idx].sort_order : l.sort_order }));
+        for (const item of items) {
+          await window.LessonService?.update(item.id, { sort_order: item.sort_order });
+        }
+        const parentModule = await window.ModuleService?.getById(lesson.module_id);
+        if (parentModule) window.SchoolCourses.manageStructure(parentModule.course_id);
+      } catch (err) { AppToast.show(err.message, 'error'); }
+    })();
+    return;
+  }
+
+  // LMS — Student Portal
+  if (action === 'sp-open-student-portal') {
+    window.StudentPortal.dashboard(id);
+    return;
+  }
+  if (action === 'sp-open-course-player') {
+    const studentId = el.dataset.studentId;
+    window.StudentPortal.openCoursePlayer(studentId, id);
+    return;
+  }
+  if (action === 'sp-player-select-lesson') {
+    const studentId = el.dataset.studentId;
+    window.StudentPortal.loadLesson(studentId, id);
+    return;
+  }
+  if (action === 'sp-player-mark-complete') {
+    const studentId = el.dataset.studentId;
+    window.StudentPortal.markComplete(studentId, id);
+    return;
+  }
+  if (action === 'sp-player-prev') {
+    const studentId = el.dataset.studentId;
+    window.StudentPortal.navigateLesson(studentId, id, 'prev');
+    return;
+  }
+  if (action === 'sp-player-next') {
+    const studentId = el.dataset.studentId;
+    window.StudentPortal.navigateLesson(studentId, id, 'next');
+    return;
+  }
+  if (action === 'sp-open-lesson') {
+    const studentId = el.dataset.studentId;
+    const lesson = await window.LessonService?.getById(id);
+    if (lesson) {
+      const parentModule = await window.ModuleService?.getById(lesson.module_id);
+      if (parentModule) window.StudentPortal.openCoursePlayer(studentId, parentModule.course_id);
+      setTimeout(() => window.StudentPortal.loadLesson(studentId, id), 300);
+    }
+    return;
+  }
+  if (action === 'sp-view-certificate') {
+    const studentId = el.dataset.studentId;
+    window.StudentPortal.viewCertificate(studentId, id);
+    return;
+  }
+  if (action === 'sp-download-certificate') {
+    AppToast.show('Certificate download will be available in the next update.', 'info');
     return;
   }
 

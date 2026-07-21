@@ -864,6 +864,133 @@ window.SchoolCourses = {
     } catch (err) { AppToast.show(err.message || 'Failed to load courses.', 'error'); }
   },
 
+  async manageStructure(courseId) {
+    try {
+      const course = await window.CourseService?.getById(courseId);
+      if (!course) { AppToast.show('Course not found.', 'error'); return; }
+      const modules = await window.ModuleService?.getByCourse(courseId) || [];
+      const allLessons = {};
+      for (const m of modules) {
+        allLessons[m.id] = await window.LessonService?.getByModule(m.id) || [];
+      }
+
+      const existing = document.getElementById('modal-course-structure');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.id = 'modal-course-structure';
+      overlay.innerHTML = `<div class="modal" style="max-width:700px;">
+        <div class="modal-header">
+          <h3 class="modal-title">Course Structure: ${course.name}</h3>
+          <button class="modal-close" data-close-modal="modal-course-structure"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+          <div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:13px;font-weight:600;">Modules & Lessons</span>
+            <button class="btn btn-primary btn-sm" data-action="sp-add-module" data-course-id="${courseId}" style="font-size:11px;height:30px;"><span class="material-symbols-outlined" style="font-size:14px;">add</span> Add Module</button>
+          </div>
+          ${modules.length === 0 ? '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;border:1px dashed var(--border);border-radius:8px;">No modules yet. Add your first module to start building the course.</div>'
+          : modules.map((m, mi) => `
+            <div style="border:1px solid var(--border);border-radius:8px;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--card-bg);border-bottom:1px solid var(--border-light);border-radius:8px 8px 0 0;">
+                <span style="font-size:12px;color:var(--text-muted);font-weight:600;">Module ${mi + 1}</span>
+                <span style="flex:1;font-size:13px;font-weight:500;">${m.title}</span>
+                <button class="btn btn-ghost btn-sm" style="width:28px;height:28px;padding:0;" data-action="sp-edit-module" data-module-id="${m.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:14px;">edit</span></button>
+                <button class="btn btn-ghost btn-sm btn-danger-ghost" style="width:28px;height:28px;padding:0;" data-action="sp-delete-module" data-module-id="${m.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:14px;">delete</span></button>
+                ${mi > 0 ? `<button class="btn btn-ghost btn-sm" style="width:28px;height:28px;padding:0;" data-action="sp-move-module" data-module-id="${m.id}" data-direction="up" title="Move Up"><span class="material-symbols-outlined" style="font-size:14px;">arrow_upward</span></button>` : ''}
+                ${mi < modules.length - 1 ? `<button class="btn btn-ghost btn-sm" style="width:28px;height:28px;padding:0;" data-action="sp-move-module" data-module-id="${m.id}" data-direction="down" title="Move Down"><span class="material-symbols-outlined" style="font-size:14px;">arrow_downward</span></button>` : ''}
+              </div>
+              <div style="padding:6px 12px 10px;">
+                ${(allLessons[m.id] || []).length === 0 ? '<div style="font-size:12px;color:var(--text-muted);padding:4px 0;">No lessons yet.</div>'
+                : (allLessons[m.id] || []).map((l, li) => {
+                  const icons = { video: 'play_circle', pdf: 'picture_as_pdf', document: 'description', image: 'image', drive_link: 'folder_open', assignment: 'assignment', quiz: 'quiz' };
+                  return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:4px;margin:2px 0;">
+                    <span class="material-symbols-outlined" style="font-size:14px;color:var(--text-muted);">${icons[l.content_type] || 'radio_button_unchecked'}</span>
+                    <span style="font-size:12px;flex:1;">${l.title}</span>
+                    <span style="font-size:10px;color:var(--text-muted);padding:1px 6px;background:var(--border-light);border-radius:4px;">${l.content_type}</span>
+                    <button class="btn btn-ghost btn-sm" style="width:24px;height:24px;padding:0;" data-action="sp-edit-lesson" data-lesson-id="${l.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:12px;">edit</span></button>
+                    <button class="btn btn-ghost btn-sm btn-danger-ghost" style="width:24px;height:24px;padding:0;" data-action="sp-delete-lesson" data-lesson-id="${l.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:12px;">delete</span></button>
+                    ${li > 0 ? `<button class="btn btn-ghost btn-sm" style="width:24px;height:24px;padding:0;" data-action="sp-move-lesson" data-lesson-id="${l.id}" data-direction="up" title="Up"><span class="material-symbols-outlined" style="font-size:12px;">arrow_upward</span></button>` : ''}
+                    ${li < (allLessons[m.id] || []).length - 1 ? `<button class="btn btn-ghost btn-sm" style="width:24px;height:24px;padding:0;" data-action="sp-move-lesson" data-lesson-id="${l.id}" data-direction="down" title="Down"><span class="material-symbols-outlined" style="font-size:12px;">arrow_downward</span></button>` : ''}
+                  </div>`;
+                }).join('')}
+                <button class="btn btn-ghost btn-sm" style="margin-top:4px;font-size:11px;color:var(--primary);" data-action="sp-add-lesson" data-module-id="${m.id}"><span class="material-symbols-outlined" style="font-size:12px;">add</span> Add Lesson</button>
+              </div>
+            </div>`).join('')}
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close-modal="modal-course-structure">Done</button>
+        </div>
+      </div>`;
+      document.body.appendChild(overlay);
+      overlay.classList.add('active');
+      document.addEventListener('keydown', AppModal._keyHandler);
+      initIcons();
+    } catch (err) { AppToast.show(err.message || 'Failed to load course structure.', 'error'); }
+  },
+
+  async showModuleForm(moduleId) {
+    let moduleData = null;
+    if (moduleId) {
+      try { moduleData = await window.ModuleService?.getById(moduleId); } catch {}
+    }
+    const existing = document.getElementById('modal-module-form');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'modal-module-form';
+    overlay.innerHTML = `<div class="modal" style="max-width:450px;">
+      <div class="modal-header"><h3 class="modal-title">${moduleId ? 'Edit Module' : 'Add Module'}</h3><button class="modal-close" data-close-modal="modal-module-form"><span class="material-symbols-outlined">close</span></button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Module Title</label><input type="text" class="form-input" id="sp-input-module-title" value="${moduleData?.title || ''}" placeholder="e.g. Introduction"></div>
+        <div class="form-group" style="margin-top:12px;"><label class="form-label">Description</label><textarea class="form-input" id="sp-input-module-desc" placeholder="Optional description..." style="height:60px;resize:vertical;">${moduleData?.description || ''}</textarea></div>
+        <input type="hidden" id="sp-input-module-id" value="${moduleId || ''}">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close-modal="modal-module-form">Cancel</button>
+        <button class="btn btn-primary" data-action="sp-save-module">${moduleId ? 'Save Changes' : 'Add Module'}</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.classList.add('active');
+    document.addEventListener('keydown', AppModal._keyHandler);
+    setTimeout(() => document.getElementById('sp-input-module-title')?.focus(), 100);
+  },
+
+  async showLessonForm(moduleId, lessonId) {
+    let lessonData = null;
+    if (lessonId) {
+      try { lessonData = await window.LessonService?.getById(lessonId); } catch {}
+    }
+    const existing = document.getElementById('modal-lesson-form');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'modal-lesson-form';
+    const types = ['video','pdf','document','image','drive_link','assignment','quiz'];
+    overlay.innerHTML = `<div class="modal" style="max-width:500px;">
+      <div class="modal-header"><h3 class="modal-title">${lessonId ? 'Edit Lesson' : 'Add Lesson'}</h3><button class="modal-close" data-close-modal="modal-lesson-form"><span class="material-symbols-outlined">close</span></button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Lesson Title</label><input type="text" class="form-input" id="sp-input-lesson-title" value="${lessonData?.title || ''}" placeholder="e.g. Introduction to Algebra"></div>
+        <div class="form-group" style="margin-top:10px;"><label class="form-label">Content Type</label>
+          <select class="form-select" id="sp-input-lesson-type">${types.map(t => `<option value="${t}" ${lessonData?.content_type === t ? 'selected' : ''}>${t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ')}</option>`).join('')}</select>
+        </div>
+        <div class="form-group" style="margin-top:10px;"><label class="form-label">Content URL</label><input type="text" class="form-input" id="sp-input-lesson-url" value="${lessonData?.content_url || ''}" placeholder="https://..."></div>
+        <div class="form-group" style="margin-top:10px;"><label class="form-label">Duration (minutes)</label><input type="number" class="form-input" id="sp-input-lesson-duration" value="${lessonData?.duration || ''}" placeholder="e.g. 15" min="0" style="width:120px;"></div>
+        <input type="hidden" id="sp-input-lesson-module" value="${moduleId}">
+        <input type="hidden" id="sp-input-lesson-id" value="${lessonId || ''}">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close-modal="modal-lesson-form">Cancel</button>
+        <button class="btn btn-primary" data-action="sp-save-lesson">${lessonId ? 'Save Changes' : 'Add Lesson'}</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.classList.add('active');
+    document.addEventListener('keydown', AppModal._keyHandler);
+    setTimeout(() => document.getElementById('sp-input-lesson-title')?.focus(), 100);
+  },
+
   filter() { this.currentPage = 1; AppRouter.render(); }
 };
 
