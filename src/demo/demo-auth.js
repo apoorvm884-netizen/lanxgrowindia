@@ -28,7 +28,7 @@ function _notify(event, session) {
   _authListeners.forEach((cb) => {
     try {
       cb(event, session);
-    } catch (_) {}
+    } catch (e) { console.error('Demo auth callback error:', e); }
   });
 }
 

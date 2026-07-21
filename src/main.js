@@ -25,8 +25,6 @@ import {
   ModuleService,
   LessonService,
   ProgressService,
-  AssignmentService,
-  QuizService,
   CertificateService
 } from './services/index.js';
 
@@ -60,8 +58,6 @@ window.PermissionsService = PermissionsService;
 window.ModuleService = ModuleService;
 window.LessonService = LessonService;
 window.ProgressService = ProgressService;
-window.AssignmentService = AssignmentService;
-window.QuizService = QuizService;
 window.CertificateService = CertificateService;
 window.supabase = supabase;
 
@@ -888,6 +884,37 @@ window.AppRouter = {
 
   // --- ROLES & PERMISSIONS ---
   async renderRolesPermissions(main) {
+    let perms = [];
+    try { perms = await window.PermissionsService?.getAll() || []; } catch (_) {}
+    const permMap = {};
+    for (const p of perms) {
+      if (!permMap[p.role]) permMap[p.role] = {};
+      permMap[p.role][p.permission] = p.enabled;
+    }
+    const superAdminPerms = [
+      { label: 'Manage Schools', key: 'manage_schools' },
+      { label: 'Manage Categories', key: 'manage_categories' },
+      { label: 'Manage Subjects', key: 'manage_subjects' },
+      { label: 'Manage Sections', key: 'manage_sections' },
+      { label: 'Manage Content', key: 'manage_content' },
+      { label: 'Manage Users', key: 'manage_users' },
+      { label: 'Manage Roles', key: 'manage_roles' },
+      { label: 'View Analytics', key: 'view_analytics' },
+      { label: 'Access Settings', key: 'access_settings' },
+      { label: 'Manage Drive', key: 'manage_drive' },
+      { label: 'Manage Media Library', key: 'manage_media' },
+      { label: 'View Audit Log', key: 'view_audit_log' }
+    ];
+    const schoolAdminPerms = [
+      { label: 'Manage School Settings', key: 'school_settings', checked: true },
+      { label: 'Manage Categories', key: 'school_categories', checked: true },
+      { label: 'Manage Subjects', key: 'school_subjects', checked: true },
+      { label: 'Manage Sections', key: 'school_sections', checked: true },
+      { label: 'Manage Content', key: 'school_content', checked: true },
+      { label: 'View Analytics', key: 'school_analytics', checked: false },
+      { label: 'Manage Own Profile', key: 'school_profile', checked: true },
+      { label: 'Upload Drive Files', key: 'school_drive_upload', checked: false }
+    ];
     main.innerHTML = `<div class="fade-in">
       <div class="page-header">
         <div class="page-header-left"><h1 class="page-title">Roles & Permissions</h1><p class="page-subtitle">Define access control for each role.</p></div>
@@ -901,10 +928,10 @@ window.AppRouter = {
           </div>
           <div style="padding:16px 20px 0;">
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;">
-              ${['Manage Schools','Manage Categories','Manage Subjects','Manage Sections','Manage Content','Manage Users','Manage Roles','View Analytics','Access Settings','Manage Drive','Manage Media Library','View Audit Log'].map(p => `
+              ${superAdminPerms.map(p => `
                 <label class="checkbox-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;">
-                  <input type="checkbox" checked disabled style="width:16px;height:16px;">
-                  <span style="font-size:13px;">${p}</span>
+                  <input type="checkbox" ${(permMap['super_admin']?.[p.key]) !== false ? 'checked' : ''} disabled style="width:16px;height:16px;">
+                  <span style="font-size:13px;">${p.label}</span>
                 </label>`).join('')}
             </div>
           </div>
@@ -917,18 +944,9 @@ window.AppRouter = {
           </div>
           <div style="padding:16px 20px 0;">
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;">
-              ${[
-                { label: 'Manage School Settings', key: 'school_settings', checked: true },
-                { label: 'Manage Categories', key: 'school_categories', checked: true },
-                { label: 'Manage Subjects', key: 'school_subjects', checked: true },
-                { label: 'Manage Sections', key: 'school_sections', checked: true },
-                { label: 'Manage Content', key: 'school_content', checked: true },
-                { label: 'View Analytics', key: 'school_analytics', checked: false },
-                { label: 'Manage Own Profile', key: 'school_profile', checked: true },
-                { label: 'Upload Drive Files', key: 'school_drive_upload', checked: false },
-              ].map(p => `
+              ${schoolAdminPerms.map(p => `
                 <label class="checkbox-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;">
-                  <input type="checkbox" ${p.checked ? 'checked' : ''} data-action="toggle-permission" data-key="${p.key}" style="width:16px;height:16px;">
+                  <input type="checkbox" ${(permMap['school_admin']?.[p.key] ?? p.checked) ? 'checked' : ''} data-action="toggle-permission" data-key="${p.key}" style="width:16px;height:16px;">
                   <span style="font-size:13px;">${p.label}</span>
                 </label>`).join('')}
             </div>
@@ -941,6 +959,11 @@ window.AppRouter = {
 
   // --- COMPANY SETTINGS ---
   async renderCompanySettings(main) {
+    let settings = {};
+    try {
+      const all = await window.SettingsService?.getAll() || [];
+      for (const s of all) settings[s.key] = s.value;
+    } catch (_) {}
     main.innerHTML = `<div class="fade-in">
       <div class="page-header">
         <div class="page-header-left"><h1 class="page-title">Company Settings</h1><p class="page-subtitle">Configure global platform preferences.</p></div>
@@ -950,27 +973,68 @@ window.AppRouter = {
         <button class="tab-item" data-action="settings-tab" data-tab="branding" style="padding:12px 20px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-secondary);">Branding</button>
         <button class="tab-item" data-action="settings-tab" data-tab="email" style="padding:12px 20px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-secondary);">Email</button>
       </div>
-      <div id="settings-content">
-        <div class="card" style="max-width:600px;">
-          <div class="card-header"><h3 class="card-title">General Settings</h3></div>
-          <div style="padding:20px;">
-            <div class="form-group"><label class="form-label">Company Name</label><input type="text" class="form-input" value="LanxGrow Learning" data-action="save-setting" data-key="companyName"></div>
-            <div class="form-group" style="margin-top:16px;"><label class="form-label">Default Platform Language</label>
-              <select class="form-select" data-action="save-setting" data-key="language"><option value="en" selected>English</option><option value="es">Spanish</option><option value="fr">French</option></select>
-            </div>
-            <div class="form-group" style="margin-top:16px;"><label class="form-label">Timezone</label>
-              <select class="form-select" data-action="save-setting" data-key="timezone"><option value="UTC" selected>UTC (Coordinated Universal Time)</option><option value="US/Eastern">US/Eastern</option><option value="US/Pacific">US/Pacific</option></select>
-            </div>
-            <div class="form-group" style="margin-top:16px;"><label class="form-label">Max Upload Size (MB)</label><input type="number" class="form-input" value="100" data-action="save-setting" data-key="maxUploadSize"></div>
-            <div style="margin-top:20px;display:flex;gap:12px;">
-              <button class="btn btn-primary" data-action="save-settings" style="height:40px;font-size:13px;">Save Changes</button>
-              <button class="btn btn-secondary" data-action="reset-settings" style="height:40px;font-size:13px;">Reset</button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <div id="settings-content">${this._settingsTabContent('general', settings)}</div>
     </div>`;
     initIcons();
+  },
+
+  _settingsTabContent(tab, settings) {
+    const v = (key, fallback) => settings[key] !== undefined ? settings[key] : fallback;
+    if (tab === 'general') {
+      return `<div class="card" style="max-width:600px;">
+        <div class="card-header"><h3 class="card-title">General Settings</h3></div>
+        <div style="padding:20px;">
+          <div class="form-group"><label class="form-label">Company Name</label><input type="text" class="form-input" value="${v('companyName', 'LanxGrow Learning')}" data-action="save-setting" data-key="companyName"></div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">Default Platform Language</label>
+            <select class="form-select" data-action="save-setting" data-key="language">
+              <option value="en" ${v('language', 'en') === 'en' ? 'selected' : ''}>English</option>
+              <option value="es" ${v('language', 'en') === 'es' ? 'selected' : ''}>Spanish</option>
+              <option value="fr" ${v('language', 'en') === 'fr' ? 'selected' : ''}>French</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">Timezone</label>
+            <select class="form-select" data-action="save-setting" data-key="timezone">
+              <option value="UTC" ${v('timezone', 'UTC') === 'UTC' ? 'selected' : ''}>UTC</option>
+              <option value="US/Eastern" ${v('timezone', 'UTC') === 'US/Eastern' ? 'selected' : ''}>US/Eastern</option>
+              <option value="US/Pacific" ${v('timezone', 'UTC') === 'US/Pacific' ? 'selected' : ''}>US/Pacific</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">Max Upload Size (MB)</label><input type="number" class="form-input" value="${v('maxUploadSize', 100)}" data-action="save-setting" data-key="maxUploadSize"></div>
+          <div style="margin-top:20px;display:flex;gap:12px;">
+            <button class="btn btn-primary" data-action="save-settings" style="height:40px;font-size:13px;">Save Changes</button>
+            <button class="btn btn-secondary" data-action="reset-settings" style="height:40px;font-size:13px;">Reset</button>
+          </div>
+        </div>
+      </div>`;
+    } else if (tab === 'branding') {
+      return `<div class="card" style="max-width:600px;">
+        <div class="card-header"><h3 class="card-title">Branding</h3></div>
+        <div style="padding:20px;">
+          <div class="form-group"><label class="form-label">Company Logo</label><div style="width:120px;height:120px;border:2px dashed var(--border);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;cursor:pointer;"><i data-icon="upload" class="icon-26" style="color:var(--text-muted);"></i></div></div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">Primary Color</label><div style="display:flex;align-items:center;gap:12px;"><input type="color" class="form-input" value="${v('primaryColor', '#1A56DB')}" style="width:48px;height:40px;padding:4px;" data-action="save-setting" data-key="primaryColor"><input type="text" class="form-input" value="${v('primaryColor', '#1A56DB')}" style="flex:1;"></div></div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">Favicon</label><input type="file" class="form-input" accept="image/*"></div>
+          <div style="margin-top:20px;display:flex;gap:12px;">
+            <button class="btn btn-primary" data-action="save-settings" style="height:40px;font-size:13px;">Save Changes</button>
+            <button class="btn btn-secondary" data-action="reset-settings" style="height:40px;font-size:13px;">Reset</button>
+          </div>
+        </div>
+      </div>`;
+    } else if (tab === 'email') {
+      return `<div class="card" style="max-width:600px;">
+        <div class="card-header"><h3 class="card-title">Email Configuration</h3></div>
+        <div style="padding:20px;">
+          <div class="form-group"><label class="form-label">SMTP Host</label><input type="text" class="form-input" value="${v('smtpHost', 'smtp.sendgrid.net')}" data-action="save-setting" data-key="smtpHost"></div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">SMTP Port</label><input type="number" class="form-input" value="${v('smtpPort', 587)}" data-action="save-setting" data-key="smtpPort"></div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">From Address</label><input type="email" class="form-input" value="${v('fromEmail', 'noreply@lanxgrow.com')}" data-action="save-setting" data-key="fromEmail"></div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">From Name</label><input type="text" class="form-input" value="${v('fromName', 'LanxGrow Learning')}" data-action="save-setting" data-key="fromName"></div>
+          <div style="margin-top:20px;display:flex;gap:12px;">
+            <button class="btn btn-primary" data-action="save-settings" style="height:40px;font-size:13px;">Save Changes</button>
+            <button class="btn btn-secondary" data-action="test-email" style="height:40px;font-size:13px;">Send Test</button>
+          </div>
+        </div>
+      </div>`;
+    }
+    return '';
   },
 
   renderSettingsTab(tab) {
@@ -980,52 +1044,14 @@ window.AppRouter = {
     if (active) { active.style.borderBottomColor = 'var(--primary)'; active.style.color = 'var(--text)'; }
     const container = document.getElementById('settings-content');
     if (!container) return;
-    if (tab === 'general') {
-      container.innerHTML = `<div class="card" style="max-width:600px;">
-        <div class="card-header"><h3 class="card-title">General Settings</h3></div>
-        <div style="padding:20px;">
-          <div class="form-group"><label class="form-label">Company Name</label><input type="text" class="form-input" value="LanxGrow Learning" data-action="save-setting" data-key="companyName"></div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">Default Platform Language</label>
-            <select class="form-select" data-action="save-setting" data-key="language"><option value="en" selected>English</option><option value="es">Spanish</option><option value="fr">French</option></select>
-          </div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">Timezone</label>
-            <select class="form-select" data-action="save-setting" data-key="timezone"><option value="UTC" selected>UTC</option><option value="US/Eastern">US/Eastern</option><option value="US/Pacific">US/Pacific</option></select>
-          </div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">Max Upload Size (MB)</label><input type="number" class="form-input" value="100" data-action="save-setting" data-key="maxUploadSize"></div>
-          <div style="margin-top:20px;display:flex;gap:12px;">
-            <button class="btn btn-primary" data-action="save-settings" style="height:40px;font-size:13px;">Save Changes</button>
-            <button class="btn btn-secondary" data-action="reset-settings" style="height:40px;font-size:13px;">Reset</button>
-          </div>
-        </div>
-      </div>`;
-    } else if (tab === 'branding') {
-      container.innerHTML = `<div class="card" style="max-width:600px;">
-        <div class="card-header"><h3 class="card-title">Branding</h3></div>
-        <div style="padding:20px;">
-          <div class="form-group"><label class="form-label">Company Logo</label><div style="width:120px;height:120px;border:2px dashed var(--border);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;cursor:pointer;"><i data-icon="upload" class="icon-26" style="color:var(--text-muted);"></i></div></div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">Primary Color</label><div style="display:flex;align-items:center;gap:12px;"><input type="color" class="form-input" value="#1A56DB" style="width:48px;height:40px;padding:4px;"><input type="text" class="form-input" value="#1A56DB" style="flex:1;"></div></div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">Favicon</label><input type="file" class="form-input" accept="image/*"></div>
-          <div style="margin-top:20px;display:flex;gap:12px;">
-            <button class="btn btn-primary" data-action="save-settings" style="height:40px;font-size:13px;">Save Changes</button>
-            <button class="btn btn-secondary" data-action="reset-settings" style="height:40px;font-size:13px;">Reset</button>
-          </div>
-        </div>
-      </div>`;
-    } else if (tab === 'email') {
-      container.innerHTML = `<div class="card" style="max-width:600px;">
-        <div class="card-header"><h3 class="card-title">Email Configuration</h3></div>
-        <div style="padding:20px;">
-          <div class="form-group"><label class="form-label">SMTP Host</label><input type="text" class="form-input" value="smtp.sendgrid.net" data-action="save-setting" data-key="smtpHost"></div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">SMTP Port</label><input type="number" class="form-input" value="587" data-action="save-setting" data-key="smtpPort"></div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">From Address</label><input type="email" class="form-input" value="noreply@lanxgrow.com" data-action="save-setting" data-key="fromEmail"></div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">From Name</label><input type="text" class="form-input" value="LanxGrow Learning" data-action="save-setting" data-key="fromName"></div>
-          <div style="margin-top:20px;display:flex;gap:12px;">
-            <button class="btn btn-primary" data-action="save-settings" style="height:40px;font-size:13px;">Save Changes</button>
-            <button class="btn btn-secondary" data-action="test-email" style="height:40px;font-size:13px;">Send Test</button>
-          </div>
-        </div>
-      </div>`;
-    }
+    const allInputs = document.querySelectorAll('#settings-content [data-action="save-setting"]');
+    const settings = {};
+    allInputs.forEach(input => {
+      const key = input.dataset.key;
+      if (!key) return;
+      settings[key] = input.type === 'checkbox' ? input.checked : input.type === 'number' ? parseFloat(input.value) || 0 : input.value;
+    });
+    container.innerHTML = this._settingsTabContent(tab, settings);
     initIcons();
   },
 
@@ -2598,6 +2624,24 @@ document.addEventListener('click', async function (e) {
     window.StudentPortal.navigateLesson(studentId, id, 'next');
     return;
   }
+  if (action === 'sp-open-assignment') {
+    const lessonId = el.dataset.lessonId;
+    try {
+      const lesson = await window.LessonService?.getById(lessonId);
+      if (lesson?.content_url) { window.open(lesson.content_url, '_blank'); }
+      else { AppToast.show('No assignment URL configured for this lesson.', 'info'); }
+    } catch (err) { AppToast.show(err.message || 'Failed to open assignment.', 'error'); }
+    return;
+  }
+  if (action === 'sp-start-quiz') {
+    const lessonId = el.dataset.lessonId;
+    try {
+      const lesson = await window.LessonService?.getById(lessonId);
+      if (lesson?.content_url) { window.open(lesson.content_url, '_blank'); }
+      else { AppToast.show('No quiz URL configured for this lesson.', 'info'); }
+    } catch (err) { AppToast.show(err.message || 'Failed to start quiz.', 'error'); }
+    return;
+  }
   if (action === 'sp-open-lesson') {
     const studentId = el.dataset.studentId;
     const lesson = await window.LessonService?.getById(id);
@@ -2614,7 +2658,41 @@ document.addEventListener('click', async function (e) {
     return;
   }
   if (action === 'sp-download-certificate') {
-    AppToast.show('Certificate download will be available in the next update.', 'info');
+    const certId = el.dataset.certId;
+    try {
+      const cert = await window.CertificateService?.getById(certId);
+      const student = cert ? await window.StudentService?.getById(cert.student_id) : null;
+      const course = cert ? await window.CourseService?.getById(cert.course_id) : null;
+      if (cert && student && course) {
+        const win = window.open('', '_blank');
+        if (win) {
+          win.document.write(`<!DOCTYPE html><html><head><title>${course.name} - Certificate</title><style>
+            body { font-family: Georgia, serif; display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5; }
+            .cert { border:3px double #1A56DB; border-radius:12px; padding:60px 40px; max-width:700px; text-align:center; background:linear-gradient(135deg,#faf5ff,#eff6ff); margin:20px; }
+            h1 { font-size:12px; text-transform:uppercase; letter-spacing:2px; color:#666; }
+            h2 { font-size:32px; color:#1A56DB; margin:8px 0; }
+            .sub { font-size:14px; color:#666; }
+            .name { font-size:24px; font-weight:600; border-bottom:2px solid #1A56DB; display:inline-block; padding-bottom:4px; margin:24px 0; }
+            .footer { font-size:9px; color:#999; margin-top:24px; }
+            .meta { font-size:11px; font-family:monospace; color:#666; margin-top:8px; }
+          </style></head><body>
+            <div class="cert">
+              <h1>Certificate of Completion</h1>
+              <h2>${course.name}</h2>
+              <div class="sub">This is to certify that</div>
+              <div class="name">${student.name}</div>
+              <div class="sub">has successfully completed the course requirements on ${AppUtils.formatDate(cert.completed_at || cert.issued_at)}</div>
+              <div class="meta">Certificate ID: ${cert.certificate_number || certId}</div>
+              <div class="footer">LANXGROW INDIA — Learning Management System</div>
+            </div>
+            <script>window.print();<\/script>
+          </body></html>`);
+          win.document.close();
+        }
+      } else {
+        AppToast.show('Certificate data not found.', 'warn');
+      }
+    } catch (err) { AppToast.show(err.message || 'Download failed.', 'error'); }
     return;
   }
 
@@ -2696,6 +2774,15 @@ document.addEventListener('click', async function (e) {
         }
       } catch (err) { AppToast.show(err.message, 'error'); }
     }
+    return;
+  }
+
+  // Logout
+  if (action === 'logout') {
+    try {
+      await AuthService.signOut();
+      window.location.reload();
+    } catch (err) { AppToast.show(err.message || 'Logout failed.', 'error'); }
     return;
   }
 
