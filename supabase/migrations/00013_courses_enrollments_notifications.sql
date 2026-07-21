@@ -1,6 +1,7 @@
 -- Create courses, course_sections, enrollments, and notifications tables
 -- with Row Level Security policies
 -- Run this AFTER 00012_students_extend.sql
+-- Fully idempotent: safe to run multiple times
 
 -- ==============================================================
 -- 1. COURSES
@@ -18,34 +19,42 @@ create index if not exists idx_courses_school_id on public.courses(school_id);
 
 alter table public.courses enable row level security;
 
+drop policy if exists "Super admins can read all courses" on public.courses;
 create policy "Super admins can read all courses"
   on public.courses for select
   using (public.is_super_admin());
 
+drop policy if exists "School admins can read own courses" on public.courses;
 create policy "School admins can read own courses"
   on public.courses for select
   using (school_id = public.get_user_school_id());
 
+drop policy if exists "Super admins can insert courses" on public.courses;
 create policy "Super admins can insert courses"
   on public.courses for insert
   with check (public.is_super_admin());
 
+drop policy if exists "School admins can insert own courses" on public.courses;
 create policy "School admins can insert own courses"
   on public.courses for insert
   with check (school_id = public.get_user_school_id());
 
+drop policy if exists "Super admins can update courses" on public.courses;
 create policy "Super admins can update courses"
   on public.courses for update
   using (public.is_super_admin());
 
+drop policy if exists "School admins can update own courses" on public.courses;
 create policy "School admins can update own courses"
   on public.courses for update
   using (school_id = public.get_user_school_id());
 
+drop policy if exists "Super admins can delete courses" on public.courses;
 create policy "Super admins can delete courses"
   on public.courses for delete
   using (public.is_super_admin());
 
+drop policy if exists "School admins can delete own courses" on public.courses;
 create policy "School admins can delete own courses"
   on public.courses for delete
   using (school_id = public.get_user_school_id());
@@ -66,10 +75,12 @@ create index if not exists idx_course_sections_section_id on public.course_secti
 
 alter table public.course_sections enable row level security;
 
+drop policy if exists "Super admins can manage course_sections" on public.course_sections;
 create policy "Super admins can manage course_sections"
   on public.course_sections for all
   using (public.is_super_admin());
 
+drop policy if exists "School admins can manage own course_sections" on public.course_sections;
 create policy "School admins can manage own course_sections"
   on public.course_sections for all
   using (exists (
@@ -98,10 +109,12 @@ create index if not exists idx_enrollments_course_id on public.enrollments(cours
 
 alter table public.enrollments enable row level security;
 
+drop policy if exists "Super admins can read all enrollments" on public.enrollments;
 create policy "Super admins can read all enrollments"
   on public.enrollments for select
   using (public.is_super_admin());
 
+drop policy if exists "School admins can read own enrollments" on public.enrollments;
 create policy "School admins can read own enrollments"
   on public.enrollments for select
   using (exists (
@@ -110,10 +123,12 @@ create policy "School admins can read own enrollments"
     and s.school_id = public.get_user_school_id()
   ));
 
+drop policy if exists "Super admins can insert enrollments" on public.enrollments;
 create policy "Super admins can insert enrollments"
   on public.enrollments for insert
   with check (public.is_super_admin());
 
+drop policy if exists "School admins can insert own enrollments" on public.enrollments;
 create policy "School admins can insert own enrollments"
   on public.enrollments for insert
   with check (exists (
@@ -122,10 +137,12 @@ create policy "School admins can insert own enrollments"
     and s.school_id = public.get_user_school_id()
   ));
 
+drop policy if exists "Super admins can update enrollments" on public.enrollments;
 create policy "Super admins can update enrollments"
   on public.enrollments for update
   using (public.is_super_admin());
 
+drop policy if exists "School admins can update own enrollments" on public.enrollments;
 create policy "School admins can update own enrollments"
   on public.enrollments for update
   using (exists (
@@ -134,10 +151,12 @@ create policy "School admins can update own enrollments"
     and s.school_id = public.get_user_school_id()
   ));
 
+drop policy if exists "Super admins can delete enrollments" on public.enrollments;
 create policy "Super admins can delete enrollments"
   on public.enrollments for delete
   using (public.is_super_admin());
 
+drop policy if exists "School admins can delete own enrollments" on public.enrollments;
 create policy "School admins can delete own enrollments"
   on public.enrollments for delete
   using (exists (
@@ -163,18 +182,22 @@ create index if not exists idx_notifications_read on public.notifications(user_i
 
 alter table public.notifications enable row level security;
 
+drop policy if exists "Users can read own notifications" on public.notifications;
 create policy "Users can read own notifications"
   on public.notifications for select
   using (user_id = auth.uid());
 
+drop policy if exists "Users can insert own notifications" on public.notifications;
 create policy "Users can insert own notifications"
   on public.notifications for insert
   with check (user_id = auth.uid());
 
+drop policy if exists "Users can update own notifications" on public.notifications;
 create policy "Users can update own notifications"
   on public.notifications for update
   using (user_id = auth.uid());
 
+drop policy if exists "Super admins can delete notifications" on public.notifications;
 create policy "Super admins can delete notifications"
   on public.notifications for delete
   using (public.is_super_admin());
