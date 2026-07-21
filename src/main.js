@@ -249,6 +249,9 @@ window.AppModal = {
   open(id) {
     const el = document.getElementById(id);
     if (!el) return;
+    if (!document.querySelector('.modal-overlay.active')) {
+      document.body.style.overflow = 'hidden';
+    }
     el.classList.add('active');
     document.addEventListener('keydown', this._keyHandler);
     const firstInput = el.querySelector('input, select, button');
@@ -258,6 +261,9 @@ window.AppModal = {
     const el = document.getElementById(id);
     if (!el) return;
     el.classList.remove('active');
+    if (!document.querySelector('.modal-overlay.active')) {
+      document.body.style.overflow = '';
+    }
     document.removeEventListener('keydown', this._keyHandler);
     if (id === 'modal-entity') document.getElementById('form-entity').reset();
   },
@@ -1938,9 +1944,12 @@ function openSchoolModal(schoolId) {
 }
 
 async function handleEntitySubmit() {
+  const btn = document.getElementById('btn-save-entity');
   const type = document.getElementById('entity-type').value;
   const id = document.getElementById('entity-id').value;
   const isEdit = !!id;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
   try {
     if (type === 'school') {
       const name = document.getElementById('input-name').value.trim();
@@ -2029,6 +2038,9 @@ async function handleEntitySubmit() {
     AppRouter.render();
   } catch (err) {
     AppToast.show(err.message || 'An error occurred.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = isEdit ? 'Save Changes' : 'Save';
   }
 }
 
@@ -2036,12 +2048,19 @@ async function handleEntitySubmit() {
 // EVENT DELEGATION — CLICK
 // ==============================================================
 document.addEventListener('click', async function (e) {
-  const el = e.target.closest('[data-action]');
+  const el = e.target.closest('[data-action], [data-close-modal]');
   if (!el) {
     const overlay = e.target.closest('.modal-overlay');
     if (overlay && e.target === overlay) { AppModal.close(overlay.id); }
     return;
   }
+
+  // Handle data-close-modal (works with or without data-action)
+  if (el.hasAttribute('data-close-modal')) {
+    AppModal.close(el.getAttribute('data-close-modal') || el.closest('.modal-overlay')?.id);
+    return;
+  }
+
   const action = el.dataset.action;
   const id = el.dataset.id;
   const route = el.dataset.route;
@@ -2100,7 +2119,7 @@ document.addEventListener('click', async function (e) {
 
   // Admin
   // User Management
-  if (action === 'add-user') { AppToast.show('User invitation requires the invite-admin Edge Function (planned).', 'info'); return; }
+  if (action === 'add-user') { AppToast.show('User invitation — coming in a future update.', 'info'); return; }
   if (action === 'edit-user') { AppUserManagement.openEditModal(id); return; }
   if (action === 'save-edit-user') { AppUserManagement.saveEditUser(id); return; }
   if (action === 'deactivate-user') { AppUserManagement.confirmDeactivate(id); return; }
@@ -2223,8 +2242,32 @@ document.addEventListener('click', async function (e) {
     return;
   }
 
-  // Media
-  if (action === 'preview-image') { AppToast.show('Preview mode.', 'info'); return; }
+  // Media — image preview
+  if (action === 'preview-image' && id) {
+    const data = await AppStorage.load();
+    const item = data.content.find(c => c.id === id);
+    if (item && item.url) {
+      const existing = document.getElementById('modal-image-preview');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.id = 'modal-image-preview';
+      overlay.innerHTML = `<div class="modal" style="max-width:90vw;max-height:90vh;">
+        <div class="modal-header">
+          <h3 class="modal-title">${item.name}</h3>
+          <button class="modal-close" data-close-modal="modal-image-preview"><span class="material-symbols-outlined">close</span></button>
+        </div>
+        <div class="modal-body" style="display:flex;align-items:center;justify-content:center;padding:16px;">
+          <img src="${item.url}" alt="${item.name}" style="max-width:100%;max-height:70vh;border-radius:6px;object-fit:contain;">
+        </div>
+      </div>`;
+      document.body.appendChild(overlay);
+      AppModal.open(overlay.id);
+    } else {
+      AppToast.show('No image URL available.', 'warn');
+    }
+    return;
+  }
 
   // Review
   if (action === 'add-timestamp') {
@@ -2242,9 +2285,39 @@ document.addEventListener('click', async function (e) {
     AppToast.show('Timestamp marker added.', 'success');
     return;
   }
-  if (action === 'review-approve') { AppToast.show('Content approved.', 'success'); return; }
-  if (action === 'review-request') { AppToast.show('Revision requested.', 'info'); return; }
-  if (action === 'review-reject') { AppToast.show('Content rejected.', 'error'); return; }
+  if (action === 'review-approve') {
+    const contentId = document.getElementById('video-content-id')?.textContent;
+    if (contentId) {
+      try {
+        await window.ContentService?.update(contentId, { status: 'published' });
+        await AppStorage.load(true);
+        AppToast.show('Content approved and published.', 'success');
+      } catch (err) { AppToast.show(err.message || 'Failed to approve content.', 'error'); }
+    }
+    return;
+  }
+  if (action === 'review-request') {
+    const contentId = document.getElementById('video-content-id')?.textContent;
+    if (contentId) {
+      try {
+        await window.ContentService?.update(contentId, { status: 'review' });
+        await AppStorage.load(true);
+        AppToast.show('Revision requested.', 'info');
+      } catch (err) { AppToast.show(err.message || 'Failed to update content.', 'error'); }
+    }
+    return;
+  }
+  if (action === 'review-reject') {
+    const contentId = document.getElementById('video-content-id')?.textContent;
+    if (contentId) {
+      try {
+        await window.ContentService?.update(contentId, { status: 'draft' });
+        await AppStorage.load(true);
+        AppToast.show('Content rejected.', 'error');
+      } catch (err) { AppToast.show(err.message || 'Failed to reject content.', 'error'); }
+    }
+    return;
+  }
 
   // Settings
   if (action === 'settings-tab') { AppRouter.renderSettingsTab(el.dataset.tab); return; }
@@ -2321,8 +2394,8 @@ document.addEventListener('click', async function (e) {
   }
   if (action === 'sp-student-page') { window.SchoolStudents.currentPage = parseInt(el.dataset.page); AppRouter.render(); return; }
   if (action === 'sp-view-student') { window.SchoolStudents.viewStudent(id); return; }
-  if (action === 'sp-download-profile') { AppToast.show('Download Profile — Available in Production Version', 'info'); return; }
-  if (action === 'sp-print-profile') { AppToast.show('Print — Available in Production Version', 'info'); return; }
+  if (action === 'sp-download-profile') { AppToast.show('Profile download — coming in a future update.', 'info'); return; }
+  if (action === 'sp-print-profile') { AppToast.show('Print — coming in a future update.', 'info'); return; }
   if (action === 'sp-student-courses') {
     window.SchoolStudents.assignCourses(id);
     return;
@@ -2605,7 +2678,7 @@ document.addEventListener('click', async function (e) {
   }
 
   // Export (Demo)
-  if (action === 'sp-export-csv') { AppToast.show('Export CSV — Available in Production Version', 'info'); return; }
+  if (action === 'sp-export-csv') { AppToast.show('Export CSV — coming in a future update.', 'info'); return; }
   // Settings
   if (action === 'sp-save-settings') { window.SchoolSettings.save(AppRouter.currentSchoolId); return; }
 

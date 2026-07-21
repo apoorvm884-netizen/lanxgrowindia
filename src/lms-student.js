@@ -112,8 +112,7 @@ window.StudentPortal = {
       </div>
     </div>`;
     document.body.appendChild(overlay);
-    overlay.classList.add('active');
-    document.addEventListener('keydown', AppModal._keyHandler);
+    AppModal.open(overlay.id);
     initIcons();
   },
 
@@ -186,8 +185,7 @@ window.StudentPortal = {
         </div>
       </div>`;
       document.body.appendChild(overlay);
-      overlay.classList.add('active');
-      document.addEventListener('keydown', AppModal._keyHandler);
+      AppModal.open(overlay.id);
       initIcons();
     } catch (err) { AppToast.show(err.message || 'Failed to open course player.', 'error'); }
   },
@@ -361,8 +359,7 @@ window.StudentPortal = {
         </div>
       </div>`;
       document.body.appendChild(overlay);
-      overlay.classList.add('active');
-      document.addEventListener('keydown', AppModal._keyHandler);
+      AppModal.open(overlay.id);
       initIcons();
     } catch (err) { AppToast.show(err.message || 'Failed to load certificate.', 'error'); }
   }
