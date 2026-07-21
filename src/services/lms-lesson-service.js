@@ -29,7 +29,7 @@ export const LessonService = {
       .insert({
         module_id: item.moduleId,
         title: item.title,
-        content_type: item.contentType || null,
+        content_type: item.contentType || 'video',
         content_url: item.contentUrl || null,
         content_id: item.contentId || null,
         sort_order: item.sortOrder,

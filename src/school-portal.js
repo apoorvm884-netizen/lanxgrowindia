@@ -400,7 +400,7 @@ window.SchoolCounselors = {
     if (q) counselors = counselors.filter(c => c.name.toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q));
 
     let students = [];
-    try { students = await window.StudentService?.getBySchool(schoolId) || []; } catch {}
+    try { students = await window.StudentService?.getBySchool(schoolId) || []; } catch (e) { console.error('Failed in school-portal:', e); }
 
     main.innerHTML = `<div class="fade-in">
       <div class="page-header">
@@ -932,7 +932,7 @@ window.SchoolCourses = {
   async showModuleForm(moduleId) {
     let moduleData = null;
     if (moduleId) {
-      try { moduleData = await window.ModuleService?.getById(moduleId); } catch {}
+      try { moduleData = await window.ModuleService?.getById(moduleId); } catch (e) { console.error('Failed in school-portal:', e); }
     }
     const existing = document.getElementById('modal-module-form');
     if (existing) existing.remove();
@@ -960,7 +960,7 @@ window.SchoolCourses = {
   async showLessonForm(moduleId, lessonId) {
     let lessonData = null;
     if (lessonId) {
-      try { lessonData = await window.LessonService?.getById(lessonId); } catch {}
+      try { lessonData = await window.LessonService?.getById(lessonId); } catch (e) { console.error('Failed in school-portal:', e); }
     }
     const existing = document.getElementById('modal-lesson-form');
     if (existing) existing.remove();
@@ -1001,9 +1001,9 @@ window.SchoolAssignments = {
   async render(main, data, school) {
     const schoolId = school.id;
     let courses = [], students = [], enrollments = [];
-    try { courses = await window.CourseService?.getBySchool(schoolId) || []; } catch {}
-    try { students = await window.StudentService?.getBySchool(schoolId) || []; } catch {}
-    try { enrollments = await window.EnrollmentService?.getBySchool(schoolId) || []; } catch {}
+    try { courses = await window.CourseService?.getBySchool(schoolId) || []; } catch (e) { console.error('Failed in school-portal:', e); }
+    try { students = await window.StudentService?.getBySchool(schoolId) || []; } catch (e) { console.error('Failed in school-portal:', e); }
+    try { enrollments = await window.EnrollmentService?.getBySchool(schoolId) || []; } catch (e) { console.error('Failed in school-portal:', e); }
 
     main.innerHTML = `<div class="fade-in">
       <div class="page-header">
@@ -1071,9 +1071,9 @@ window.SchoolReports = {
   async render(main, data, school) {
     const schoolId = school.id;
     let students = [], courses = [], enrollments = [];
-    try { students = await window.StudentService?.getBySchool(schoolId) || []; } catch {}
-    try { courses = await window.CourseService?.getBySchool(schoolId) || []; } catch {}
-    try { enrollments = await window.EnrollmentService?.getBySchool(schoolId) || []; } catch {}
+    try { students = await window.StudentService?.getBySchool(schoolId) || []; } catch (e) { console.error('Failed in school-portal:', e); }
+    try { courses = await window.CourseService?.getBySchool(schoolId) || []; } catch (e) { console.error('Failed in school-portal:', e); }
+    try { enrollments = await window.EnrollmentService?.getBySchool(schoolId) || []; } catch (e) { console.error('Failed in school-portal:', e); }
     const content = data.content.filter(c => c.school_id === schoolId);
     const activeStudents = students.filter(s => s.status === 'active');
     const activeEnrollments = enrollments.filter(e => e.status === 'active');
@@ -1141,7 +1141,7 @@ window.SchoolNotifications = {
     try {
       const profile = await AuthService.getProfile();
       if (profile) notifications = await window.NotificationService?.getByUser(profile.id) || [];
-    } catch {}
+    } catch (e) { console.error('Failed in school-portal:', e); }
     const filter = document.getElementById('sp-notif-filter')?.value || '';
     if (filter === 'unread') notifications = notifications.filter(n => !n.is_read);
 

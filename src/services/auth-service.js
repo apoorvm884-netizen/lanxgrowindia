@@ -19,7 +19,8 @@ export const AuthService = {
 
   async signOut() {
     const { error } = await supabase.auth.signOut();
-    return { success: !error, error: error?.message };
+    if (error) return { success: false, error: error.message };
+    return { success: true };
   },
 
   async getSession() {
@@ -36,17 +37,31 @@ export const AuthService = {
 
   onAuthStateChange(callback) {
     return supabase.auth.onAuthStateChange((event, session) => {
-      callback(event, session);
+      try { callback(event, session); } catch (e) { console.error('Auth state change handler error:', e); }
     });
   },
 
+  async signUpWithEmail(email, password, options) {
+    const { data, error } = await supabase.auth.signUp({ email, password, options });
+    if (error) return { success: false, error: error.message };
+    return { success: true, user: data.user, session: data.session };
+  },
+
+  async sendPasswordResetEmail(email) {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/reset-password'
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true, data };
+  },
+
   async getProfile() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) return null;
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
+      .eq('id', userData.user.id)
       .single();
     if (error) return null;
     return data;

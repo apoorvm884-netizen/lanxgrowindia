@@ -17,7 +17,7 @@ export const PermissionsService = {
     const { data, error } = await supabase
       .from('permissions')
       .select('*')
-      .order('role, permission');
+      .order('role').order('permission');
     if (error) throw error;
     return data || [];
   },

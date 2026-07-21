@@ -28,8 +28,8 @@ export const ProgressService = {
       student_id: studentId,
       lesson_id: lessonId,
       completed: data.completed ?? false,
-      time_spent: data.timeSpent ?? data.time_spent ?? null,
-      resume_position: data.resumePosition ?? data.resume_position ?? null,
+      time_spent: data.timeSpent ?? data.time_spent ?? 0,
+      resume_position: data.resumePosition ?? data.resume_position ?? 0,
       last_activity: new Date().toISOString()
     };
     if (data.completed_at !== undefined) payload.completed_at = data.completed_at;
@@ -65,22 +65,39 @@ export const ProgressService = {
   },
 
   async getCourseProgress(studentId, courseId) {
+    const { data: modules, error: modError } = await supabase
+      .from('course_modules')
+      .select('id')
+      .eq('course_id', courseId);
+    if (modError) throw modError;
+    const moduleIds = modules?.map(m => m.id) || [];
+    if (moduleIds.length === 0) {
+      return { total_lessons: 0, completed_lessons: 0, percentage: 0 };
+    }
+
     const { count: totalLessons, error: totalError } = await supabase
       .from('lessons')
       .select('id', { count: 'exact', head: true })
-      .eq('course_id', courseId);
+      .in('module_id', moduleIds);
     if (totalError) throw totalError;
+
+    const { data: allLessonIds, error: lessonError } = await supabase
+      .from('lessons')
+      .select('id')
+      .in('module_id', moduleIds);
+    if (lessonError) throw lessonError;
+    const lessonIds = allLessonIds?.map(l => l.id) || [];
+
+    if (lessonIds.length === 0) {
+      return { total_lessons: 0, completed_lessons: 0, percentage: 0 };
+    }
 
     const { count: completedLessons, error: completedError } = await supabase
       .from('student_progress')
       .select('id', { count: 'exact', head: true })
       .eq('student_id', studentId)
       .eq('completed', true)
-      .in('lesson_id', (await supabase
-        .from('lessons')
-        .select('id')
-        .eq('course_id', courseId)
-      ).data?.map(l => l.id) || []);
+      .in('lesson_id', lessonIds);
     if (completedError) throw completedError;
 
     return {

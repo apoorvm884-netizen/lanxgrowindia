@@ -110,7 +110,8 @@ export const DriveService = {
       .eq('id', entityId)
       .single();
 
-    if (error || !data) return entityId;
+    if (error) throw error;
+    if (!data) return entityId;
     return data.name;
   }
 };

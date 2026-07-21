@@ -12,15 +12,15 @@ window.StudentPortal = {
     const courses = enrollments.map(e => (data.courses || []).find(c => c.id === e.course_id)).filter(Boolean);
     const progressMap = {};
     for (const c of courses) {
-      try { progressMap[c.id] = await window.ProgressService?.getCourseProgress(studentId, c.id) || { completed: 0, total: 0, percentage: 0 }; }
-      catch { progressMap[c.id] = { completed: 0, total: 0, percentage: 0 }; }
+      try { progressMap[c.id] = await window.ProgressService?.getCourseProgress(studentId, c.id) || { completed_lessons: 0, total_lessons: 0, percentage: 0 }; }
+      catch { progressMap[c.id] = { completed_lessons: 0, total_lessons: 0, percentage: 0 }; }
     }
     const modules = {};
     for (const c of courses) {
       try {
         const ms = await window.ModuleService?.getByCourse(c.id) || [];
         modules[c.id] = ms;
-      } catch { modules[c.id] = []; }
+      } catch (e) { console.error('Failed to fetch modules:', e); modules[c.id] = []; }
     }
     const recentLessons = [];
     try {
@@ -29,11 +29,11 @@ window.StudentPortal = {
         try {
           const lesson = await window.LessonService?.getById(p.lesson_id);
           if (lesson) return { ...p, lesson };
-        } catch {}
+        } catch (e) { console.error('Failed to fetch lesson:', e); }
         return null;
       }));
       recentLessons.push(...progressWithLessons.filter(Boolean).reverse());
-    } catch {}
+    } catch (e) { console.error('Failed to load recent lessons:', e); }
 
     const existing = document.getElementById('modal-student-portal');
     if (existing) existing.remove();
@@ -52,7 +52,7 @@ window.StudentPortal = {
             <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Courses</div>
           </div>
           <div style="padding:14px;background:#eff6ff;border-radius:8px;text-align:center;">
-            <div style="font-size:22px;font-weight:700;color:#3b82f6;">${Object.values(progressMap).reduce((s, p) => s + (p.completed || 0), 0)}</div>
+            <div style="font-size:22px;font-weight:700;color:#3b82f6;">${Object.values(progressMap).reduce((s, p) => s + (p.completed_lessons || 0), 0)}</div>
             <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Lessons Done</div>
           </div>
           <div style="padding:14px;background:#f5f3ff;border-radius:8px;text-align:center;">
@@ -69,7 +69,7 @@ window.StudentPortal = {
           <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Enrolled Courses</div>
           ${courses.length === 0 ? '<div style="font-size:13px;color:var(--text-muted);padding:20px;text-align:center;border:1px dashed var(--border);border-radius:8px;">No courses assigned yet.</div>'
           : courses.map(c => {
-            const p = progressMap[c.id] || { completed: 0, total: 0, percentage: 0 };
+            const p = progressMap[c.id] || { completed_lessons: 0, total_lessons: 0, percentage: 0 };
             const mods = modules[c.id] || [];
             return `<div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;cursor:pointer;" data-action="sp-open-course-player" data-student-id="${studentId}" data-course-id="${c.id}">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -133,7 +133,7 @@ window.StudentPortal = {
         try {
           const p = await window.ProgressService?.getByLesson(studentId, l.id);
           if (p) progressMap[l.id] = p;
-        } catch {}
+        } catch (e) { console.error('Failed to fetch lesson progress:', e); }
       }
       const completedCount = flatLessons.filter(l => progressMap[l.id]?.completed).length;
       const totalCount = flatLessons.length;
@@ -308,7 +308,7 @@ window.StudentPortal = {
   async viewCertificate(studentId, courseId) {
     try {
       let cert;
-      try { cert = await window.CertificateService?.getByCourse(studentId, courseId); } catch {}
+      try { cert = await window.CertificateService?.getByCourse(studentId, courseId); } catch (e) { console.error('Failed to fetch certificate:', e); }
       if (!cert) {
         const progress = await window.ProgressService?.getCourseProgress(studentId, courseId);
         if (!progress || progress.percentage < 100) {

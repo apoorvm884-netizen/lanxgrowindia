@@ -92,7 +92,7 @@ export const QuizService = {
       .insert({
         quiz_id: data.quizId || data.quiz_id,
         question_text: data.questionText || data.question_text,
-        question_type: data.questionType || data.question_type || 'multiple_choice',
+        question_type: data.questionType || data.question_type || 'mcq',
         options: data.options || null,
         correct_answer: data.correctAnswer || data.correct_answer || null,
         marks: data.marks ?? 1,
@@ -189,6 +189,14 @@ export const QuizService = {
       .single();
     if (attempt.error) throw attempt.error;
 
+    const { data: quiz, error: quizError } = await supabase
+      .from('quizzes')
+      .select('passing_score')
+      .eq('id', attempt.data.quiz_id)
+      .single();
+    if (quizError) throw quizError;
+    const passingScore = quiz?.passing_score ?? 50;
+
     const { data: questions, error: qError } = await supabase
       .from('quiz_questions')
       .select('id, marks, correct_answer')
@@ -224,7 +232,7 @@ export const QuizService = {
         score,
         total_marks: totalMarks,
         percentage,
-        passed: percentage >= 0
+        passed: percentage >= passingScore
       })
       .eq('id', attemptId)
       .select()
