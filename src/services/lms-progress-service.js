@@ -75,18 +75,12 @@ export const ProgressService = {
       return { total_lessons: 0, completed_lessons: 0, percentage: 0 };
     }
 
-    const { count: totalLessons, error: totalError } = await supabase
-      .from('lessons')
-      .select('id', { count: 'exact', head: true })
-      .in('module_id', moduleIds);
-    if (totalError) throw totalError;
-
-    const { data: allLessonIds, error: lessonError } = await supabase
+    const { data: allLessons, error: lessonError } = await supabase
       .from('lessons')
       .select('id')
       .in('module_id', moduleIds);
     if (lessonError) throw lessonError;
-    const lessonIds = allLessonIds?.map(l => l.id) || [];
+    const lessonIds = allLessons?.map(l => l.id) || [];
 
     if (lessonIds.length === 0) {
       return { total_lessons: 0, completed_lessons: 0, percentage: 0 };
@@ -101,9 +95,93 @@ export const ProgressService = {
     if (completedError) throw completedError;
 
     return {
-      total_lessons: totalLessons || 0,
+      total_lessons: lessonIds.length,
       completed_lessons: completedLessons || 0,
-      percentage: totalLessons ? Math.round(((completedLessons || 0) / totalLessons) * 100) : 0
+      percentage: lessonIds.length ? Math.round(((completedLessons || 0) / lessonIds.length) * 100) : 0
     };
+  },
+
+  async getCourseProgressBatch(studentId, courseIds) {
+    if (!courseIds.length) return {};
+    const { data: modules, error: modError } = await supabase
+      .from('course_modules')
+      .select('id, course_id')
+      .in('course_id', courseIds);
+    if (modError) throw modError;
+    if (!modules?.length) return Object.fromEntries(courseIds.map(c => [c, { total_lessons: 0, completed_lessons: 0, percentage: 0 }]));
+
+    const courseModuleMap = {};
+    for (const m of modules) {
+      if (!courseModuleMap[m.course_id]) courseModuleMap[m.course_id] = [];
+      courseModuleMap[m.course_id].push(m.id);
+    }
+    const allModuleIds = modules.map(m => m.id);
+
+    const { data: allLessons, error: lessonError } = await supabase
+      .from('lessons')
+      .select('id, module_id')
+      .in('module_id', allModuleIds);
+    if (lessonError) throw lessonError;
+
+    const moduleLessonMap = {};
+    const allLessonIds = [];
+    for (const l of allLessons || []) {
+      if (!moduleLessonMap[l.module_id]) moduleLessonMap[l.module_id] = [];
+      moduleLessonMap[l.module_id].push(l.id);
+      allLessonIds.push(l.id);
+    }
+
+    const courseLessonCount = {};
+    for (const [courseId, mids] of Object.entries(courseModuleMap)) {
+      courseLessonCount[courseId] = 0;
+      for (const mid of mids) {
+        courseLessonCount[courseId] += (moduleLessonMap[mid] || []).length;
+      }
+    }
+
+    const result = {};
+    if (allLessonIds.length === 0) {
+      for (const cid of courseIds) {
+        result[cid] = { total_lessons: 0, completed_lessons: 0, percentage: 0 };
+      }
+      return result;
+    }
+
+    const { data: completedData, error: completedError } = await supabase
+      .from('student_progress')
+      .select('lesson_id')
+      .eq('student_id', studentId)
+      .eq('completed', true)
+      .in('lesson_id', allLessonIds);
+    if (completedError) throw completedError;
+
+    const completedLessonIds = new Set((completedData || []).map(p => p.lesson_id));
+    for (const cid of courseIds) {
+      const total = courseLessonCount[cid] || 0;
+      const completed = (courseModuleMap[cid] || []).reduce((sum, mid) => {
+        return sum + (moduleLessonMap[mid] || []).filter(lid => completedLessonIds.has(lid)).length;
+      }, 0);
+      result[cid] = {
+        total_lessons: total,
+        completed_lessons: completed,
+        percentage: total ? Math.round((completed / total) * 100) : 0
+      };
+    }
+    return result;
+  },
+
+  async getByLessons(studentId, lessonIds) {
+    if (!lessonIds.length) return {};
+    const { data, error } = await supabase
+      .from('student_progress')
+      .select('*')
+      .eq('student_id', studentId)
+      .in('lesson_id', lessonIds);
+    if (error) throw error;
+    const map = {};
+    for (const p of data || []) {
+      map[p.lesson_id] = p;
+    }
+    return map;
   }
 };

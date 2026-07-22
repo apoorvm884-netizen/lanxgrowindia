@@ -81,6 +81,36 @@ export const LessonService = {
     await AuditLogService.log('deleted', 'Lesson', item?.title || 'Unknown', 'Lesson deleted');
   },
 
+  async getByModules(moduleIds) {
+    if (!moduleIds.length) return {};
+    const { data, error } = await supabase
+      .from('lessons')
+      .select('*')
+      .in('module_id', moduleIds)
+      .order('sort_order');
+    if (error) throw error;
+    const map = {};
+    for (const l of data || []) {
+      if (!map[l.module_id]) map[l.module_id] = [];
+      map[l.module_id].push(l);
+    }
+    return map;
+  },
+
+  async getByIds(ids) {
+    if (!ids.length) return {};
+    const { data, error } = await supabase
+      .from('lessons')
+      .select('*')
+      .in('id', ids);
+    if (error) throw error;
+    const map = {};
+    for (const l of data || []) {
+      map[l.id] = l;
+    }
+    return map;
+  },
+
   async reorder(items) {
     const { error } = await supabase
       .from('lessons')

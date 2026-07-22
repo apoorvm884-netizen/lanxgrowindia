@@ -24,6 +24,8 @@ import { renderSchoolIntelligence } from './demo-analytics.js';
 const demoIntegration = { DEMO_MODE: false };
 
 if (DEMO_MODE) {
+  const w = window;
+  const eh = w.AppUtils.escapeHtml;
   // ==============================================================
   // DEMO-DASHBOARD RENDERERS
   // ==============================================================
@@ -46,7 +48,7 @@ if (DEMO_MODE) {
     container.innerHTML = `
       <div style="padding:24px;">
         <h1 style="font-size:24px;font-weight:700;margin:0 0 4px;">Counselor Dashboard</h1>
-        <p style="color:var(--text-secondary);margin:0 0 24px;">${profile?.name || 'Counselor'} · ${school?.name || 'School'}</p>
+        <p style="color:var(--text-secondary);margin:0 0 24px;">${eh(profile?.name || 'Counselor')} · ${eh(school?.name || 'School')}</p>
 
         <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
           <div class="metric-card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
@@ -82,8 +84,8 @@ if (DEMO_MODE) {
                     </tr></thead>
                     <tbody>${myStudents.map((s) => `
                       <tr style="border-bottom:1px solid var(--border-light);">
-                        <td style="padding:8px 12px;">${s.name}</td>
-                        <td style="padding:8px 12px;color:var(--text-secondary);">${s.class}</td>
+                        <td style="padding:8px 12px;">${eh(s.name)}</td>
+                        <td style="padding:8px 12px;color:var(--text-secondary);">${eh(s.class)}</td>
                         <td style="padding:8px 12px;">
                           <div style="display:flex;align-items:center;gap:8px;">
                             <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
@@ -92,7 +94,7 @@ if (DEMO_MODE) {
                             <span style="font-size:12px;color:var(--text-secondary);">${s.progress}%</span>
                           </div>
                         </td>
-                        <td style="padding:8px 12px;"><span class="badge badge-${s.status === 'active' ? 'success' : 'warning'}" style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:${s.status === 'active' ? 'var(--success-bg, #e6f7e6)' : 'var(--warning-bg, #fff3e0)'};color:${s.status === 'active' ? 'var(--success, #2e7d32)' : 'var(--warning, #f57c00)'};">${s.status}</span></td>
+                        <td style="padding:8px 12px;"><span class="badge badge-${s.status === 'active' ? 'success' : 'warning'}" style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:${s.status === 'active' ? 'var(--success-bg, #e6f7e6)' : 'var(--warning-bg, #fff3e0)'};color:${s.status === 'active' ? 'var(--success, #2e7d32)' : 'var(--warning, #f57c00)'};">${eh(s.status)}</span></td>
                       </tr>`).join('')}</tbody>
                   </table>
                 </div>`}
@@ -149,7 +151,7 @@ if (DEMO_MODE) {
     container.innerHTML = `
       <div style="padding:24px;">
         <h1 style="font-size:24px;font-weight:700;margin:0 0 4px;">Student Dashboard</h1>
-        <p style="color:var(--text-secondary);margin:0 0 24px;">${student?.name || profile?.name || 'Student'} · ${school?.name || 'School'} · ${student?.class || ''}</p>
+        <p style="color:var(--text-secondary);margin:0 0 24px;">${eh(student?.name || profile?.name || 'Student')} · ${eh(school?.name || 'School')} · ${eh(student?.class || '')}</p>
 
         <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
           <div class="metric-card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
@@ -185,10 +187,10 @@ if (DEMO_MODE) {
                   return `
                     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px solid var(--border);border-radius:8px;">
                       <div>
-                        <div style="font-weight:600;font-size:14px;">${course?.name || 'Unknown Course'}</div>
-                        <div style="font-size:12px;color:var(--text-secondary);">${course?.description || ''}</div>
+                        <div style="font-weight:600;font-size:14px;">${eh(course?.name || 'Unknown Course')}</div>
+                        <div style="font-size:12px;color:var(--text-secondary);">${eh(course?.description || '')}</div>
                       </div>
-                      <span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:12px;background:${e.status === 'completed' ? 'var(--success-bg, #e6f7e6)' : e.status === 'in_progress' ? 'var(--primary-bg, #e3f2fd)' : 'var(--border-light)'};color:${statusColors[e.status] || 'var(--text-secondary)'};">${e.status.replace('_', ' ')}</span>
+                      <span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:12px;background:${e.status === 'completed' ? 'var(--success-bg, #e6f7e6)' : e.status === 'in_progress' ? 'var(--primary-bg, #e3f2fd)' : 'var(--border-light)'};color:${statusColors[e.status] || 'var(--text-secondary)'};">${eh(e.status.replace('_', ' '))}</span>
                     </div>`;
                 }).join('')}</div>`}
           </div>
@@ -225,8 +227,8 @@ if (DEMO_MODE) {
                   <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border-light);cursor:pointer;" data-action="play-video" data-id="${v.id}">
                     <span class="material-symbols-outlined" style="font-size:20px;color:var(--primary);">play_circle</span>
                     <div style="flex:1;">
-                      <div style="font-size:13px;font-weight:500;">${v.name}</div>
-                      <div style="font-size:11px;color:var(--text-secondary);">${v.duration}</div>
+                      <div style="font-size:13px;font-weight:500;">${eh(v.name)}</div>
+                      <div style="font-size:11px;color:var(--text-secondary);">${eh(v.duration)}</div>
                     </div>
                   </div>
                 `).join('')}
@@ -249,8 +251,8 @@ if (DEMO_MODE) {
             <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);${!n.is_read ? 'font-weight:600;' : ''}">
               <span class="material-symbols-outlined" style="font-size:18px;color:${!n.is_read ? 'var(--primary)' : 'var(--text-muted)'};">${!n.is_read ? 'notifications_active' : 'notifications'}</span>
               <div style="flex:1;">
-                <div style="font-size:13px;">${n.title}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">${n.message}</div>
+                <div style="font-size:13px;">${eh(n.title)}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">${eh(n.message)}</div>
               </div>
             </div>
           `).join('')}
@@ -611,6 +613,7 @@ if (DEMO_MODE) {
           id: newDemoId('audit'),
           user_id: 'demo-user',
           user_name: 'Demo User',
+          school_id: null,
           action,
           entity,
           entity_name: entityName,
@@ -835,7 +838,7 @@ if (DEMO_MODE) {
       el.style.color = '#fff';
       const filterLabel = document.querySelector('[data-action="sp-analytics-filter"] ~ span');
       const labelEl = e.target.closest('[style*="display:flex"]')?.querySelector('span:last-child');
-      if (labelEl) labelEl.innerHTML = `Showing data for <strong>${period.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</strong> · Updated just now`;
+      if (labelEl) labelEl.innerHTML = `Showing data for <strong>${eh(period.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))}</strong> · Updated just now`;
       window.AppToast?.show(`Filtered by ${period.replace(/-/g, ' ')}`, 'info');
       return;
     }

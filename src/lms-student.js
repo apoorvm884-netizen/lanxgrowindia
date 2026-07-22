@@ -5,34 +5,49 @@
 window.StudentPortal = {
 
   async dashboard(studentId) {
+    const portalEl = document.getElementById('modal-student-portal');
+    if (!portalEl) {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'modal-overlay active';
+      placeholder.id = 'modal-student-portal';
+      placeholder.innerHTML = `<div class="modal" style="max-width:800px;"><div class="modal-body" style="padding:40px;text-align:center;"><div class="spinner" style="width:32px;height:32px;border-width:3px;margin:0 auto 12px;"></div><div style="font-size:14px;color:var(--text-secondary);">Loading student portal...</div></div></div>`;
+      document.body.appendChild(placeholder);
+    }
     const student = await window.StudentService?.getById(studentId);
     if (!student) { AppToast.show('Student not found.', 'error'); return; }
     const data = await AppStorage.load();
     const enrollments = (data.enrollments || []).filter(e => e.student_id === studentId && e.status === 'active');
     const courses = enrollments.map(e => (data.courses || []).find(c => c.id === e.course_id)).filter(Boolean);
+    const courseIds = courses.map(c => c.id);
     const progressMap = {};
-    for (const c of courses) {
-      try { progressMap[c.id] = await window.ProgressService?.getCourseProgress(studentId, c.id) || { completed_lessons: 0, total_lessons: 0, percentage: 0 }; }
-      catch { progressMap[c.id] = { completed_lessons: 0, total_lessons: 0, percentage: 0 }; }
+    if (courseIds.length > 0) {
+      try {
+        const batchProgress = await window.ProgressService?.getCourseProgressBatch(studentId, courseIds) || {};
+        for (const c of courses) {
+          progressMap[c.id] = batchProgress[c.id] || { completed_lessons: 0, total_lessons: 0, percentage: 0 };
+        }
+      } catch (e) { console.error('Failed to fetch progress batch:', e); }
     }
     const modules = {};
-    for (const c of courses) {
+    if (courseIds.length > 0) {
       try {
-        const ms = await window.ModuleService?.getByCourse(c.id) || [];
-        modules[c.id] = ms;
-      } catch (e) { console.error('Failed to fetch modules:', e); modules[c.id] = []; }
+        const batchModules = await window.ModuleService?.getByCourses(courseIds) || {};
+        for (const c of courses) {
+          modules[c.id] = batchModules[c.id] || [];
+        }
+      } catch (e) { console.error('Failed to fetch modules batch:', e); }
     }
     const recentLessons = [];
     try {
       const allProgress = await window.ProgressService?.getByStudent(studentId) || [];
-      const progressWithLessons = await Promise.all(allProgress.slice(-10).map(async p => {
-        try {
-          const lesson = await window.LessonService?.getById(p.lesson_id);
-          if (lesson) return { ...p, lesson };
-        } catch (e) { console.error('Failed to fetch lesson:', e); }
-        return null;
-      }));
-      recentLessons.push(...progressWithLessons.filter(Boolean).reverse());
+      const recent = allProgress.slice(-10);
+      const lessonIds = recent.map(p => p.lesson_id).filter(Boolean);
+      const lessonMap = lessonIds.length > 0 ? (await window.LessonService?.getByIds(lessonIds) || {}) : {};
+      for (const p of recent) {
+        const lesson = lessonMap[p.lesson_id];
+        if (lesson) recentLessons.push({ ...p, lesson });
+      }
+      recentLessons.reverse();
     } catch (e) { console.error('Failed to load recent lessons:', e); }
 
     const existing = document.getElementById('modal-student-portal');
@@ -40,9 +55,10 @@ window.StudentPortal = {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'modal-student-portal';
-    overlay.innerHTML = `<div class="modal" style="max-width:800px;">
+      const eh = AppUtils.escapeHtml;
+      overlay.innerHTML = `<div class="modal" style="max-width:800px;">
       <div class="modal-header">
-        <h3 class="modal-title">${student.name} — Learning Portal</h3>
+        <h3 class="modal-title">${eh(student.name)} — Learning Portal</h3>
         <button class="modal-close" data-close-modal="modal-student-portal"><span class="material-symbols-outlined">close</span></button>
       </div>
       <div class="modal-body" style="max-height:80vh;overflow-y:auto;padding:20px;">
@@ -73,7 +89,7 @@ window.StudentPortal = {
             const mods = modules[c.id] || [];
             return `<div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;cursor:pointer;" data-action="sp-open-course-player" data-student-id="${studentId}" data-course-id="${c.id}">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <span style="font-size:14px;font-weight:600;">${c.name}</span>
+                <span style="font-size:14px;font-weight:600;">${eh(c.name)}</span>
                 <span style="font-size:11px;color:var(--text-muted);">${mods.length} module${mods.length !== 1 ? 's' : ''}</span>
               </div>
               <div style="display:flex;align-items:center;gap:10px;">
@@ -91,7 +107,7 @@ window.StudentPortal = {
           <div style="display:flex;flex-direction:column;gap:4px;">${recentLessons.slice(0, 4).map(r => `
             <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border-light);border-radius:6px;cursor:pointer;" data-action="sp-open-lesson" data-student-id="${studentId}" data-lesson-id="${r.lesson_id}">
               <span class="material-symbols-outlined" style="font-size:16px;color:${r.completed ? '#10b981' : '#3b82f6'};">${r.completed ? 'check_circle' : 'play_circle'}</span>
-              <div style="flex:1;font-size:13px;">${r.lesson?.title || 'Unknown lesson'}</div>
+              <div style="flex:1;font-size:13px;">${eh(r.lesson?.title) || 'Unknown lesson'}</div>
               <div style="font-size:10px;color:var(--text-muted);">${r.completed ? 'Completed' : 'In progress'}</div>
             </div>`).join('')}
           </div>
@@ -102,7 +118,7 @@ window.StudentPortal = {
           ${courses.filter(c => progressMap[c.id]?.percentage >= 100).map(c => `
             <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border-light);border-radius:6px;cursor:pointer;" data-action="sp-view-certificate" data-student-id="${studentId}" data-course-id="${c.id}">
               <span class="material-symbols-outlined" style="font-size:16px;color:#f59e0b;">workspace_premium</span>
-              <span style="flex:1;font-size:13px;">${c.name} — Certificate Available</span>
+              <span style="flex:1;font-size:13px;">${eh(c.name)} — Certificate Available</span>
               <span style="font-size:11px;color:var(--text-secondary);">View</span>
             </div>`).join('')}
         </div>` : ''}
@@ -122,17 +138,25 @@ window.StudentPortal = {
       const course = await window.CourseService?.getById(courseId);
       if (!course || !student) return;
       const modules = await window.ModuleService?.getByCourse(courseId) || [];
+      const moduleIds = modules.map(m => m.id);
       const allLessons = {};
-      for (const m of modules) {
-        allLessons[m.id] = await window.LessonService?.getByModule(m.id) || [];
+      if (moduleIds.length > 0) {
+        try {
+          const batchLessons = await window.LessonService?.getByModules(moduleIds) || {};
+          for (const m of modules) {
+            allLessons[m.id] = batchLessons[m.id] || [];
+          }
+        } catch (e) { console.error('Failed to fetch lessons batch:', e); }
       }
       const flatLessons = modules.flatMap(m => (allLessons[m.id] || []).map(l => ({ ...l, moduleTitle: m.title, moduleId: m.id })));
       const progressMap = {};
-      for (const l of flatLessons) {
+      if (flatLessons.length > 0) {
         try {
-          const p = await window.ProgressService?.getByLesson(studentId, l.id);
-          if (p) progressMap[l.id] = p;
-        } catch (e) { console.error('Failed to fetch lesson progress:', e); }
+          const batchProgress = await window.ProgressService?.getByLessons(studentId, flatLessons.map(l => l.id)) || {};
+          for (const l of flatLessons) {
+            if (batchProgress[l.id]) progressMap[l.id] = batchProgress[l.id];
+          }
+        } catch (e) { console.error('Failed to fetch progress batch:', e); }
       }
       const completedCount = flatLessons.filter(l => progressMap[l.id]?.completed).length;
       const totalCount = flatLessons.length;
@@ -143,15 +167,16 @@ window.StudentPortal = {
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
       overlay.id = 'modal-course-player';
+      const eh = AppUtils.escapeHtml;
       overlay.innerHTML = `<div class="modal" style="max-width:900px;">
         <div class="modal-header">
-          <h3 class="modal-title">${course.name}</h3>
+          <h3 class="modal-title">${eh(course.name)}</h3>
           <button class="modal-close" data-close-modal="modal-course-player"><span class="material-symbols-outlined">close</span></button>
         </div>
         <div class="modal-body" style="max-height:80vh;overflow-y:auto;padding:0;display:flex;flex-direction:column;">
           <div style="padding:16px 20px;border-bottom:1px solid var(--border);">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-              <span style="font-size:13px;color:var(--text-secondary);">${student.name}</span>
+              <span style="font-size:13px;color:var(--text-secondary);">${eh(student.name)}</span>
               <span style="font-size:12px;font-weight:600;color:${percentage >= 80 ? '#10b981' : percentage >= 40 ? '#f59e0b' : '#6b7280'};">${completedCount}/${totalCount} lessons (${percentage}%)</span>
             </div>
             <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
@@ -163,14 +188,14 @@ window.StudentPortal = {
               ${modules.length === 0 ? '<div style="padding:20px;font-size:13px;color:var(--text-muted);text-align:center;">No modules yet.</div>'
               : modules.map((m, mi) => `
                 <div style="border-bottom:1px solid var(--border-light);">
-                  <div style="padding:10px 14px;font-size:12px;font-weight:600;color:var(--text-secondary);">${m.title}</div>
+                  <div style="padding:10px 14px;font-size:12px;font-weight:600;color:var(--text-secondary);">${eh(m.title)}</div>
                   ${(allLessons[m.id] || []).map((l, li) => {
                     const p = progressMap[l.id];
                     const isDone = p?.completed;
                     const iconMap = { video: 'play_circle', pdf: 'picture_as_pdf', document: 'description', image: 'image', drive_link: 'folder_open', assignment: 'assignment', quiz: 'quiz' };
                     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 14px 8px 20px;cursor:pointer;${isDone ? 'opacity:0.7;' : ''}background:${p && !isDone ? 'var(--primary)08' : 'transparent'};" data-action="sp-player-select-lesson" data-student-id="${studentId}" data-lesson-id="${l.id}">
                       <span class="material-symbols-outlined" style="font-size:14px;color:${isDone ? '#10b981' : '#6b7280'};">${isDone ? 'check_circle' : iconMap[l.content_type] || 'radio_button_unchecked'}</span>
-                      <span style="font-size:12px;flex:1;">${l.title}</span>
+                      <span style="font-size:12px;flex:1;">${eh(l.title)}</span>
                     </div>`;
                   }).join('')}
                 </div>`).join('')}
@@ -206,6 +231,8 @@ window.StudentPortal = {
       const iconMap = { video: 'play_circle', pdf: 'picture_as_pdf', document: 'description', image: 'image', drive_link: 'folder_open', assignment: 'assignment', quiz: 'quiz' };
       const typeLabels = { video: 'Video Lesson', pdf: 'PDF Document', document: 'Document', image: 'Image', drive_link: 'Google Drive Link', assignment: 'Assignment', quiz: 'Quiz' };
 
+      const eh = AppUtils.escapeHtml;
+      const safeUrl = u => u && u.startsWith('http') ? eh(u) : '';
       let contentHtml = '';
       if (lesson.content_type === 'video' && lesson.content_url) {
         if (lesson.content_url.includes('youtube.com') || lesson.content_url.includes('youtu.be')) {
@@ -215,42 +242,42 @@ window.StudentPortal = {
           if (videoId) {
             contentHtml = `<iframe width="100%" height="400" src="https://www.youtube.com/embed/${videoId}?start=${resumePos}" frameborder="0" allowfullscreen style="border-radius:8px;"></iframe>`;
           } else {
-            contentHtml = `<video controls style="width:100%;max-height:400px;border-radius:8px;" src="${lesson.content_url}"></video>`;
+            contentHtml = `<video controls style="width:100%;max-height:400px;border-radius:8px;" src="${eh(lesson.content_url)}"></video>`;
           }
         } else {
-          contentHtml = `<video controls style="width:100%;max-height:400px;border-radius:8px;" src="${lesson.content_url}"></video>`;
+          contentHtml = `<video controls style="width:100%;max-height:400px;border-radius:8px;" src="${eh(lesson.content_url)}"></video>`;
         }
       } else if (lesson.content_type === 'pdf' && lesson.content_url) {
-        contentHtml = `<iframe src="${lesson.content_url}" style="width:100%;height:500px;border:1px solid var(--border);border-radius:8px;"></iframe>`;
+        contentHtml = `<iframe src="${eh(lesson.content_url)}" style="width:100%;height:500px;border:1px solid var(--border);border-radius:8px;"></iframe>`;
       } else if (lesson.content_type === 'image' && lesson.content_url) {
-        contentHtml = `<img src="${lesson.content_url}" style="max-width:100%;max-height:450px;border-radius:8px;object-fit:contain;" alt="${lesson.title}">`;
+        contentHtml = `<img src="${eh(lesson.content_url)}" style="max-width:100%;max-height:450px;border-radius:8px;object-fit:contain;" alt="${eh(lesson.title)}">`;
       } else if (lesson.content_type === 'drive_link' && lesson.content_url) {
         contentHtml = `<div style="padding:30px;text-align:center;border:2px dashed var(--border);border-radius:8px;">
           <span class="material-symbols-outlined" style="font-size:48px;color:#4285f4;margin-bottom:12px;">folder_open</span>
           <div style="font-size:14px;margin-bottom:10px;">Google Drive File</div>
-          <a href="${lesson.content_url}" target="_blank" class="btn btn-primary" style="display:inline-flex;gap:6px;"><span class="material-symbols-outlined" style="font-size:16px;">open_in_new</span> Open in Drive</a>
+          <a href="${safeUrl(lesson.content_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="display:inline-flex;gap:6px;"><span class="material-symbols-outlined" style="font-size:16px;">open_in_new</span> Open in Drive</a>
         </div>`;
       } else if (lesson.content_type === 'document' && lesson.content_url) {
         contentHtml = `<iframe src="https://docs.google.com/gview?url=${encodeURIComponent(lesson.content_url)}&embedded=true" style="width:100%;height:500px;border:1px solid var(--border);border-radius:8px;"></iframe>`;
       } else if (lesson.content_type === 'assignment') {
         contentHtml = `<div style="padding:20px;text-align:center;">
           <span class="material-symbols-outlined" style="font-size:48px;color:#8b5cf6;margin-bottom:12px;">assignment</span>
-          <div style="font-size:16px;font-weight:600;margin-bottom:4px;">${lesson.title}</div>
+          <div style="font-size:16px;font-weight:600;margin-bottom:4px;">${eh(lesson.title)}</div>
           <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Complete this assignment</div>
           <button class="btn btn-primary" data-action="sp-open-assignment" data-student-id="${studentId}" data-lesson-id="${lesson.id}"><span class="material-symbols-outlined" style="font-size:16px;">edit_note</span> Open Assignment</button>
         </div>`;
       } else if (lesson.content_type === 'quiz') {
         contentHtml = `<div style="padding:20px;text-align:center;">
           <span class="material-symbols-outlined" style="font-size:48px;color:#f59e0b;margin-bottom:12px;">quiz</span>
-          <div style="font-size:16px;font-weight:600;margin-bottom:4px;">${lesson.title}</div>
+          <div style="font-size:16px;font-weight:600;margin-bottom:4px;">${eh(lesson.title)}</div>
           <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Test your knowledge</div>
           <button class="btn btn-primary" data-action="sp-start-quiz" data-student-id="${studentId}" data-lesson-id="${lesson.id}"><span class="material-symbols-outlined" style="font-size:16px;">play_arrow</span> Start Quiz</button>
         </div>`;
       } else {
         contentHtml = `<div style="padding:40px;text-align:center;color:var(--text-muted);">
           <span class="material-symbols-outlined" style="font-size:48px;margin-bottom:12px;">${iconMap[lesson.content_type] || 'help'}</span>
-          <div style="font-size:14px;">${typeLabels[lesson.content_type] || 'Lesson'}: ${lesson.title}</div>
-          ${lesson.content_url ? `<div style="margin-top:12px;"><a href="${lesson.content_url}" target="_blank" class="btn btn-secondary btn-sm">Open Content</a></div>` : ''}
+          <div style="font-size:14px;">${typeLabels[lesson.content_type] || 'Lesson'}: ${eh(lesson.title)}</div>
+          ${lesson.content_url ? `<div style="margin-top:12px;"><a href="${safeUrl(lesson.content_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">Open Content</a></div>` : ''}
         </div>`;
       }
 
@@ -258,7 +285,7 @@ window.StudentPortal = {
         <div style="margin-bottom:16px;">
           <div style="font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px;">
             <span class="material-symbols-outlined" style="font-size:18px;color:var(--primary);">${iconMap[lesson.content_type] || 'menu_book'}</span>
-            ${lesson.title}
+            ${eh(lesson.title)}
           </div>
           <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${typeLabels[lesson.content_type] || 'Lesson'} ${lesson.duration ? '· ' + lesson.duration + ' min' : ''}</div>
         </div>
@@ -270,6 +297,25 @@ window.StudentPortal = {
         </div>
       </div>`;
       initIcons();
+      if (lesson.content_type === 'video' && !lesson.content_url?.includes('youtube')) {
+        const vid = container.querySelector('video');
+        if (vid) {
+          if (resumePos > 0 && vid.readyState >= 1) vid.currentTime = resumePos;
+          vid.addEventListener('loadedmetadata', () => { if (resumePos > 0) vid.currentTime = resumePos; }, { once: true });
+          let saveTimer = null;
+          vid.addEventListener('timeupdate', () => {
+            if (!saveTimer) {
+              saveTimer = setTimeout(() => {
+                saveTimer = null;
+                const pos = Math.floor(vid.currentTime);
+                if (pos > 0) {
+                  window.ProgressService?.upsertProgress(studentId, lesson.id, { resumePosition: pos }).catch(() => {});
+                }
+              }, 5000);
+            }
+          });
+        }
+      }
     } catch (err) { AppToast.show(err.message || 'Failed to load lesson.', 'error'); }
   },
 
@@ -285,13 +331,16 @@ window.StudentPortal = {
     try {
       const lesson = await window.LessonService?.getById(lessonId);
       if (!lesson) return;
-      const modules = await window.ModuleService?.getByCourse(
-        (await window.ModuleService?.getById(lesson.module_id))?.course_id
-      ) || [];
+      const currentModule = await window.ModuleService?.getById(lesson.module_id);
+      if (!currentModule) return;
+      const modules = await window.ModuleService?.getByCourse(currentModule.course_id) || [];
+      const moduleIds = modules.map(m => m.id);
       const allLessons = [];
-      for (const m of modules) {
-        const ls = await window.LessonService?.getByModule(m.id) || [];
-        allLessons.push(...ls);
+      if (moduleIds.length > 0) {
+        const batchLessons = await window.LessonService?.getByModules(moduleIds) || {};
+        for (const m of modules) {
+          allLessons.push(...(batchLessons[m.id] || []));
+        }
       }
       const idx = allLessons.findIndex(l => l.id === lessonId);
       const targetIdx = direction === 'next' ? idx + 1 : idx - 1;
@@ -320,6 +369,7 @@ window.StudentPortal = {
       const course = await window.CourseService?.getById(courseId);
       if (!cert || !student || !course) return;
 
+      const eh = AppUtils.escapeHtml;
       const existing = document.getElementById('modal-certificate');
       if (existing) existing.remove();
       const overlay = document.createElement('div');
@@ -330,9 +380,9 @@ window.StudentPortal = {
         <div class="modal-body" style="padding:30px;">
           <div style="border:3px double var(--primary);border-radius:12px;padding:40px 30px;text-align:center;background:linear-gradient(135deg,#faf5ff,#eff6ff);">
             <div style="font-size:12px;text-transform:uppercase;letter-spacing:2px;color:var(--text-secondary);margin-bottom:16px;">Certificate of Completion</div>
-            <div style="font-size:32px;font-weight:700;color:var(--primary);margin-bottom:8px;">${course.name}</div>
+            <div style="font-size:32px;font-weight:700;color:var(--primary);margin-bottom:8px;">${eh(course.name)}</div>
             <div style="font-size:14px;color:var(--text-secondary);margin-bottom:24px;">This is to certify that</div>
-            <div style="font-size:24px;font-weight:600;margin-bottom:24px;border-bottom:2px solid var(--primary);display:inline-block;padding-bottom:4px;">${student.name}</div>
+            <div style="font-size:24px;font-weight:600;margin-bottom:24px;border-bottom:2px solid var(--primary);display:inline-block;padding-bottom:4px;">${eh(student.name)}</div>
             <div style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;">has successfully completed the course requirements on ${AppUtils.formatDate(cert.completed_at || cert.issued_at)}</div>
             <div style="display:flex;justify-content:center;gap:40px;margin-bottom:20px;">
               <div style="text-align:center;">
@@ -340,7 +390,7 @@ window.StudentPortal = {
                   <span class="material-symbols-outlined" style="font-size:40px;color:#8b5cf6;">verified</span>
                 </div>
                 <div style="font-size:10px;color:var(--text-muted);">Certificate ID</div>
-                <div style="font-size:11px;font-weight:600;font-family:monospace;">${cert.certificate_number}</div>
+                <div style="font-size:11px;font-weight:600;font-family:monospace;">${eh(cert.certificate_number)}</div>
               </div>
               <div style="text-align:center;">
                 <div style="width:80px;height:80px;margin:0 auto 8px;background:#f5f3ff;border-radius:50%;display:flex;align-items:center;justify-content:center;">

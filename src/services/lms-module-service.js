@@ -75,6 +75,22 @@ export const ModuleService = {
     await AuditLogService.log('deleted', 'Module', item?.title || 'Unknown', 'Module deleted');
   },
 
+  async getByCourses(courseIds) {
+    if (!courseIds.length) return {};
+    const { data, error } = await supabase
+      .from('course_modules')
+      .select('*')
+      .in('course_id', courseIds)
+      .order('sort_order');
+    if (error) throw error;
+    const map = {};
+    for (const m of data || []) {
+      if (!map[m.course_id]) map[m.course_id] = [];
+      map[m.course_id].push(m);
+    }
+    return map;
+  },
+
   async reorder(items) {
     const { error } = await supabase
       .from('course_modules')

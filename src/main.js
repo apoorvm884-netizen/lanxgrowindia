@@ -25,14 +25,10 @@ import {
   ModuleService,
   LessonService,
   ProgressService,
+  AssignmentService,
+  QuizService,
   CertificateService
 } from './services/index.js';
-
-// Import School Portal rendering module
-import './school-portal.js';
-
-// Import Student Portal rendering module (LMS)
-import './lms-student.js';
 
 // Conditional Demo Mode — only loads when VITE_DEMO_MODE=true
 import { DEMO_MODE } from './demo/demo-config.js';
@@ -58,6 +54,8 @@ window.PermissionsService = PermissionsService;
 window.ModuleService = ModuleService;
 window.LessonService = LessonService;
 window.ProgressService = ProgressService;
+window.AssignmentService = AssignmentService;
+window.QuizService = QuizService;
 window.CertificateService = CertificateService;
 window.supabase = supabase;
 
@@ -66,12 +64,16 @@ window.supabase = supabase;
 // ==============================================================
 window.AppStorage = {
   KEY: 'lanxgrow_cos',
+  _cache: null,
+  _cacheTime: 0,
+  _cacheTTL: 30000,
 
   async init() {
     // Schema is managed by Supabase migrations — no-op
   },
 
-  async load() {
+  async load(forceRefresh) {
+    if (!forceRefresh && this._cache && (Date.now() - this._cacheTime) < this._cacheTTL) return this._cache;
     const [schoolsRes, categoriesRes, subjectsRes, sectionsRes, contentRes, profilesRes, logsRes,
            studentsRes, coursesRes, enrollmentsRes, courseSectionsRes, notificationsRes] =
       await Promise.all([
@@ -102,7 +104,6 @@ window.AppStorage = {
     const courseSections = courseSectionsRes.data || [];
     const notifications = notificationsRes.data || [];
 
-    // Map profiles to old 'users' shape for backward compat
     const users = profiles.map(p => ({
       id: p.id,
       name: p.name,
@@ -112,7 +113,14 @@ window.AppStorage = {
       schoolId: p.school_id
     }));
 
-    return { schools, categories, subjects, sections, content, users, auditLog, students, courses, enrollments, courseSections, notifications };
+    this._cache = { schools, categories, subjects, sections, content, users, auditLog, students, courses, enrollments, courseSections, notifications };
+    this._cacheTime = Date.now();
+    return this._cache;
+  },
+
+  invalidate() {
+    this._cache = null;
+    this._cacheTime = 0;
   },
 
   async save() {
@@ -221,6 +229,63 @@ window.AppUtils = {
 };
 
 // ==============================================================
+// RBAC constants
+// ==============================================================
+window.ROLE_LABELS = {
+  super_admin: 'Super Admin',
+  company_admin: 'Company Admin',
+  school_admin: 'School Admin',
+  teacher: 'Teacher',
+  counselor: 'Counselor',
+  student: 'Student'
+};
+window.ROLE_COLORS = {
+  super_admin: { bg: 'var(--primary-subtle)', fg: 'var(--primary)' },
+  company_admin: { bg: '#eef2ff', fg: '#4338ca' },
+  school_admin: { bg: 'var(--warning-light)', fg: '#92400e' },
+  teacher: { bg: '#f0fdf4', fg: '#166534' },
+  counselor: { bg: '#faf5ff', fg: '#7c3aed' },
+  student: { bg: '#f0f9ff', fg: '#0369a1' }
+};
+window.ROLE_HIERARCHY = ['super_admin', 'company_admin', 'school_admin', 'teacher', 'counselor', 'student'];
+
+// ==============================================================
+// CONFIRM DIALOG — replaces native confirm()
+// ==============================================================
+window.AppConfirm = {
+  show(message, title = 'Are you sure?') {
+    return new Promise((resolve) => {
+      const existing = document.getElementById('modal-app-confirm');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.id = 'modal-app-confirm';
+      overlay.innerHTML = `<div class="modal confirm-modal">
+        <div class="modal-body" style="text-align:center;">
+          <span class="material-symbols-outlined" style="font-size:40px;color:var(--danger);margin-bottom:12px;">warning</span>
+          <h3 style="font-size:17px;font-weight:600;margin-bottom:6px;color:var(--on-surface);">${AppUtils.escapeHtml(title)}</h3>
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;">${AppUtils.escapeHtml(message)}</p>
+          <div class="confirm-actions" style="display:flex;justify-content:center;gap:10px;">
+            <button class="btn btn-secondary" id="btn-app-confirm-cancel">Cancel</button>
+            <button class="btn btn-danger" id="btn-app-confirm-ok">Confirm</button>
+          </div>
+        </div>
+      </div>`;
+      document.body.appendChild(overlay);
+      overlay.classList.add('active');
+      document.addEventListener('keydown', AppModal._keyHandler);
+      const cleanup = () => {
+        overlay.classList.remove('active');
+        document.removeEventListener('keydown', AppModal._keyHandler);
+        setTimeout(() => overlay.remove(), 300);
+      };
+      document.getElementById('btn-app-confirm-cancel').onclick = () => { cleanup(); resolve(false); };
+      document.getElementById('btn-app-confirm-ok').onclick = () => { cleanup(); resolve(true); };
+    });
+  }
+};
+
+// ==============================================================
 // TOAST MODULE
 // ==============================================================
 window.AppToast = {
@@ -231,7 +296,7 @@ window.AppToast = {
     const icons = { success: 'check_circle', error: 'error', info: 'info', warning: 'warning' };
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    toast.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;">${icons[type] || 'info'}</span><span>${message}</span>`;
+    toast.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;">${icons[type] || 'info'}</span><span>${AppUtils.escapeHtml(message)}</span>`;
     container.appendChild(toast);
     initIcons();
     setTimeout(() => { toast.classList.add('toast-out'); setTimeout(() => toast.remove(), 300); }, 3000);
@@ -261,7 +326,8 @@ window.AppModal = {
       document.body.style.overflow = '';
     }
     document.removeEventListener('keydown', this._keyHandler);
-    if (id === 'modal-entity') document.getElementById('form-entity').reset();
+    if (id === 'modal-entity') document.getElementById('form-entity')?.reset();
+    setTimeout(() => { const overlay = document.getElementById(id); if (overlay && !overlay.classList.contains('active')) overlay.remove(); }, 300);
   },
   _keyHandler(e) {
     if (e.key === 'Escape') {
@@ -299,6 +365,20 @@ window.AppSidebar = {
     { id: 'audit-log', label: 'Audit Log', icon: 'history', route: 'audit-log' },
   ],
 
+  COMPANY_ADMIN_ITEMS: [
+    { id: 'company-dashboard', label: 'Dashboard', icon: 'layout-dashboard', route: 'company-dashboard' },
+    { id: 'schools', label: 'Schools', icon: 'building-2', route: 'schools' },
+    { id: 'sep1', separator: true },
+    { id: 'content-manager', label: 'Content Manager', icon: 'folder-kanban', route: 'content-manager' },
+    { id: 'drive-manager', label: 'Drive Manager', icon: 'hard-drive', route: 'drive-manager' },
+    { id: 'media-library', label: 'Media Library', icon: 'image', route: 'media-library' },
+    { id: 'sep2', separator: true },
+    { id: 'school-admins', label: 'School Admins', icon: 'user-cog', route: 'school-admins' },
+    { id: 'company-settings', label: 'Settings', icon: 'settings', route: 'company-settings' },
+    { id: 'sep3', separator: true },
+    { id: 'audit-log', label: 'Audit Log', icon: 'history', route: 'audit-log' },
+  ],
+
   SCHOOL_ITEMS: [
     { id: 'school-dashboard', label: 'Dashboard', icon: 'layout-dashboard', route: 'school-dashboard' },
     { id: 'sep-s1', separator: true },
@@ -318,6 +398,44 @@ window.AppSidebar = {
     { id: 'sep-s5', separator: true },
     { id: 'school-settings', label: 'Settings', icon: 'settings', route: 'school-settings' },
     { id: 'school-profile', label: 'Profile', icon: 'person', route: 'school-profile' },
+  ],
+
+  TEACHER_ITEMS: [
+    { id: 'school-dashboard', label: 'Dashboard', icon: 'layout-dashboard', route: 'school-dashboard' },
+    { id: 'sep-s1', separator: true },
+    { id: 'school-students', label: 'Students', icon: 'groups', route: 'school-students' },
+    { id: 'sep-s2', separator: true },
+    { id: 'school-courses', label: 'Courses', icon: 'school', route: 'school-courses' },
+    { id: 'school-assignments', label: 'Assignments', icon: 'assignment', route: 'school-assignments' },
+    { id: 'sep-s3', separator: true },
+    { id: 'school-reports', label: 'Reports', icon: 'bar-chart-3', route: 'school-reports' },
+    { id: 'school-notifications', label: 'Notifications', icon: 'notifications', route: 'school-notifications' },
+    { id: 'sep-s4', separator: true },
+    { id: 'school-profile', label: 'Profile', icon: 'person', route: 'school-profile' },
+  ],
+
+  COUNSELOR_ITEMS: [
+    { id: 'school-dashboard', label: 'Dashboard', icon: 'layout-dashboard', route: 'school-dashboard' },
+    { id: 'sep-s1', separator: true },
+    { id: 'school-students', label: 'Students', icon: 'groups', route: 'school-students' },
+    { id: 'sep-s2', separator: true },
+    { id: 'school-reports', label: 'Reports & Analytics', icon: 'bar-chart-3', route: 'school-reports' },
+    { id: 'school-notifications', label: 'Notifications', icon: 'notifications', route: 'school-notifications' },
+    { id: 'sep-s3', separator: true },
+    { id: 'school-profile', label: 'Profile', icon: 'person', route: 'school-profile' },
+  ],
+
+  STUDENT_ITEMS: [
+    { id: 'school-dashboard', label: 'My Dashboard', icon: 'layout-dashboard', route: 'school-dashboard' },
+    { id: 'sep-s1', separator: true },
+    { id: 'school-courses', label: 'My Courses', icon: 'school', route: 'school-courses' },
+    { id: 'school-assignments', label: 'Assignments', icon: 'assignment', route: 'school-assignments' },
+    { id: 'school-videos', label: 'Video Library', icon: 'video-library', route: 'school-videos' },
+    { id: 'sep-s2', separator: true },
+    { id: 'school-reports', label: 'My Progress', icon: 'bar-chart-3', route: 'school-reports' },
+    { id: 'school-notifications', label: 'Notifications', icon: 'notifications', route: 'school-notifications' },
+    { id: 'sep-s3', separator: true },
+    { id: 'school-profile', label: 'My Profile', icon: 'person', route: 'school-profile' },
   ],
 
   ITEM_ICONS: {
@@ -372,12 +490,43 @@ window.AppRouter = {
   currentSchoolId: null,
   _selectedCategoryId: null,
   _selectedSubjectId: null,
+  _currentProfile: null,
   SCHOOL_ROUTES: ['school-dashboard','school-categories','school-subjects','school-sections',
     'school-students','school-counselors','school-courses','school-videos',
     'school-assignments','school-reports','school-notifications','school-settings','school-profile'],
+  COMPANY_ROUTES: ['company-dashboard','schools','content-manager','drive-manager',
+    'media-library','school-admins','roles-permissions','company-settings','audit-log'],
 
-  init() {
-    this.navigate(this.currentRoute || 'company-dashboard');
+  COMPANY_ADMIN_ROUTES: ['company-dashboard','schools','content-manager','drive-manager',
+    'media-library','school-admins','roles-permissions','company-settings','audit-log'],
+
+  async _getProfile() {
+    if (!this._currentProfile) this._currentProfile = await AuthService.getProfile();
+    return this._currentProfile;
+  },
+
+  _clearProfile() {
+    this._currentProfile = null;
+  },
+
+  async init() {
+    this._currentProfile = await AuthService.getProfile();
+    const role = this._currentProfile?.role;
+    if (!role) { this.navigate('company-dashboard'); return; }
+    const defaultRoute = role === 'school_admin' || role === 'teacher' || role === 'counselor'
+      ? 'school-dashboard'
+      : role === 'student'
+        ? 'school-dashboard'
+        : 'company-dashboard';
+    const params = (role === 'school_admin' || role === 'teacher' || role === 'counselor' || role === 'student')
+      && this._currentProfile?.school_id
+      ? { schoolId: this._currentProfile.school_id }
+      : {};
+    if (!this.currentRoute || this.currentRoute === 'company-dashboard' && role !== 'super_admin' && role !== 'company_admin') {
+      this.navigate(defaultRoute, params);
+    } else {
+      this.navigate(this.currentRoute, params);
+    }
   },
 
   navigate(route, params) {
@@ -391,18 +540,49 @@ window.AppRouter = {
     this.render();
   },
 
+  async _loadPageModule(route) {
+    const pages = {
+      'company-dashboard': () => import('./pages/company-dashboard.js'),
+      'schools': () => import('./pages/schools.js'),
+    };
+    return pages[route] ? pages[route]() : null;
+  },
+
   async render() {
     const main = document.getElementById('main-content');
     if (!main) return;
-    const user = await AuthService.getUser();
+    const profile = await this._getProfile();
+    if (!profile) { main.innerHTML = '<div class="empty-state"><h3>Not authenticated</h3><p>Please sign in again.</p></div>'; return; }
+    this._currentProfile = profile;
+
     const isSchoolRoute = this.currentRoute && this.currentRoute.startsWith('school-');
-    if (!isSchoolRoute && user?.authenticated) {
-      const profile = await AuthService.getProfile();
-      if (profile?.role === 'school_admin' && profile.school_id) {
+
+    // Role-based redirect: non-admin users must always be in their school context
+    if (!isSchoolRoute && this.currentRoute !== 'company-dashboard') {
+      const schoolOnlyRoles = ['school_admin', 'teacher', 'counselor', 'student'];
+      if (schoolOnlyRoles.includes(profile.role)) {
         this.navigate('school-dashboard', { schoolId: profile.school_id });
         return;
       }
     }
+
+    // Redirect school-level users away from company routes
+    if (!isSchoolRoute && !this.COMPANY_ROUTES.includes(this.currentRoute)) {
+      const schoolOnlyRoles = ['school_admin', 'teacher', 'counselor', 'student'];
+      if (schoolOnlyRoles.includes(profile.role)) {
+        this.navigate('school-dashboard', { schoolId: profile.school_id });
+        return;
+      }
+    }
+
+    // Student auto-routed to their own student portal
+    if (profile.role === 'student' && isSchoolRoute && this.currentSchoolId) {
+      const data = await AppStorage.load();
+      const studentRecord = (data.students || []).find(s => s.user_id === profile.id);
+      if (studentRecord) {
+      }
+    }
+
     if (this.currentRoute === 'school-dashboard') {
       main.innerHTML = AppSkeleton.dashboard();
     } else if (['school-students','school-counselors','school-courses','school-assignments'].includes(this.currentRoute)) {
@@ -417,13 +597,19 @@ window.AppRouter = {
         const school = data.schools.find(s => s.id === this.currentSchoolId);
         if (school) {
           document.getElementById('sidebar').classList.remove('sidebar-hq');
-          AppSidebar.render(AppSidebar.SCHOOL_ITEMS, this.currentRoute,
-            `<div class="nav-item" data-action="navigate" data-route="schools">
+          const schoolSidebar = profile?.role === 'teacher' ? AppSidebar.TEACHER_ITEMS
+            : profile?.role === 'counselor' ? AppSidebar.COUNSELOR_ITEMS
+            : profile?.role === 'student' ? AppSidebar.STUDENT_ITEMS
+            : AppSidebar.SCHOOL_ITEMS;
+          const canAccessCompany = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+          AppSidebar.render(schoolSidebar, this.currentRoute,
+            canAccessCompany ? `<div class="nav-item" data-action="navigate" data-route="schools">
               <span class="material-symbols-outlined" style="font-size:20px;">chevron_left</span><span class="nav-label">Back to Schools</span>
-            </div>`
+            </div>` : ''
           );
           initIcons();
-          await this.renderSchoolWorkspace(main, user, school, data);
+          await import('./school-portal.js');
+          await this.renderSchoolWorkspace(main, profile, school, data);
           return;
         }
       }
@@ -432,7 +618,8 @@ window.AppRouter = {
     }
 
     document.getElementById('sidebar').classList.add('sidebar-hq');
-    AppSidebar.render(AppSidebar.COMPANY_ITEMS, this.currentRoute);
+    const companySidebar = profile?.role === 'company_admin' ? AppSidebar.COMPANY_ADMIN_ITEMS : AppSidebar.COMPANY_ITEMS;
+    AppSidebar.render(companySidebar, this.currentRoute);
     initIcons();
 
     if (this.currentRoute === 'company-dashboard') {
@@ -443,11 +630,14 @@ window.AppRouter = {
 
     switch (this.currentRoute) {
       case 'company-dashboard':
-        await this.renderCompanyDashboard(main);
+      case 'schools': {
+        const pageModule = await this._loadPageModule(this.currentRoute);
+        if (pageModule) {
+          const data = await AppStorage.load();
+          await pageModule.render(main, data, this);
+        }
         break;
-      case 'schools':
-        await this.renderSchools(main);
-        break;
+      }
       case 'content-manager':
         await this.renderContentManager(main);
         break;
@@ -479,7 +669,7 @@ window.AppRouter = {
   async renderSchoolWorkspace(main, user, school, data) {
     const profile = await AuthService.getProfile();
     const isSuperAdmin = profile && profile.role === 'super_admin';
-    const schoolName = school?.name || 'School';
+    const schoolName = AppUtils.escapeHtml(school?.name || 'School');
     const schoolId = this.currentSchoolId;
 
     if (this.currentRoute === 'school-dashboard') {
@@ -489,7 +679,7 @@ window.AppRouter = {
       const content = data.content.filter(c => c.school_id === schoolId);
       const schoolStudents = (data.students || []).filter(s => s.school_id === schoolId);
       const schoolCourses = (data.courses || []).filter(c => c.school_id === schoolId);
-      const schoolCounselors = (data.users || []).filter(c => c.schoolId === schoolId && c.role === 'school_admin');
+      const schoolCounselors = (data.users || []).filter(c => c.schoolId === schoolId && (c.role === 'counselor' || c.role === 'school_admin'));
       const schoolEnrollments = (data.enrollments || []).filter(e => schoolStudents.some(s => s.id === e.student_id));
       const schoolNotifications = (data.notifications || []).filter(n => n.user_id === (profile ? profile.id : ''));
       const avgAttendance = schoolStudents.length ? Math.round(schoolStudents.reduce((s, st) => s + (st.attendance || 0), 0) / schoolStudents.length) : 0;
@@ -513,7 +703,7 @@ window.AppRouter = {
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
               <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1e3a8a,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;">${AppUtils.getInitials(schoolName)}</div>
               <div>
-                <h1 style="font-size:22px;font-weight:700;margin:0;">${greeting}, ${profile?.name || 'Admin'}!</h1>
+                <h1 style="font-size:22px;font-weight:700;margin:0;">${greeting}, ${AppUtils.escapeHtml(profile?.name || 'Admin')}!</h1>
                 <p style="margin:2px 0 0;font-size:13px;color:var(--text-secondary);">${schoolName} · ${dateStr}</p>
               </div>
             </div>
@@ -592,10 +782,10 @@ window.AppRouter = {
               return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);">
                 <div style="width:28px;height:28px;border-radius:50%;background:var(--primary)12;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--primary);flex-shrink:0;">${AppUtils.getInitials(student?.name || '')}</div>
                 <div style="flex:1;min-width:0;">
-                  <div style="font-size:13px;font-weight:500;">${student?.name || 'Unknown'} → ${course?.name || 'Unknown'}</div>
-                  <div style="font-size:11px;color:var(--text-secondary);">${e.status}</div>
+                  <div style="font-size:13px;font-weight:500;">${AppUtils.escapeHtml(student?.name || 'Unknown')} → ${AppUtils.escapeHtml(course?.name || 'Unknown')}</div>
+                  <div style="font-size:11px;color:var(--text-secondary);">${AppUtils.escapeHtml(e.status)}</div>
                 </div>
-                <span class="status-badge ${e.status === 'active' ? 'status-active' : e.status === 'completed' ? 'status-active' : 'status-suspended'}" style="font-size:10px;">${e.status}</span>
+                <span class="status-badge ${e.status === 'active' ? 'status-active' : e.status === 'completed' ? 'status-active' : 'status-suspended'}" style="font-size:10px;">${AppUtils.escapeHtml(e.status)}</span>
               </div>`;
             }).join('')}</div>`}
           </div>
@@ -610,8 +800,8 @@ window.AppRouter = {
               <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border-light);${!n.is_read ? '' : 'opacity:0.6;'}">
                 <span class="material-symbols-outlined" style="font-size:16px;color:${!n.is_read ? 'var(--primary)' : 'var(--text-muted)'};">${!n.is_read ? 'notifications_active' : 'notifications'}</span>
                 <div style="flex:1;min-width:0;">
-                  <div style="font-size:12px;font-weight:${!n.is_read ? '600' : '400'};">${n.title}</div>
-                  <div style="font-size:11px;color:var(--text-secondary);">${n.message || ''}</div>
+                  <div style="font-size:12px;font-weight:${!n.is_read ? '600' : '400'};">${AppUtils.escapeHtml(n.title)}</div>
+                  <div style="font-size:11px;color:var(--text-secondary);">${AppUtils.escapeHtml(n.message || '')}</div>
                 </div>
               </div>`).join('')}</div>`}
           </div>
@@ -643,7 +833,7 @@ window.AppRouter = {
             ${cats.length === 0 ? `<tr><td colspan="4"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">folder</span><h3>No categories yet</h3><p>Create your first category.</p></div></td></tr>`
             : cats.map(c => {
               const count = data.subjects.filter(s => s.category_id === c.id).length;
-              return `<tr><td><div class="font-semibold">${c.name}</div></td><td>${count}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.created_at)}</td>
+              return `<tr><td><div class="font-semibold">${AppUtils.escapeHtml(c.name)}</div></td><td>${count}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.created_at)}</td>
                 <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
                   <button class="btn btn-ghost btn-sm" data-action="open-category" data-id="${c.id}" title="Open"><span class="material-symbols-outlined" style="font-size:16px;">open_in_new</span></button>
                   <button class="btn btn-ghost btn-sm" data-action="edit-category" data-id="${c.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
@@ -666,7 +856,7 @@ window.AppRouter = {
           <div class="page-header-left">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
               <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-categories"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-              <span style="font-size:12px;color:var(--text-secondary);">${schoolName} / ${catId ? (cats.find(c => c.id === catId)?.name || '') : 'Subjects'}</span>
+              <span style="font-size:12px;color:var(--text-secondary);">${schoolName} / ${catId ? AppUtils.escapeHtml(cats.find(c => c.id === catId)?.name || '') : 'Subjects'}</span>
             </div>
             <h1 class="page-title">Subjects</h1>
             <p class="page-subtitle">Manage subjects within ${schoolName}.</p>
@@ -677,7 +867,7 @@ window.AppRouter = {
           <div class="search-bar" style="max-width:280px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="subject-search" placeholder="Search subjects..." data-action="subject-search-input"></div>
           <select class="form-select" id="subject-category-filter" style="width:160px;height:40px;font-size:13px;">
             <option value="">All Categories</option>
-            ${cats.map(c => `<option value="${c.id}" ${c.id === catId ? 'selected' : ''}>${c.name}</option>`).join('')}
+            ${cats.map(c => `<option value="${c.id}" ${c.id === catId ? 'selected' : ''}>${AppUtils.escapeHtml(c.name)}</option>`).join('')}
           </select>
         </div>
         <div class="card" style="padding:0;overflow:hidden;">
@@ -686,7 +876,7 @@ window.AppRouter = {
             : subjects.map(s => {
               const cat = cats.find(c => c.id === s.category_id);
               const secCount = data.sections.filter(sec => sec.subject_id === s.id).length;
-              return `<tr><td><div class="font-semibold">${s.name}</div></td><td style="font-size:13px;">${cat?.name || '—'}</td><td>${secCount}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(s.created_at)}</td>
+              return `<tr><td><div class="font-semibold">${AppUtils.escapeHtml(s.name)}</div></td><td style="font-size:13px;">${AppUtils.escapeHtml(cat?.name || '—')}</td><td>${secCount}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(s.created_at)}</td>
                 <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
                   <button class="btn btn-ghost btn-sm" data-action="open-subject" data-id="${s.id}" title="Open"><span class="material-symbols-outlined" style="font-size:16px;">open_in_new</span></button>
                   <button class="btn btn-ghost btn-sm" data-action="edit-subject" data-id="${s.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
@@ -710,7 +900,7 @@ window.AppRouter = {
           <div class="page-header-left">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
               <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-subjects"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-              <span style="font-size:12px;color:var(--text-secondary);">${schoolName} / ${subjId ? (subjects.find(s => s.id === subjId)?.name || '') : 'Sections'}</span>
+              <span style="font-size:12px;color:var(--text-secondary);">${schoolName} / ${subjId ? AppUtils.escapeHtml(subjects.find(s => s.id === subjId)?.name || '') : 'Sections'}</span>
             </div>
             <h1 class="page-title">Sections</h1>
             <p class="page-subtitle">Manage sections within ${schoolName}.</p>
@@ -721,7 +911,7 @@ window.AppRouter = {
           <div class="search-bar" style="max-width:280px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="section-search" placeholder="Search sections..." data-action="section-search-input"></div>
           <select class="form-select" id="section-subject-filter" style="width:160px;height:40px;font-size:13px;">
             <option value="">All Subjects</option>
-            ${subjects.map(s => `<option value="${s.id}" ${s.id === subjId ? 'selected' : ''}>${s.name}</option>`).join('')}
+            ${subjects.map(s => `<option value="${s.id}" ${s.id === subjId ? 'selected' : ''}>${AppUtils.escapeHtml(s.name)}</option>`).join('')}
           </select>
         </div>
         <div class="card" style="padding:0;overflow:hidden;">
@@ -731,7 +921,7 @@ window.AppRouter = {
               const subj = subjects.find(s => s.id === sec.subject_id);
               const cat = cats.find(c => c.id === subj?.category_id);
               const conCount = data.content.filter(c => c.section_id === sec.id).length;
-              return `<tr><td><div class="font-semibold">${sec.name}</div></td><td style="font-size:13px;">${subj?.name || '—'}</td><td style="font-size:13px;color:var(--text-secondary);">${cat?.name || '—'}</td><td>${conCount}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(sec.created_at)}</td>
+              return `<tr><td><div class="font-semibold">${AppUtils.escapeHtml(sec.name)}</div></td><td style="font-size:13px;">${AppUtils.escapeHtml(subj?.name || '—')}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.escapeHtml(cat?.name || '—')}</td><td>${conCount}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(sec.created_at)}</td>
                 <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
                   <button class="btn btn-ghost btn-sm" data-action="edit-section" data-id="${sec.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
                   <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-section" data-id="${sec.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
@@ -801,7 +991,7 @@ window.AppRouter = {
       <div class="management-bar">
         <div class="search-bar" style="max-width:300px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="content-search" placeholder="Search content..." data-action="content-search-input"></div>
         <select class="form-select" id="content-type-filter" style="width:140px;height:44px;font-size:13px;"><option value="">All Types</option><option value="Video">Video</option><option value="PDF">PDF</option><option value="Image">Image</option><option value="Document">Document</option><option value="Other">Other</option></select>
-        <select class="form-select" id="content-school-filter" style="width:160px;height:44px;font-size:13px;"><option value="">All Schools</option>${schools.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
+        <select class="form-select" id="content-school-filter" style="width:160px;height:44px;font-size:13px;"><option value="">All Schools</option>${schools.map(s => `<option value="${s.id}">${AppUtils.escapeHtml(s.name)}</option>`).join('')}</select>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
         ${items.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">folder</span><h3>No content yet</h3><p>Create your first content item.</p></div>`
@@ -809,11 +999,11 @@ window.AppRouter = {
           const school = schoolsById[c.school_id] || {};
           const typeIcons = { Video: 'videocam', PDF: 'description', Image: 'image', Document: 'description' };
           return `<tr>
-            <td><div class="flex-center gap-10" style="justify-content:flex-start;"><i data-icon="${typeIcons[c.type] || 'insert_drive_file'}" style="width:16px;height:16px;color:var(--primary);"></i><span class="font-semibold">${c.name}</span></div></td>
-            <td style="font-size:13px;">${c.type}</td>
-            <td style="font-size:13px;">${school.name || '—'}</td>
-            <td><span class="status-badge ${c.status === 'published' ? 'status-active' : c.status === 'draft' ? 'status-suspended' : 'status-pending'}">${c.status}</span></td>
-            <td style="font-size:13px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.description || ''}</td>
+            <td><div class="flex-center gap-10" style="justify-content:flex-start;"><i data-icon="${typeIcons[c.type] || 'insert_drive_file'}" style="width:16px;height:16px;color:var(--primary);"></i><span class="font-semibold">${AppUtils.escapeHtml(c.name)}</span></div></td>
+            <td style="font-size:13px;">${AppUtils.escapeHtml(c.type)}</td>
+            <td style="font-size:13px;">${AppUtils.escapeHtml(school.name || '—')}</td>
+            <td><span class="status-badge ${c.status === 'published' ? 'status-active' : c.status === 'draft' ? 'status-suspended' : 'status-pending'}">${AppUtils.escapeHtml(c.status)}</span></td>
+            <td style="font-size:13px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${AppUtils.escapeHtml(c.description || '')}</td>
             <td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.updated_at)}</td>
             <td class="td-actions"><button class="btn btn-ghost btn-sm" data-action="play-video" data-id="${c.id}" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="btn btn-ghost btn-sm" data-action="edit-content" data-id="${c.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button><button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-content" data-id="${c.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:18px;">delete</span></button></td></tr>`;
         }).join('')}</tbody></table></div>`}
@@ -862,8 +1052,8 @@ window.AppRouter = {
                   <i data-icon="${isVideo ? 'play_circle' : 'image'}" style="width:36px;height:36px;color:${isVideo ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)'};"></i>
                 </div>
                 <div style="padding:12px;">
-                  <div style="font-size:14px;font-weight:600;">${m.name}</div>
-                  <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${m.type} · ${m.size || '—'} · ${school?.name || '—'}</div>
+                  <div style="font-size:14px;font-weight:600;">${AppUtils.escapeHtml(m.name)}</div>
+                  <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${AppUtils.escapeHtml(m.type)} · ${AppUtils.escapeHtml(m.size || '—')} · ${AppUtils.escapeHtml(school?.name || '—')}</div>
                   <div style="display:flex;gap:8px;margin-top:8px;">
                     ${isVideo ? `<button class="btn btn-primary btn-sm" style="flex:1;height:32px;font-size:12px;" data-action="play-video" data-id="${m.id}"><span class="material-symbols-outlined" style="font-size:18px;">play_arrow</span> Play</button>` : `<button class="btn btn-primary btn-sm" style="flex:1;height:32px;font-size:12px;" data-action="preview-image" data-id="${m.id}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span> Preview</button>`}
                     <button class="btn btn-secondary btn-sm" style="flex:1;height:32px;font-size:12px;" data-action="view-content-file" data-id="${m.id}">Details</button>
@@ -891,67 +1081,97 @@ window.AppRouter = {
       if (!permMap[p.role]) permMap[p.role] = {};
       permMap[p.role][p.permission] = p.enabled;
     }
-    const superAdminPerms = [
-      { label: 'Manage Schools', key: 'manage_schools' },
-      { label: 'Manage Categories', key: 'manage_categories' },
-      { label: 'Manage Subjects', key: 'manage_subjects' },
-      { label: 'Manage Sections', key: 'manage_sections' },
-      { label: 'Manage Content', key: 'manage_content' },
-      { label: 'Manage Users', key: 'manage_users' },
-      { label: 'Manage Roles', key: 'manage_roles' },
-      { label: 'View Analytics', key: 'view_analytics' },
-      { label: 'Access Settings', key: 'access_settings' },
-      { label: 'Manage Drive', key: 'manage_drive' },
-      { label: 'Manage Media Library', key: 'manage_media' },
-      { label: 'View Audit Log', key: 'view_audit_log' }
+
+    function permissionSection(role, title, icon, description, perms, disabled, gridClass) {
+      return `<div style="padding:20px 0;${title !== 'Super Admin' ? 'border-top:1px solid var(--border);' : ''}">
+        <div style="padding:0 20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+          <div class="metric-icon" style="width:40px;height:40px;background:${ROLE_COLORS[role]?.bg || 'var(--surface-low)'};color:${ROLE_COLORS[role]?.fg || 'var(--on-surface-variant)'}"><span class="material-symbols-outlined" style="font-size:20px;">${icon}</span></div>
+          <div><div style="font-weight:600;">${title}</div><div style="font-size:12px;color:var(--text-secondary);">${description}</div></div>
+          <div style="margin-left:auto;"><span class="status-badge status-active">Active</span></div>
+        </div>
+        <div style="padding:16px 20px 0;">
+          <div class="${gridClass || 'perm-grid'}" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;">
+            ${perms.map(p => `
+              <label class="checkbox-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;">
+                <input type="checkbox" ${(permMap[role]?.[p.key] ?? (!disabled && p.checked !== undefined ? p.checked : true)) ? 'checked' : ''} ${disabled ? 'disabled' : `data-action="toggle-permission" data-key="${p.key}" data-role="${role}"`} style="width:16px;height:16px;">
+                <span style="font-size:13px;">${p.label}</span>
+              </label>`).join('')}
+          </div>
+        </div>
+      </div>`;
+    }
+
+    const sections = [
+      { role: 'super_admin', title: 'Super Admin', icon: 'admin_panel_settings', description: 'Full system access - all permissions enabled by default', disabled: true,
+        perms: [
+          { label: 'Manage Schools', key: 'manage_schools' },
+          { label: 'Manage Categories', key: 'manage_categories' },
+          { label: 'Manage Subjects', key: 'manage_subjects' },
+          { label: 'Manage Sections', key: 'manage_sections' },
+          { label: 'Manage Content', key: 'manage_content' },
+          { label: 'Manage Users', key: 'manage_users' },
+          { label: 'Manage Roles', key: 'manage_roles' },
+          { label: 'View Analytics', key: 'view_analytics' },
+          { label: 'Access Settings', key: 'access_settings' },
+          { label: 'Manage Drive', key: 'manage_drive' },
+          { label: 'Manage Media Library', key: 'manage_media' },
+          { label: 'View Audit Log', key: 'view_audit_log' }
+        ]},
+      { role: 'company_admin', title: 'Company Admin', icon: 'business', description: 'Manages their own company and schools', disabled: false,
+        perms: [
+          { label: 'Manage Schools', key: 'manage_schools', checked: true },
+          { label: 'Manage Categories', key: 'manage_categories', checked: true },
+          { label: 'Manage Subjects', key: 'manage_subjects', checked: true },
+          { label: 'Manage Sections', key: 'manage_sections', checked: true },
+          { label: 'Manage Content', key: 'manage_content', checked: true },
+          { label: 'Manage Users', key: 'manage_users', checked: true },
+          { label: 'View Analytics', key: 'view_analytics', checked: true },
+          { label: 'Access Settings', key: 'access_settings', checked: true },
+          { label: 'Manage Own Profile', key: 'company_profile', checked: true }
+        ]},
+      { role: 'school_admin', title: 'School Admin', icon: 'manage_accounts', description: 'Restricted to own school', disabled: false,
+        perms: [
+          { label: 'Manage School Settings', key: 'school_settings', checked: true },
+          { label: 'Manage Categories', key: 'school_categories', checked: true },
+          { label: 'Manage Subjects', key: 'school_subjects', checked: true },
+          { label: 'Manage Sections', key: 'school_sections', checked: true },
+          { label: 'Manage Content', key: 'school_content', checked: true },
+          { label: 'View Analytics', key: 'school_analytics', checked: false },
+          { label: 'Manage Own Profile', key: 'school_profile', checked: true },
+          { label: 'Upload Drive Files', key: 'school_drive_upload', checked: false }
+        ]},
+      { role: 'teacher', title: 'Teacher', icon: 'school', description: 'Manage assigned courses and students', disabled: false,
+        perms: [
+          { label: 'View Assigned Courses', key: 'teacher_courses', checked: true },
+          { label: 'View Assigned Students', key: 'teacher_students', checked: true },
+          { label: 'Grade Assignments', key: 'teacher_grade_assignments', checked: true },
+          { label: 'Grade Quizzes', key: 'teacher_grade_quizzes', checked: true },
+          { label: 'View Reports', key: 'teacher_reports', checked: true },
+          { label: 'View Own Profile', key: 'teacher_profile', checked: true }
+        ]},
+      { role: 'counselor', title: 'Counselor', icon: 'badge', description: 'Manage assigned students and counseling records', disabled: false,
+        perms: [
+          { label: 'View Assigned Students', key: 'counselor_students', checked: true },
+          { label: 'Manage Student Progress', key: 'counselor_progress', checked: true },
+          { label: 'View Analytics', key: 'counselor_analytics', checked: true },
+          { label: 'Send Notifications', key: 'counselor_notifications', checked: true },
+          { label: 'Manage Own Profile', key: 'counselor_profile', checked: true }
+        ]},
+      { role: 'student', title: 'Student', icon: 'person', description: 'View own courses, progress, and certificates', disabled: false,
+        perms: [
+          { label: 'View Own Courses', key: 'student_courses', checked: true },
+          { label: 'Track Own Progress', key: 'student_progress', checked: true },
+          { label: 'View Own Notifications', key: 'student_notifications', checked: true },
+          { label: 'Manage Own Profile', key: 'student_profile', checked: true }
+        ]}
     ];
-    const schoolAdminPerms = [
-      { label: 'Manage School Settings', key: 'school_settings', checked: true },
-      { label: 'Manage Categories', key: 'school_categories', checked: true },
-      { label: 'Manage Subjects', key: 'school_subjects', checked: true },
-      { label: 'Manage Sections', key: 'school_sections', checked: true },
-      { label: 'Manage Content', key: 'school_content', checked: true },
-      { label: 'View Analytics', key: 'school_analytics', checked: false },
-      { label: 'Manage Own Profile', key: 'school_profile', checked: true },
-      { label: 'Upload Drive Files', key: 'school_drive_upload', checked: false }
-    ];
+
     main.innerHTML = `<div class="fade-in">
       <div class="page-header">
-        <div class="page-header-left"><h1 class="page-title">Roles & Permissions</h1><p class="page-subtitle">Define access control for each role.</p></div>
+        <div class="page-header-left"><h1 class="page-title">Roles & Permissions</h1><p class="page-subtitle">Define access control for each role in the hierarchy.</p></div>
       </div>
-      <div class="card">
-        <div style="padding:20px 0;">
-          <div style="padding:0 20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
-            <div class="metric-icon metric-icon-blue" style="width:40px;height:40px;"><span class="material-symbols-outlined" style="font-size:20px;">admin_panel_settings</span></div>
-            <div><div style="font-weight:600;">Super Admin</div><div style="font-size:12px;color:var(--text-secondary);">Full system access - all permissions enabled by default</div></div>
-            <div style="margin-left:auto;"><span class="status-badge status-active">Active</span></div>
-          </div>
-          <div style="padding:16px 20px 0;">
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;">
-              ${superAdminPerms.map(p => `
-                <label class="checkbox-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;">
-                  <input type="checkbox" ${(permMap['super_admin']?.[p.key]) !== false ? 'checked' : ''} disabled style="width:16px;height:16px;">
-                  <span style="font-size:13px;">${p.label}</span>
-                </label>`).join('')}
-            </div>
-          </div>
-        </div>
-        <div style="padding:20px 0;border-top:1px solid var(--border);">
-          <div style="padding:0 20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
-            <div class="metric-icon metric-icon-green" style="width:40px;height:40px;"><span class="material-symbols-outlined" style="font-size:20px;">manage_accounts</span></div>
-            <div><div style="font-weight:600;">School Admin</div><div style="font-size:12px;color:var(--text-secondary);">Restricted to own school</div></div>
-            <div style="margin-left:auto;"><span class="status-badge status-active">Active</span></div>
-          </div>
-          <div style="padding:16px 20px 0;">
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;">
-              ${schoolAdminPerms.map(p => `
-                <label class="checkbox-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer;">
-                  <input type="checkbox" ${(permMap['school_admin']?.[p.key] ?? p.checked) ? 'checked' : ''} data-action="toggle-permission" data-key="${p.key}" style="width:16px;height:16px;">
-                  <span style="font-size:13px;">${p.label}</span>
-                </label>`).join('')}
-            </div>
-          </div>
-        </div>
+      <div class="card" style="padding:0;">
+        ${sections.map(s => permissionSection(s.role, s.title, s.icon, s.description, s.perms, s.disabled)).join('')}
       </div>
     </div>`;
     initIcons();
@@ -979,7 +1199,7 @@ window.AppRouter = {
   },
 
   _settingsTabContent(tab, settings) {
-    const v = (key, fallback) => settings[key] !== undefined ? settings[key] : fallback;
+    const v = (key, fallback) => settings[key] !== undefined ? AppUtils.escapeHtml(settings[key]) : fallback;
     if (tab === 'general') {
       return `<div class="card" style="max-width:600px;">
         <div class="card-header"><h3 class="card-title">General Settings</h3></div>
@@ -1100,9 +1320,9 @@ window.AppRouter = {
             : `<div class="table-container"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Updated</th></tr></thead><tbody>${recentContent.map(c => {
               const typeIcon = { Video: 'videocam', PDF: 'description', Image: 'image', Document: 'description' };
               return `<tr style="cursor:pointer;" data-action="navigate" data-route="content-manager">
-                <td><div style="display:flex;align-items:center;gap:8px;"><span class="material-symbols-outlined" style="font-size:16px;color:var(--text-muted);">${typeIcon[c.type] || 'insert_drive_file'}</span><span class="font-semibold">${c.name}</span></div></td>
-                <td><span class="status-badge" style="background:var(--primary-subtle);color:var(--primary);">${c.type}</span></td>
-                <td><span class="status-badge ${c.status === 'published' ? 'status-active' : c.status === 'draft' ? 'status-suspended' : 'status-pending'}">${c.status}</span></td>
+                <td><div style="display:flex;align-items:center;gap:8px;"><span class="material-symbols-outlined" style="font-size:16px;color:var(--text-muted);">${typeIcon[c.type] || 'insert_drive_file'}</span><span class="font-semibold">${AppUtils.escapeHtml(c.name)}</span></div></td>
+                <td><span class="status-badge" style="background:var(--primary-subtle);color:var(--primary);">${AppUtils.escapeHtml(c.type)}</span></td>
+                <td><span class="status-badge ${c.status === 'published' ? 'status-active' : c.status === 'draft' ? 'status-suspended' : 'status-pending'}">${AppUtils.escapeHtml(c.status)}</span></td>
                 <td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.updated_at)}</td>
               </tr>`;
             }).join('')}</tbody></table></div>`}
@@ -1115,12 +1335,12 @@ window.AppRouter = {
             ${recentLogs.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">history</span><h3>No activity yet</h3></div>`
             : `<div style="display:flex;flex-direction:column;gap:0;">${recentLogs.map(l => {
               const actionColors = { created: '#10b981', edited: '#3b82f6', uploaded: '#8b5cf6', deleted: '#ef4444', suspended: '#f59e0b' };
-              const userName = profileMap[l.created_by]?.name || 'System';
+              const userName = AppUtils.escapeHtml(profileMap[l.created_by]?.name || 'System');
               return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
                 <div style="width:8px;height:8px;border-radius:50%;background:${actionColors[l.action] || '#94a3b8'};margin-top:6px;flex-shrink:0;"></div>
                 <div style="flex:1;min-width:0;">
                   <div style="font-size:13px;font-weight:500;color:var(--on-surface);">${userName}</div>
-                  <div style="font-size:12px;color:var(--text-secondary);">${l.action} ${l.entity} — ${l.entity_name}</div>
+                  <div style="font-size:12px;color:var(--text-secondary);">${AppUtils.escapeHtml(l.action)} ${AppUtils.escapeHtml(l.entity)} — ${AppUtils.escapeHtml(l.entity_name)}</div>
                 </div>
                 <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;">${AppUtils.formatDate(l.created_at)}</div>
               </div>`;
@@ -1130,7 +1350,7 @@ window.AppRouter = {
       </div>`;
       initIcons();
     } catch (err) {
-      main.innerHTML = `<div class="empty-state" style="padding:60px;"><span class="material-symbols-outlined" style="font-size:48px;color:#ef4444;">error</span><h3>Failed to load dashboard</h3><p>${err.message}</p><button class="btn btn-primary" onclick="AppRouter.render()">Retry</button></div>`;
+      main.innerHTML = `<div class="empty-state" style="padding:60px;"><span class="material-symbols-outlined" style="font-size:48px;color:#ef4444;">error</span><h3>Failed to load dashboard</h3><p>${AppUtils.escapeHtml(err.message)}</p><button class="btn btn-primary" onclick="AppRouter.render()">Retry</button></div>`;
     }
   },
 
@@ -1175,11 +1395,11 @@ window.AppRouter = {
             <div class="school-card-top">
               <div class="school-logo ${logoClass}">${AppUtils.getInitials(s.name)}</div>
               <div class="school-info">
-                <div class="school-name">${s.name}</div>
-                <div class="school-code">Code: ${s.code}</div>
-                <div class="school-admin"><span class="material-symbols-outlined" style="font-size:14px;">person</span> ${s.principal_name || 'No principal'}</div>
+                <div class="school-name">${AppUtils.escapeHtml(s.name)}</div>
+                <div class="school-code">Code: ${AppUtils.escapeHtml(s.code)}</div>
+                <div class="school-admin"><span class="material-symbols-outlined" style="font-size:14px;">person</span> ${AppUtils.escapeHtml(s.principal_name || 'No principal')}</div>
               </div>
-              <span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-suspended'}">${s.status}</span>
+              <span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-suspended'}">${AppUtils.escapeHtml(s.status)}</span>
             </div>
             <div class="school-stats">
               <div class="school-stat"><div class="school-stat-value">${stats.categories}</div><div class="school-stat-label">Categories</div></div>
@@ -1197,7 +1417,7 @@ window.AppRouter = {
       </div>`;
       initIcons();
     } catch (err) {
-      main.innerHTML = `<div class="empty-state" style="padding:60px;"><span class="material-symbols-outlined" style="font-size:48px;color:#ef4444;">error</span><h3>Failed to load schools</h3><p>${err.message}</p><button class="btn btn-primary" onclick="AppRouter.render()">Retry</button></div>`;
+      main.innerHTML = `<div class="empty-state" style="padding:60px;"><span class="material-symbols-outlined" style="font-size:48px;color:#ef4444;">error</span><h3>Failed to load schools</h3><p>${AppUtils.escapeHtml(err.message)}</p><button class="btn btn-primary" onclick="AppRouter.render()">Retry</button></div>`;
     }
   }
 }; // End AppRouter
@@ -1263,8 +1483,7 @@ window.AppUserManagement = {
       return { ...u, schoolName: school?.name || '—', schoolStatus: school?.status || 'inactive' };
     });
 
-    if (this.currentTab === 'super_admin') users = users.filter(u => u.role === 'super_admin');
-    else if (this.currentTab === 'school_admin') users = users.filter(u => u.role === 'school_admin');
+    if (this.currentTab !== 'all') users = users.filter(u => u.role === this.currentTab);
 
     if (q) users = users.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
 
@@ -1278,19 +1497,24 @@ window.AppUserManagement = {
         <button class="btn btn-primary" data-action="add-user"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span> Add User</button>
       </div>
       <div class="tab-bar" style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);background:transparent;">
-        ${['all', 'super_admin', 'school_admin'].map(t => `
-          <button class="tab-item ${this.currentTab === t ? 'active' : ''}" data-action="um-tab" data-tab="${t}" style="padding:10px 20px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid ${this.currentTab === t ? 'var(--primary)' : 'transparent'};color:${this.currentTab === t ? 'var(--text)' : 'var(--text-secondary)'};">
-            ${t === 'all' ? 'All Users' : t === 'super_admin' ? 'Super Admins' : 'School Admins'}
-            <span style="margin-left:6px;font-size:11px;color:var(--text-muted);">(${users.length})</span>
-          </button>
-        `).join('')}
+        ${['all', 'super_admin', 'company_admin', 'school_admin', 'teacher', 'counselor', 'student'].map(t => {
+          const labels = { all: 'All Users', super_admin: 'Super Admin', company_admin: 'Company Admin', school_admin: 'School Admin', teacher: 'Teacher', counselor: 'Counselor', student: 'Student' };
+          return `<button class="tab-item ${this.currentTab === t ? 'active' : ''}" data-action="um-tab" data-tab="${t}" style="padding:10px 16px;font-size:12px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid ${this.currentTab === t ? 'var(--primary)' : 'transparent'};color:${this.currentTab === t ? 'var(--text)' : 'var(--text-secondary)'};white-space:nowrap;">
+            ${labels[t] || t}
+            <span style="margin-left:4px;font-size:11px;color:var(--text-muted);">(${t === 'all' ? users.length : users.filter(u => u.role === t).length})</span>
+          </button>`;
+        }).join('')}
       </div>
       <div class="management-bar" style="margin-bottom:16px;">
-        <div class="search-bar" style="max-width:280px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="um-search" placeholder="Search users..." value="${this.searchQuery}" data-action="um-search-input"></div>
+        <div class="search-bar" style="max-width:280px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="um-search" placeholder="Search users..." value="${AppUtils.escapeHtml(this.searchQuery)}" data-action="um-search-input"></div>
         <select class="form-select" id="um-role-filter" style="width:160px;height:40px;font-size:13px;" data-action="um-filter-role">
           <option value="">All Roles</option>
           <option value="super_admin" ${this.currentTab === 'super_admin' ? 'selected' : ''}>Super Admin</option>
+          <option value="company_admin" ${this.currentTab === 'company_admin' ? 'selected' : ''}>Company Admin</option>
           <option value="school_admin" ${this.currentTab === 'school_admin' ? 'selected' : ''}>School Admin</option>
+          <option value="teacher" ${this.currentTab === 'teacher' ? 'selected' : ''}>Teacher</option>
+          <option value="counselor" ${this.currentTab === 'counselor' ? 'selected' : ''}>Counselor</option>
+          <option value="student" ${this.currentTab === 'student' ? 'selected' : ''}>Student</option>
         </select>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
@@ -1304,20 +1528,22 @@ window.AppUserManagement = {
               <th>Status</th>
               <th style="width:140px;"></th>
             </tr></thead><tbody>${pageUsers.map(u => {
+              const eh = AppUtils.escapeHtml;
               const isActive = u.schoolStatus === 'active';
+              const roleLabel = ROLE_LABELS[u.role] || u.role;
               return `<tr>
                 <td><input type="checkbox" class="um-row-check" data-id="${u.id}" style="width:16px;height:16px;cursor:pointer;"></td>
                 <td>
                   <div style="display:flex;align-items:center;gap:10px;">
                     <div class="user-avatar" style="width:32px;height:32px;font-size:11px;">${AppUtils.getInitials(u.name)}</div>
                     <div>
-                      <div class="font-semibold" style="font-size:13px;">${u.name}</div>
-                      <div style="font-size:12px;color:var(--text-secondary);">${u.email || '—'}</div>
+                      <div class="font-semibold" style="font-size:13px;">${eh(u.name)}</div>
+                      <div style="font-size:12px;color:var(--text-secondary);">${eh(u.email || '—')}</div>
                     </div>
                   </div>
                 </td>
-                <td><span class="status-badge" style="background:${u.role === 'super_admin' ? 'var(--primary-subtle)' : 'var(--warning-light)'};color:${u.role === 'super_admin' ? 'var(--primary)' : '#92400e'};">${u.role === 'super_admin' ? 'Super Admin' : 'School Admin'}</span></td>
-                <td style="font-size:13px;">${u.schoolName}</td>
+                <td><span class="status-badge" style="background:${ROLE_COLORS[u.role]?.bg || 'var(--surface-low)'};color:${ROLE_COLORS[u.role]?.fg || 'var(--on-surface-variant)'};">${eh(roleLabel)}</span></td>
+                <td style="font-size:13px;">${eh(u.schoolName)}</td>
                 <td><span class="status-badge ${isActive ? 'status-active' : 'status-suspended'}">${isActive ? 'Active' : 'Suspended'}</span></td>
                 <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
                   <button class="btn btn-ghost btn-sm" data-action="edit-user" data-id="${u.id}" title="Edit user"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
@@ -1370,16 +1596,16 @@ window.AppUserManagement = {
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">User Name</label>
-          <input type="text" class="form-input" id="edit-user-name" value="${user.name}" placeholder="Enter user name">
+          <input type="text" class="form-input" id="edit-user-name" value="${AppUtils.escapeHtml(user.name)}" placeholder="Enter user name">
         </div>
         <div class="form-group">
           <label class="form-label">Email</label>
-          <input type="email" class="form-input" value="${user.email || ''}" disabled style="color:var(--text-muted);">
+          <input type="email" class="form-input" value="${AppUtils.escapeHtml(user.email || '')}" disabled style="color:var(--text-muted);">
           <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Email cannot be changed.</div>
         </div>
         <div class="form-group">
           <label class="form-label">Role</label>
-          <input type="text" class="form-input" value="${user.role === 'super_admin' ? 'Super Admin' : 'School Admin'}" disabled style="color:var(--text-muted);">
+          <input type="text" class="form-input" value="${AppUtils.escapeHtml(ROLE_LABELS[user.role] || user.role)}" disabled style="color:var(--text-muted);">
         </div>
       </div>
       <div class="modal-footer">
@@ -1472,7 +1698,7 @@ window.AppCategories = {
     } else {
       tbody.innerHTML = filtered.map(c => {
         const count = data.subjects.filter(s => s.category_id === c.id).length;
-        return `<tr><td><div class="font-semibold">${c.name}</div></td><td>${count}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.created_at)}</td>
+        return `<tr><td><div class="font-semibold">${AppUtils.escapeHtml(c.name)}</div></td><td>${count}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.created_at)}</td>
           <td class="td-actions"><button class="btn btn-ghost btn-sm" data-action="open-category" data-id="${c.id}"><span class="material-symbols-outlined" style="font-size:18px;">open_in_new</span></button><button class="btn btn-ghost btn-sm" data-action="edit-category" data-id="${c.id}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button><button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-category" data-id="${c.id}"><span class="material-symbols-outlined" style="font-size:18px;">delete</span></button></td></tr>`;
       }).join('');
     }
@@ -1494,7 +1720,7 @@ window.AppSubjects = {
     const catSelect = document.getElementById('input-subject-category');
     const schoolId = AppRouter.currentSchoolId;
     const cats = data.categories.filter(c => c.school_id === schoolId);
-    catSelect.innerHTML = `<option value="">Choose...</option>${cats.map(c => `<option value="${c.id}" ${c.id === categoryId ? 'selected' : ''}>${c.name}</option>`).join('')}`;
+    catSelect.innerHTML = `<option value="">Choose...</option>${cats.map(c => `<option value="${c.id}" ${c.id === categoryId ? 'selected' : ''}>${AppUtils.escapeHtml(c.name)}</option>`).join('')}`;
     document.getElementById('modal-title').textContent = 'Add Subject';
     AppModal.open('modal-entity');
   },
@@ -1510,7 +1736,7 @@ window.AppSubjects = {
     const catSelect = document.getElementById('input-subject-category');
     const schoolId = AppRouter.currentSchoolId;
     const cats = data.categories.filter(c => c.school_id === schoolId);
-    catSelect.innerHTML = `<option value="">Choose...</option>${cats.map(c => `<option value="${c.id}" ${c.id === subj.category_id ? 'selected' : ''}>${c.name}</option>`).join('')}`;
+    catSelect.innerHTML = `<option value="">Choose...</option>${cats.map(c => `<option value="${c.id}" ${c.id === subj.category_id ? 'selected' : ''}>${AppUtils.escapeHtml(c.name)}</option>`).join('')}`;
     document.getElementById('modal-title').textContent = 'Edit Subject';
     AppModal.open('modal-entity');
   },
@@ -1539,7 +1765,7 @@ window.AppSubjects = {
       tbody.innerHTML = filtered.map(s => {
         const cat = cats.find(c => c.id === s.category_id);
         const secCount = data.sections.filter(sec => sec.subject_id === s.id).length;
-        return `<tr><td><div class="font-semibold">${s.name}</div></td><td style="font-size:13px;">${cat?.name || '—'}</td><td>${secCount}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(s.created_at)}</td>
+        return `<tr><td><div class="font-semibold">${AppUtils.escapeHtml(s.name)}</div></td><td style="font-size:13px;">${AppUtils.escapeHtml(cat?.name || '—')}</td><td>${secCount}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(s.created_at)}</td>
           <td class="td-actions"><button class="btn btn-ghost btn-sm" data-action="open-subject" data-id="${s.id}"><span class="material-symbols-outlined" style="font-size:18px;">open_in_new</span></button><button class="btn btn-ghost btn-sm" data-action="edit-subject" data-id="${s.id}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button><button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-subject" data-id="${s.id}"><span class="material-symbols-outlined" style="font-size:18px;">delete</span></button></td></tr>`;
       }).join('');
     }
@@ -1561,7 +1787,7 @@ window.AppSections = {
     const subjSelect = document.getElementById('input-section-subject');
     const schoolId = AppRouter.currentSchoolId;
     const subjects = data.subjects.filter(s => s.school_id === schoolId);
-    subjSelect.innerHTML = `<option value="">Choose...</option>${subjects.map(s => `<option value="${s.id}" ${s.id === subjectId ? 'selected' : ''}>${s.name}</option>`).join('')}`;
+    subjSelect.innerHTML = `<option value="">Choose...</option>${subjects.map(s => `<option value="${s.id}" ${s.id === subjectId ? 'selected' : ''}>${AppUtils.escapeHtml(s.name)}</option>`).join('')}`;
     document.getElementById('modal-title').textContent = 'Add Section';
     AppModal.open('modal-entity');
   },
@@ -1577,7 +1803,7 @@ window.AppSections = {
     const subjSelect = document.getElementById('input-section-subject');
     const schoolId = AppRouter.currentSchoolId;
     const subjects = data.subjects.filter(s => s.school_id === schoolId);
-    subjSelect.innerHTML = `<option value="">Choose...</option>${subjects.map(s => `<option value="${s.id}" ${s.id === sec.subject_id ? 'selected' : ''}>${s.name}</option>`).join('')}`;
+    subjSelect.innerHTML = `<option value="">Choose...</option>${subjects.map(s => `<option value="${s.id}" ${s.id === sec.subject_id ? 'selected' : ''}>${AppUtils.escapeHtml(s.name)}</option>`).join('')}`;
     document.getElementById('modal-title').textContent = 'Edit Section';
     AppModal.open('modal-entity');
   },
@@ -1608,7 +1834,7 @@ window.AppSections = {
         const subj = subjects.find(sub => sub.id === s.subject_id);
         const cat = cats.find(c => c.id === subj?.category_id);
         const conCount = data.content.filter(c => c.section_id === s.id).length;
-        return `<tr><td><div class="font-semibold">${s.name}</div></td><td style="font-size:13px;">${subj?.name || '—'}</td><td style="font-size:13px;color:var(--text-secondary);">${cat?.name || '—'}</td><td>${conCount}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(s.created_at)}</td>
+        return `<tr><td><div class="font-semibold">${AppUtils.escapeHtml(s.name)}</div></td><td style="font-size:13px;">${AppUtils.escapeHtml(subj?.name || '—')}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.escapeHtml(cat?.name || '—')}</td><td>${conCount}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(s.created_at)}</td>
           <td class="td-actions"><button class="btn btn-ghost btn-sm" data-action="edit-section" data-id="${s.id}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button><button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-section" data-id="${s.id}"><span class="material-symbols-outlined" style="font-size:18px;">delete</span></button></td></tr>`;
       }).join('');
     }
@@ -1634,7 +1860,7 @@ window.AppContent = {
     document.getElementById('input-content-tags').value = '';
     document.getElementById('input-content-status').value = 'draft';
     const schoolSelect = document.getElementById('input-content-school');
-    schoolSelect.innerHTML = `<option value="">Choose...</option>${data.schools.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}`;
+    schoolSelect.innerHTML = `<option value="">Choose...</option>${data.schools.map(s => `<option value="${s.id}">${AppUtils.escapeHtml(s.name)}</option>`).join('')}`;
     document.getElementById('input-content-section').innerHTML = '<option value="">Choose a school first</option>';
     if (sectionId) {
       const sec = data.sections.find(s => s.id === sectionId);
@@ -1659,7 +1885,7 @@ window.AppContent = {
     document.getElementById('input-content-tags').value = (item.tags || []).join(', ');
     document.getElementById('input-content-status').value = item.status;
     const schoolSelect = document.getElementById('input-content-school');
-    schoolSelect.innerHTML = `<option value="">Choose...</option>${data.schools.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}`;
+    schoolSelect.innerHTML = `<option value="">Choose...</option>${data.schools.map(s => `<option value="${s.id}">${AppUtils.escapeHtml(s.name)}</option>`).join('')}`;
     schoolSelect.value = item.school_id;
     this.populateSections(item.school_id, item.section_id);
     document.getElementById('modal-title').textContent = 'Edit Content';
@@ -1696,7 +1922,7 @@ window.AppContent = {
     const data = await AppStorage.load();
     const sections = data.sections.filter(s => s.school_id === schoolId);
     const select = document.getElementById('input-content-section');
-    select.innerHTML = `<option value="">Choose...</option>${sections.map(s => `<option value="${s.id}" ${s.id === selectedId ? 'selected' : ''}>${s.name}</option>`).join('')}`;
+    select.innerHTML = `<option value="">Choose...</option>${sections.map(s => `<option value="${s.id}" ${s.id === selectedId ? 'selected' : ''}>${AppUtils.escapeHtml(s.name)}</option>`).join('')}`;
   },
   async render() {
     const q = (document.getElementById('content-search')?.value || '').toLowerCase();
@@ -1716,10 +1942,10 @@ window.AppContent = {
       const typeIcons = { Video: 'video', PDF: 'file-text', Image: 'image', Document: 'file' };
       wrapper.innerHTML = `<table><thead><tr><th>Name</th><th>Type</th><th>School</th><th>Status</th><th>Description</th><th>Updated</th><th style="width:120px;"></th></tr></thead><tbody>${items.map(c => {
         const school = schoolsById[c.school_id] || {};
-        return `<tr><td><div class="flex-center gap-10" style="justify-content:flex-start;"><i data-icon="${typeIcons[c.type] || 'insert_drive_file'}" style="width:16px;height:16px;color:var(--primary);"></i><span class="font-semibold">${c.name}</span></div></td>
-          <td style="font-size:13px;">${c.type}</td><td style="font-size:13px;">${school.name || '—'}</td>
-          <td><span class="status-badge ${c.status === 'published' ? 'status-active' : c.status === 'draft' ? 'status-suspended' : 'status-pending'}">${c.status}</span></td>
-          <td style="font-size:13px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.description || ''}</td>
+        return `<tr><td><div class="flex-center gap-10" style="justify-content:flex-start;"><i data-icon="${typeIcons[c.type] || 'insert_drive_file'}" style="width:16px;height:16px;color:var(--primary);"></i><span class="font-semibold">${AppUtils.escapeHtml(c.name)}</span></div></td>
+          <td style="font-size:13px;">${AppUtils.escapeHtml(c.type)}</td><td style="font-size:13px;">${AppUtils.escapeHtml(school.name || '—')}</td>
+          <td><span class="status-badge ${c.status === 'published' ? 'status-active' : c.status === 'draft' ? 'status-suspended' : 'status-pending'}">${AppUtils.escapeHtml(c.status)}</span></td>
+          <td style="font-size:13px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${AppUtils.escapeHtml(c.description || '')}</td>
           <td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.updated_at)}</td>
           <td class="td-actions"><button class="btn btn-ghost btn-sm" data-action="play-video" data-id="${c.id}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="btn btn-ghost btn-sm" data-action="edit-content" data-id="${c.id}"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button><button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-content" data-id="${c.id}"><span class="material-symbols-outlined" style="font-size:18px;">delete</span></button></td></tr>`;
       }).join('')}</tbody></table>`;
@@ -1739,15 +1965,15 @@ window.AppDriveManager = {
     let html = '';
     data.schools.forEach(s => {
       const hasDrive = s.drive_folder_id ? ' 🔗' : '';
-      html += `<div class="explorer-item" data-id="${s.id}" data-action="drive-select"><i data-icon="building-2" style="width:16px;height:16px;"></i> ${s.name}${hasDrive ? '<span style="margin-left:auto;font-size:10px;color:var(--primary);">Drive</span>' : ''}</div>`;
+      html += `<div class="explorer-item" data-id="${s.id}" data-action="drive-select"><i data-icon="building-2" style="width:16px;height:16px;"></i> ${AppUtils.escapeHtml(s.name)}${hasDrive ? '<span style="margin-left:auto;font-size:10px;color:var(--primary);">Drive</span>' : ''}</div>`;
       const cats = data.categories.filter(c => c.school_id === s.id);
       cats.forEach(c => {
         const hasCatDrive = c.drive_folder_id ? ' 🔗' : '';
-        html += `<div class="explorer-item" style="padding-left:28px;" data-school-id="${s.id}" data-action="drive-select-folder" data-id="${c.id}"><i data-icon="folder" style="width:16px;height:16px;"></i> ${c.name}${hasCatDrive ? '<span style="margin-left:auto;font-size:10px;color:var(--primary);">Drive</span>' : ''}</div>`;
+        html += `<div class="explorer-item" style="padding-left:28px;" data-school-id="${s.id}" data-action="drive-select-folder" data-id="${c.id}"><i data-icon="folder" style="width:16px;height:16px;"></i> ${AppUtils.escapeHtml(c.name)}${hasCatDrive ? '<span style="margin-left:auto;font-size:10px;color:var(--primary);">Drive</span>' : ''}</div>`;
         const subs = data.subjects.filter(sub => sub.category_id === c.id);
         subs.forEach(sub => {
           const hasSubDrive = sub.drive_folder_id ? ' 🔗' : '';
-          html += `<div class="explorer-item" style="padding-left:44px;" data-school-id="${s.id}" data-action="drive-select-folder" data-id="${sub.id}"><i data-icon="book-open" style="width:14px;height:14px;"></i> ${sub.name}${hasSubDrive ? '<span style="margin-left:auto;font-size:10px;color:var(--primary);">Drive</span>' : ''}</div>`;
+          html += `<div class="explorer-item" style="padding-left:44px;" data-school-id="${s.id}" data-action="drive-select-folder" data-id="${sub.id}"><i data-icon="book-open" style="width:14px;height:14px;"></i> ${AppUtils.escapeHtml(sub.name)}${hasSubDrive ? '<span style="margin-left:auto;font-size:10px;color:var(--primary);">Drive</span>' : ''}</div>`;
         });
       });
     });
@@ -1761,7 +1987,7 @@ window.AppDriveManager = {
     const container = document.getElementById('drive-content');
     const driveId = school?.drive_folder_id || '';
     let html = `<div style="padding:20px 24px;border-bottom:1px solid var(--border);">
-      <div style="font-size:16px;font-weight:600;">${school ? school.name : 'School'}</div>
+      <div style="font-size:16px;font-weight:600;">${AppUtils.escapeHtml(school ? school.name : 'School')}</div>
       <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${cats.length} folders · ${files.length} files</div>
     </div>
     <div style="padding:16px 24px;border-bottom:1px solid var(--border);">
@@ -1782,12 +2008,12 @@ window.AppDriveManager = {
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:20px;">${cats.map(c => `
           <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-md);cursor:pointer;" data-action="drive-select-folder" data-id="${c.id}" data-school-id="${schoolId}">
             <i data-icon="folder" style="width:18px;height:18px;color:var(--primary);flex-shrink:0;"></i>
-            <div><div style="font-size:13px;font-weight:500;">${c.name}</div><div style="font-size:11px;color:var(--text-muted);">${data.subjects.filter(s => s.category_id === c.id).length} subjects</div></div>
+            <div><div style="font-size:13px;font-weight:500;">${AppUtils.escapeHtml(c.name)}</div><div style="font-size:11px;color:var(--text-muted);">${data.subjects.filter(s => s.category_id === c.id).length} subjects</div></div>
           </div>`).join('')}</div>`;
       }
       if (files.length > 0) {
         html += `<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Files</div>
-        <div class="table-container"><table><thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Updated</th></tr></thead><tbody>${files.map(f => `<tr><td><div class="flex-center gap-10" style="justify-content:flex-start;"><i data-icon="${f.type === 'Video' ? 'videocam' : f.type === 'PDF' ? 'description' : 'insert_drive_file'}" style="width:16px;height:16px;color:var(--text-muted);"></i><span class="font-semibold">${f.name}</span></div></td><td style="font-size:13px;">${f.type}</td><td style="font-size:13px;color:var(--text-secondary);">${f.size || '—'}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(f.updated_at)}</td></tr>`).join('')}</tbody></table></div>`;
+        <div class="table-container"><table><thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Updated</th></tr></thead><tbody>${files.map(f => `<tr><td><div class="flex-center gap-10" style="justify-content:flex-start;"><i data-icon="${f.type === 'Video' ? 'videocam' : f.type === 'PDF' ? 'description' : 'insert_drive_file'}" style="width:16px;height:16px;color:var(--text-muted);"></i><span class="font-semibold">${AppUtils.escapeHtml(f.name)}</span></div></td><td style="font-size:13px;">${AppUtils.escapeHtml(f.type)}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.escapeHtml(f.size || '—')}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(f.updated_at)}</td></tr>`).join('')}</tbody></table></div>`;
       }
     }
     html += '</div>';
@@ -1805,8 +2031,8 @@ window.AppDriveManager = {
     const driveId = folder?.drive_folder_id || '';
     const entityType = isCategory ? 'category' : 'subject';
     let html = `<div style="padding:20px 24px;border-bottom:1px solid var(--border);">
-      <div style="font-size:13px;color:var(--text-secondary);">${school ? school.name : ''} /</div>
-      <div style="font-size:16px;font-weight:600;">${folder ? folder.name : 'Folder'}</div>
+      <div style="font-size:13px;color:var(--text-secondary);">${AppUtils.escapeHtml(school ? school.name : '')} /</div>
+      <div style="font-size:16px;font-weight:600;">${AppUtils.escapeHtml(folder ? folder.name : 'Folder')}</div>
       <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${subs.length + folderFiles.length} items</div>
     </div>
     <div style="padding:16px 24px;border-bottom:1px solid var(--border);">
@@ -1825,11 +2051,11 @@ window.AppDriveManager = {
       if (subs.length > 0) {
         html += `<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Subjects</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:20px;">${subs.map(sub => `
-          <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-md);"><i data-icon="book-open" style="width:16px;height:16px;color:var(--success);flex-shrink:0;"></i><div><div style="font-size:13px;font-weight:500;">${sub.name}</div><div style="font-size:11px;color:var(--text-muted);">${data.sections.filter(sec => sec.subject_id === sub.id).length} sections</div></div></div>`).join('')}</div>`;
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-md);"><i data-icon="book-open" style="width:16px;height:16px;color:var(--success);flex-shrink:0;"></i><div><div style="font-size:13px;font-weight:500;">${AppUtils.escapeHtml(sub.name)}</div><div style="font-size:11px;color:var(--text-muted);">${data.sections.filter(sec => sec.subject_id === sub.id).length} sections</div></div></div>`).join('')}</div>`;
       }
       if (folderFiles.length > 0) {
         html += `<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Files</div>
-        <div class="table-container"><table><thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Updated</th></tr></thead><tbody>${folderFiles.map(f => `<tr><td><div class="flex-center gap-10" style="justify-content:flex-start;"><i data-icon="${f.type === 'Video' ? 'videocam' : f.type === 'PDF' ? 'description' : 'insert_drive_file'}" style="width:16px;height:16px;color:var(--text-muted);"></i><span class="font-semibold">${f.name}</span></div></td><td style="font-size:13px;">${f.type}</td><td style="font-size:13px;color:var(--text-secondary);">${f.size || '—'}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(f.updated_at)}</td></tr>`).join('')}</tbody></table></div>`;
+        <div class="table-container"><table><thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Updated</th></tr></thead><tbody>${folderFiles.map(f => `<tr><td><div class="flex-center gap-10" style="justify-content:flex-start;"><i data-icon="${f.type === 'Video' ? 'videocam' : f.type === 'PDF' ? 'description' : 'insert_drive_file'}" style="width:16px;height:16px;color:var(--text-muted);"></i><span class="font-semibold">${AppUtils.escapeHtml(f.name)}</span></div></td><td style="font-size:13px;">${AppUtils.escapeHtml(f.type)}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.escapeHtml(f.size || '—')}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(f.updated_at)}</td></tr>`).join('')}</tbody></table></div>`;
       }
     }
     html += '</div>';
@@ -1885,8 +2111,9 @@ window.AppGlobalSearch = {
       results.innerHTML = '<div class="empty-state" style="padding:32px 24px;"><i data-icon="search-x" style="width:32px;height:32px;color:var(--text-muted);"></i><h3 style="font-size:14px;">No results</h3><p style="font-size:13px;">Try a different search term.</p></div>';
     } else {
       const typeIcons = { School: 'building-2', Category: 'folder-tree', Subject: 'book-open', Section: 'folder-kanban' };
+      const eh = AppUtils.escapeHtml;
       results.innerHTML = `<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;padding:8px 20px 4px;">${matches.length} result${matches.length > 1 ? 's' : ''}</div>
-      ${matches.slice(0, 15).map(m => { const icon = typeIcons[m.type.split(' ')[0]] || 'file'; const action = m.action || 'global-search-nav'; return `<div class="explorer-item" style="padding:10px 20px;border-radius:0;" data-action="${action}" data-route="${m.route || ''}" data-id="${m.id || ''}" data-school-id="${m.schoolId || ''}" data-cat-id="${m.catId || ''}"><i data-icon="${icon}" style="width:16px;height:16px;color:var(--primary);"></i><div style="flex:1;"><div style="font-size:13px;font-weight:500;">${m.label}</div><div style="font-size:11px;color:var(--text-muted);">${m.type} ${m.sub}</div></div></div>`; }).join('')}`;
+      ${matches.slice(0, 15).map(m => { const icon = typeIcons[m.type.split(' ')[0]] || 'file'; const action = m.action || 'global-search-nav'; return `<div class="explorer-item" style="padding:10px 20px;border-radius:0;" data-action="${action}" data-route="${m.route || ''}" data-id="${m.id || ''}" data-school-id="${m.schoolId || ''}" data-cat-id="${m.catId || ''}"><i data-icon="${icon}" style="width:16px;height:16px;color:var(--primary);"></i><div style="flex:1;"><div style="font-size:13px;font-weight:500;">${eh(m.label)}</div><div style="font-size:11px;color:var(--text-muted);">${eh(m.type)} ${eh(m.sub)}</div></div></div>`; }).join('')}`;
     }
     initIcons();
   }
@@ -1896,9 +2123,14 @@ window.AppGlobalSearch = {
 // AUDIT LOG MODULE
 // ==============================================================
 window.AppAuditLog = {
+  _page: 1,
+  _perPage: 50,
+
   async render(main) {
     const data = await AppStorage.load();
     const logs = (data.auditLog || []).sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+    this._logs = logs;
+    this._page = 1;
     main.innerHTML = `<div class="fade-in">
       <div class="page-header"><div class="page-header-left"><h1 class="page-title">Audit Log</h1><p class="page-subtitle">Track all activities across the platform.</p></div></div>
       <div class="management-bar">
@@ -1910,20 +2142,36 @@ window.AppAuditLog = {
           <option value="">All Types</option><option value="School">School</option><option value="Category">Category</option><option value="Subject">Subject</option><option value="Section">Section</option><option value="Content">Content</option>
         </select>
       </div>
-      <div class="card" style="padding:0;overflow:hidden;">
+      <div class="card" style="padding:0;overflow:hidden;" id="audit-log-card">
         ${logs.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">history</span><h3>No activity yet</h3></div>`
-        : `<div class="table-container"><table><thead><tr><th>User</th><th>Action</th><th>Entity</th><th>Details</th><th>Date</th></tr></thead><tbody>${logs.map(l => {
-          const actionColors = { created: 'var(--success)', edited: 'var(--info)', uploaded: 'var(--primary)', deleted: 'var(--danger)', suspended: 'var(--warning)' };
-          return `<tr><td><div class="flex-center gap-10" style="justify-content:flex-start;"><div class="user-avatar" style="width:28px;height:28px;font-size:10px;">${AppUtils.getInitials(l.user_name)}</div><div><div style="font-size:13px;font-weight:500;">${l.user_name}</div></div></div></td>
-            <td><span style="font-size:12px;font-weight:600;color:${actionColors[l.action] || 'var(--text-secondary)'};">${l.action.charAt(0).toUpperCase() + l.action.slice(1)}</span></td>
-            <td><span style="font-size:13px;">${l.entity}</span><div style="font-size:11px;color:var(--text-muted);">${l.entity_name}</div></td>
-            <td style="font-size:13px;color:var(--text-secondary);max-width:300px;">${l.detail}</td>
-            <td style="font-size:13px;color:var(--text-secondary);white-space:nowrap;">${AppUtils.formatDate(l.created_at)}</td></tr>`;
-        }).join('')}</tbody></table></div>`}
+        : this._renderTable(logs)}
       </div>
     </div>`;
     initIcons();
   },
+
+  _renderTable(logs) {
+    const totalPages = Math.max(1, Math.ceil(logs.length / this._perPage));
+    const page = Math.min(this._page, totalPages);
+    const start = (page - 1) * this._perPage;
+    const pageLogs = logs.slice(start, start + this._perPage);
+    const eh = AppUtils.escapeHtml;
+    const actionColors = { created: 'var(--success)', edited: 'var(--info)', uploaded: 'var(--primary)', deleted: 'var(--danger)', suspended: 'var(--warning)' };
+    return `<div class="table-container"><table><thead><tr><th>User</th><th>Action</th><th>Entity</th><th>Details</th><th>Date</th></tr></thead><tbody>${pageLogs.map(l => {
+      const ac = actionColors[l.action] || 'var(--text-secondary)';
+      return `<tr><td><div class="flex-center gap-10" style="justify-content:flex-start;"><div class="user-avatar" style="width:28px;height:28px;font-size:10px;">${eh(l.user_name ? AppUtils.getInitials(l.user_name) : '?')}</div><div><div style="font-size:13px;font-weight:500;">${eh(l.user_name)}</div></div></div></td>
+        <td><span style="font-size:12px;font-weight:600;color:${ac};">${eh(l.action.charAt(0).toUpperCase() + l.action.slice(1))}</span></td>
+        <td><span style="font-size:13px;">${eh(l.entity)}</span><div style="font-size:11px;color:var(--text-muted);">${eh(l.entity_name)}</div></td>
+        <td style="font-size:13px;color:var(--text-secondary);max-width:300px;">${eh(l.detail)}</td>
+        <td style="font-size:13px;color:var(--text-secondary);white-space:nowrap;">${AppUtils.formatDate(l.created_at)}</td></tr>`;
+    }).join('')}</tbody></table></div>
+    ${totalPages > 1 ? `<div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-top:1px solid var(--border);">
+      <button class="btn btn-sm btn-secondary" data-action="audit-page" data-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}>Previous</button>
+      <span style="font-size:12px;color:var(--text-secondary);">Page ${page} of ${totalPages} (${logs.length} total)</span>
+      <button class="btn btn-sm btn-secondary" data-action="audit-page" data-page="${page + 1}" ${page >= totalPages ? 'disabled' : ''}>Next</button>
+    </div>` : ''}`;
+  },
+
   filter() {
     const q = (document.getElementById('audit-search')?.value || '').toLowerCase();
     const actionFilter = document.getElementById('audit-action-filter')?.value || '';
@@ -1931,25 +2179,30 @@ window.AppAuditLog = {
     AppStorage.load().then(data => {
       const logs = (data.auditLog || []).sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
       let filtered = logs;
-      if (q) filtered = filtered.filter(l => l.user_name.toLowerCase().includes(q) || l.entity_name.toLowerCase().includes(q) || (l.detail || '').toLowerCase().includes(q));
+      if (q) filtered = filtered.filter(l => l.user_name?.toLowerCase().includes(q) || l.entity_name?.toLowerCase().includes(q) || (l.detail || '').toLowerCase().includes(q));
       if (actionFilter) filtered = filtered.filter(l => l.action === actionFilter);
       if (entityFilter) filtered = filtered.filter(l => l.entity === entityFilter);
-      const container = document.querySelector('#main-content .card');
-      if (!container) return;
+      const card = document.getElementById('audit-log-card');
+      if (!card) return;
       if (filtered.length === 0) {
-        container.innerHTML = `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">history</span><h3>No matching activity</h3></div>`;
+        card.innerHTML = `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">history</span><h3>No matching activity</h3></div>`;
       } else {
-        container.innerHTML = `<div class="table-container"><table><thead><tr><th>User</th><th>Action</th><th>Entity</th><th>Details</th><th>Date</th></tr></thead><tbody>${filtered.map(l => {
-          const actionColors = { created: 'var(--success)', edited: 'var(--info)', uploaded: 'var(--primary)', deleted: 'var(--danger)', suspended: 'var(--warning)' };
-          return `<tr><td>...</td>
-            <td><span style="font-size:12px;font-weight:600;color:${actionColors[l.action] || 'var(--text-secondary)'};">${l.action.charAt(0).toUpperCase() + l.action.slice(1)}</span></td>
-            <td><span style="font-size:13px;">${l.entity}</span><div style="font-size:11px;color:var(--text-muted);">${l.entity_name}</div></td>
-            <td style="font-size:13px;color:var(--text-secondary);max-width:300px;">${l.detail}</td>
-            <td style="font-size:13px;color:var(--text-secondary);white-space:nowrap;">${AppUtils.formatDate(l.created_at)}</td></tr>`;
-        }).join('')}</tbody></table></div>`;
+        this._logs = filtered;
+        this._page = 1;
+        card.innerHTML = this._renderTable(filtered);
       }
       initIcons();
     });
+  },
+
+  goToPage(page) {
+    if (!this._logs) return;
+    this._page = page;
+    const card = document.getElementById('audit-log-card');
+    if (card) {
+      card.innerHTML = this._renderTable(this._logs);
+      initIcons();
+    }
   }
 };
 
@@ -2061,6 +2314,7 @@ async function handleEntitySubmit() {
       }
     }
     AppModal.close('modal-entity');
+    AppStorage.invalidate();
     AppRouter.render();
   } catch (err) {
     AppToast.show(err.message || 'An error occurred.', 'error');
@@ -2184,6 +2438,7 @@ document.addEventListener('click', async function (e) {
         if (error) throw error;
         AppToast.show('School admin removed.', 'success');
       }
+      AppStorage.invalidate();
       AppModal.close('modal-confirm');
       AppRouter.render();
     } catch (err) {
@@ -2220,8 +2475,9 @@ document.addEventListener('click', async function (e) {
     try {
       await DriveService.setFolderId(entityType, entityId, folderId);
       AppToast.show('Drive folder linked successfully.', 'success');
-      statusEl.innerHTML = `Linked folder: <code style="background:var(--border-light);padding:2px 6px;border-radius:4px;">${folderId}</code>`;
+      statusEl.innerHTML = `Linked folder: <code style="background:var(--border-light);padding:2px 6px;border-radius:4px;">${AppUtils.escapeHtml(folderId)}</code>`;
       statusEl.style.color = 'var(--success)';
+      AppStorage.invalidate();
       AppRouter.render();
     } catch (err) {
       AppToast.show(err.message || 'Failed to link Drive folder.', 'error');
@@ -2248,6 +2504,7 @@ document.addEventListener('click', async function (e) {
     try {
       await DriveService.removeFolderId(etype, eid);
       AppToast.show('Drive folder unlinked.', 'success');
+      AppStorage.invalidate();
       AppModal.close('modal-confirm');
       AppRouter.render();
     } catch (err) {
@@ -2280,11 +2537,11 @@ document.addEventListener('click', async function (e) {
       overlay.id = 'modal-image-preview';
       overlay.innerHTML = `<div class="modal" style="max-width:90vw;max-height:90vh;">
         <div class="modal-header">
-          <h3 class="modal-title">${item.name}</h3>
+          <h3 class="modal-title">${AppUtils.escapeHtml(item.name)}</h3>
           <button class="modal-close" data-close-modal="modal-image-preview"><span class="material-symbols-outlined">close</span></button>
         </div>
         <div class="modal-body" style="display:flex;align-items:center;justify-content:center;padding:16px;">
-          <img src="${item.url}" alt="${item.name}" style="max-width:100%;max-height:70vh;border-radius:6px;object-fit:contain;">
+          <img src="${AppUtils.escapeHtml(item.url)}" alt="${AppUtils.escapeHtml(item.name)}" style="max-width:100%;max-height:70vh;border-radius:6px;object-fit:contain;">
         </div>
       </div>`;
       document.body.appendChild(overlay);
@@ -2304,7 +2561,7 @@ document.addEventListener('click', async function (e) {
       const note = notes ? notes.value.trim() : '';
       const item = document.createElement('div');
       item.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:13px;';
-      item.innerHTML = `<span style="color:var(--primary);font-weight:600;cursor:pointer;">${time}</span><span style="color:var(--text-secondary);">${note || 'Review note'}</span>`;
+      item.innerHTML = `<span style="color:var(--primary);font-weight:600;cursor:pointer;">${AppUtils.escapeHtml(time)}</span><span style="color:var(--text-secondary);">${AppUtils.escapeHtml(note || 'Review note')}</span>`;
       list.appendChild(item);
       if (notes) notes.value = '';
     }
@@ -2374,10 +2631,12 @@ document.addEventListener('click', async function (e) {
     return;
   }
   if (action === 'reset-settings') {
-    if (!confirm('Reset all settings to defaults?')) return;
+    const confirmed = await AppConfirm.show('Reset all settings to defaults?', 'Reset Settings');
+    if (!confirmed) return;
     try {
       await window.SettingsService.reset();
       AppToast.show('Settings reset to defaults.', 'success');
+      AppStorage.invalidate();
       AppRouter.render();
     } catch (err) {
       AppToast.show(err.message || 'Failed to reset settings.', 'error');
@@ -2388,10 +2647,11 @@ document.addEventListener('click', async function (e) {
   // Toggle permissions
   if (action === 'toggle-permission') {
     const key = el.dataset.key;
-    const role = 'school_admin'; // Default role being edited in Company Portal
+    const role = el.dataset.role;
+    if (!role) { AppToast.show('Role not specified.', 'error'); return; }
     try {
       await window.PermissionsService.set(role, key, el.checked);
-      AppToast.show(`${el.checked ? 'Enabled' : 'Disabled'} ${key.replace(/_/g, ' ')}`, 'success');
+      AppToast.show(`${el.checked ? 'Enabled' : 'Disabled'} ${key.replace(/_/g, ' ')} for ${ROLE_LABELS[role] || role}`, 'success');
     } catch (err) {
       AppToast.show(err.message || 'Failed to update permission.', 'error');
       el.checked = !el.checked; // Revert on failure
@@ -2414,7 +2674,7 @@ document.addEventListener('click', async function (e) {
   if (action === 'sp-edit-student') { window.SchoolStudents.openEdit(id); return; }
   if (action === 'sp-delete-student') { window.SchoolStudents.confirmDelete(id); return; }
   if (action === 'sp-confirm-delete-student') {
-    try { await window.StudentService?.delete(id); AppToast.show('Student deleted.', 'success'); AppModal.close('modal-confirm-student'); AppRouter.render(); }
+    try { await window.StudentService?.delete(id); AppToast.show('Student deleted.', 'success'); AppStorage.invalidate(); AppModal.close('modal-confirm-student'); AppRouter.render(); }
     catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
     return;
   }
@@ -2439,7 +2699,7 @@ document.addEventListener('click', async function (e) {
   if (action === 'sp-view-course') { window.SchoolCourses.viewCourse(id); return; }
   if (action === 'sp-delete-course') { window.SchoolCourses.confirmDelete(id); return; }
   if (action === 'sp-confirm-delete-course') {
-    try { await window.CourseService?.delete(id); AppToast.show('Course deleted.', 'success'); AppModal.close('modal-confirm-course'); AppRouter.render(); }
+    try { await window.CourseService?.delete(id); AppToast.show('Course deleted.', 'success'); AppStorage.invalidate(); AppModal.close('modal-confirm-course'); AppRouter.render(); }
     catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
     return;
   }
@@ -2470,6 +2730,7 @@ document.addEventListener('click', async function (e) {
     const moduleId = document.getElementById('sp-input-module-id')?.value;
     const courseId = el.dataset.courseId;
     (async () => {
+      const eh = AppUtils.escapeHtml;
       try {
         if (moduleId) {
           await window.ModuleService?.update(moduleId, { title, description });
@@ -2480,6 +2741,7 @@ document.addEventListener('click', async function (e) {
           AppToast.show('Module added.', 'success');
         }
         AppModal.close('modal-module-form');
+        AppStorage.invalidate();
         window.SchoolCourses.manageStructure(courseId);
       } catch (err) { AppToast.show(err.message || 'Failed to save module.', 'error'); }
     })();
@@ -2490,12 +2752,15 @@ document.addEventListener('click', async function (e) {
     return;
   }
   if (action === 'sp-delete-module') {
-    if (!confirm('Delete this module and all its lessons?')) return;
+    const confirmed = await AppConfirm.show('Delete this module and all its lessons? This action cannot be undone.', 'Delete Module');
+    if (!confirmed) return;
     const courseId = el.dataset.courseId;
     (async () => {
+      const eh = AppUtils.escapeHtml;
       try {
         await window.ModuleService?.delete(id);
         AppToast.show('Module deleted.', 'success');
+        AppStorage.invalidate();
         if (courseId) window.SchoolCourses.manageStructure(courseId);
       } catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
     })();
@@ -2516,16 +2781,34 @@ document.addEventListener('click', async function (e) {
     const lessonId = document.getElementById('sp-input-lesson-id')?.value;
     const courseId = el.dataset.courseId;
     (async () => {
+      const eh = AppUtils.escapeHtml;
       try {
+        let contentId = null;
         if (lessonId) {
+          const existing = await window.LessonService?.getById(lessonId);
+          contentId = existing?.content_id || null;
           await window.LessonService?.update(lessonId, { title, content_type: contentType, content_url: contentUrl, duration });
           AppToast.show('Lesson updated.', 'success');
         } else {
           const lessons = await window.LessonService?.getByModule(moduleId) || [];
-          await window.LessonService?.create({ module_id: moduleId, title, content_type: contentType, content_url: contentUrl, sort_order: lessons.length, duration });
+          const created = await window.LessonService?.create({ module_id: moduleId, title, content_type: contentType, content_url: contentUrl, sort_order: lessons.length, duration });
+          if (created) contentId = created.id;
           AppToast.show('Lesson added.', 'success');
         }
+        if (contentType === 'assignment' && courseId) {
+          const existing = await window.AssignmentService?.getByCourse(courseId) || [];
+          if (!existing.find(a => a.title === title)) {
+            await window.AssignmentService?.create({ courseId, title, description: null, dueDate: null, maxMarks: null });
+          }
+        }
+        if (contentType === 'quiz' && courseId) {
+          const existing = await window.QuizService?.getByCourse(courseId) || [];
+          if (!existing.find(q => q.title === title)) {
+            await window.QuizService?.create({ courseId, title, description: null, timeLimit: null, passingScore: null });
+          }
+        }
         AppModal.close('modal-lesson-form');
+        AppStorage.invalidate();
         const parentModule = await window.ModuleService?.getById(moduleId);
         if (parentModule) window.SchoolCourses.manageStructure(parentModule.course_id);
       } catch (err) { AppToast.show(err.message || 'Failed to save lesson.', 'error'); }
@@ -2538,13 +2821,16 @@ document.addEventListener('click', async function (e) {
     return;
   }
   if (action === 'sp-delete-lesson') {
-    if (!confirm('Delete this lesson?')) return;
+    const confirmed = await AppConfirm.show('Delete this lesson? This action cannot be undone.', 'Delete Lesson');
+    if (!confirmed) return;
     const courseId = el.dataset.courseId;
     (async () => {
+      const eh = AppUtils.escapeHtml;
       try {
         const lesson = await window.LessonService?.getById(id);
         await window.LessonService?.delete(id);
         AppToast.show('Lesson deleted.', 'success');
+        AppStorage.invalidate();
         if (lesson) {
           const parentModule = await window.ModuleService?.getById(lesson.module_id);
           if (parentModule) window.SchoolCourses.manageStructure(parentModule.course_id);
@@ -2557,6 +2843,7 @@ document.addEventListener('click', async function (e) {
     const dir = el.dataset.direction;
     const courseId = el.dataset.courseId;
     (async () => {
+      const eh = AppUtils.escapeHtml;
       try {
         const modules = await window.ModuleService?.getByCourse(courseId) || [];
         const idx = modules.findIndex(m => m.id === id);
@@ -2577,6 +2864,7 @@ document.addEventListener('click', async function (e) {
     const lesson = await window.LessonService?.getById(id);
     if (!lesson) return;
     (async () => {
+      const eh = AppUtils.escapeHtml;
       try {
         const lessons = await window.LessonService?.getByModule(lesson.module_id) || [];
         const idx = lessons.findIndex(l => l.id === id);
@@ -2594,67 +2882,254 @@ document.addEventListener('click', async function (e) {
     return;
   }
 
-  // LMS — Student Portal
+  // LMS — Student Portal (lazy-load lms-student.js)
+  async function _ensureStudentPortal() {
+    if (!window.StudentPortal) await import('./lms-student.js');
+  }
   if (action === 'sp-open-student-portal') {
-    window.StudentPortal.dashboard(id);
+    const studentId = el.dataset.studentId || id;
+    await _ensureStudentPortal();
+    window.StudentPortal.dashboard(studentId);
     return;
   }
   if (action === 'sp-open-course-player') {
     const studentId = el.dataset.studentId;
-    window.StudentPortal.openCoursePlayer(studentId, id);
+    const courseId = el.dataset.courseId || id;
+    await _ensureStudentPortal();
+    window.StudentPortal.openCoursePlayer(studentId, courseId);
     return;
   }
   if (action === 'sp-player-select-lesson') {
     const studentId = el.dataset.studentId;
-    window.StudentPortal.loadLesson(studentId, id);
+    const lessonId = el.dataset.lessonId || id;
+    await _ensureStudentPortal();
+    window.StudentPortal.loadLesson(studentId, lessonId);
     return;
   }
   if (action === 'sp-player-mark-complete') {
     const studentId = el.dataset.studentId;
-    window.StudentPortal.markComplete(studentId, id);
+    const lessonId = el.dataset.lessonId || id;
+    await _ensureStudentPortal();
+    window.StudentPortal.markComplete(studentId, lessonId);
     return;
   }
   if (action === 'sp-player-prev') {
     const studentId = el.dataset.studentId;
-    window.StudentPortal.navigateLesson(studentId, id, 'prev');
+    const lessonId = el.dataset.lessonId || id;
+    await _ensureStudentPortal();
+    window.StudentPortal.navigateLesson(studentId, lessonId, 'prev');
     return;
   }
   if (action === 'sp-player-next') {
     const studentId = el.dataset.studentId;
-    window.StudentPortal.navigateLesson(studentId, id, 'next');
+    const lessonId = el.dataset.lessonId || id;
+    await _ensureStudentPortal();
+    window.StudentPortal.navigateLesson(studentId, lessonId, 'next');
     return;
   }
   if (action === 'sp-open-assignment') {
     const lessonId = el.dataset.lessonId;
-    try {
-      const lesson = await window.LessonService?.getById(lessonId);
-      if (lesson?.content_url) { window.open(lesson.content_url, '_blank'); }
-      else { AppToast.show('No assignment URL configured for this lesson.', 'info'); }
-    } catch (err) { AppToast.show(err.message || 'Failed to open assignment.', 'error'); }
+    const studentId = el.dataset.studentId;
+    (async () => {
+      const eh = AppUtils.escapeHtml;
+      try {
+        const lesson = await window.LessonService?.getById(lessonId);
+        if (!lesson) { AppToast.show('Lesson not found.', 'error'); return; }
+        const mod = await window.ModuleService?.getById(lesson.module_id);
+        if (!mod) { AppToast.show('Module not found.', 'error'); return; }
+        const assignments = await window.AssignmentService?.getByCourse(mod.course_id) || [];
+        const assignment = assignments.find(a => a.title === lesson.title) || assignments[0];
+        const submission = studentId && assignment ? await window.AssignmentService?.getStudentSubmission(assignment.id, studentId) : null;
+        const existing = document.getElementById('modal-assignment');
+        if (existing) existing.remove();
+        const eh = AppUtils.escapeHtml;
+        const safeUrl = u => u && u.startsWith('http') ? eh(u) : '';
+        const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; overlay.id = 'modal-assignment';
+        overlay.innerHTML = `<div class="modal" style="max-width:600px;">
+          <div class="modal-header"><h3 class="modal-title">${eh(lesson.title)}</h3><button class="modal-close" data-close-modal="modal-assignment"><span class="material-symbols-outlined">close</span></button></div>
+          <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+            ${assignment ? `<div style="margin-bottom:16px;">
+              ${assignment.description ? `<div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">${eh(assignment.description)}</div>` : ''}
+              <div style="display:flex;gap:12px;">
+                ${assignment.max_marks ? `<div style="padding:8px 12px;background:#f5f3ff;border-radius:6px;font-size:12px;"><strong>Max Marks:</strong> ${assignment.max_marks}</div>` : ''}
+                ${assignment.due_date ? `<div style="padding:8px 12px;background:#fffbeb;border-radius:6px;font-size:12px;"><strong>Due:</strong> ${AppUtils.formatDate(assignment.due_date)}</div>` : ''}
+              </div>
+            </div>` : '<div style="padding:12px;background:#fef2f2;border-radius:8px;font-size:13px;">No assignment configuration found. Contact your teacher.</div>'}
+            ${studentId && assignment ? (submission ? `<div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px;">
+              <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Your Submission</div>
+              <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <span class="status-badge ${submission.status === 'reviewed' ? 'status-active' : 'status-suspended'}" style="font-size:11px;">${eh(submission.status)}</span>
+                ${submission.marks !== null && submission.marks !== undefined ? `<span style="font-size:13px;font-weight:600;">Score: ${submission.marks}${assignment.max_marks ? '/' + assignment.max_marks : ''}</span>` : ''}
+              </div>
+              ${submission.submission_text ? `<div style="font-size:12px;background:var(--card-bg);padding:8px;border-radius:6px;margin-bottom:6px;">${eh(submission.submission_text)}</div>` : ''}
+              ${submission.file_url ? `<div style="font-size:12px;"><a href="${safeUrl(submission.file_url)}" target="_blank" rel="noopener noreferrer">View attachment</a></div>` : ''}
+              ${submission.remarks ? `<div style="margin-top:8px;padding:8px;background:#f0fdf4;border-radius:6px;font-size:12px;"><strong>Feedback:</strong> ${eh(submission.remarks)}</div>` : ''}
+            </div>` : `<div style="margin-bottom:12px;">
+              <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Submit Assignment</div>
+              <div class="form-group"><textarea class="form-input" id="sp-assignment-text" placeholder="Write your answer here..." style="height:100px;resize:vertical;"></textarea></div>
+              <div class="form-group" style="margin-top:8px;"><input type="text" class="form-input" id="sp-assignment-url" placeholder="Attachment URL (optional)"></div>
+              <button class="btn btn-primary" data-action="sp-submit-assignment" data-assignment-id="${assignment.id}" data-student-id="${studentId}" data-lesson-id="${lessonId}" style="margin-top:8px;">Submit</button>
+            </div>`) : ''}
+          </div>
+          <div class="modal-footer"><button class="btn btn-secondary" data-close-modal="modal-assignment">Close</button></div>
+        </div>`;
+        document.body.appendChild(overlay);
+        AppModal.open(overlay.id);
+        initIcons();
+      } catch (err) { AppToast.show(err.message || 'Failed to open assignment.', 'error'); }
+    })();
     return;
   }
   if (action === 'sp-start-quiz') {
     const lessonId = el.dataset.lessonId;
+    const studentId = el.dataset.studentId;
+    (async () => {
+      const eh = AppUtils.escapeHtml;
+      try {
+        const lesson = await window.LessonService?.getById(lessonId);
+        if (!lesson) { AppToast.show('Lesson not found.', 'error'); return; }
+        const mod = await window.ModuleService?.getById(lesson.module_id);
+        if (!mod) { AppToast.show('Module not found.', 'error'); return; }
+        const quizzes = await window.QuizService?.getByCourse(mod.course_id) || [];
+        const quiz = quizzes.find(q => q.title === lesson.title) || quizzes[0];
+        if (!quiz) { AppToast.show('Quiz not configured. Contact your teacher.', 'warn'); return; }
+        const questions = await window.QuizService?.getQuestions(quiz.id) || [];
+        if (questions.length === 0) { AppToast.show('No questions in this quiz yet.', 'info'); return; }
+        const existing = document.getElementById('modal-quiz');
+        if (existing) existing.remove();
+        const eh = AppUtils.escapeHtml;
+        const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; overlay.id = 'modal-quiz';
+        overlay.innerHTML = `<div class="modal" style="max-width:650px;">
+          <div class="modal-header"><h3 class="modal-title">${eh(lesson.title)}</h3><button class="modal-close" data-close-modal="modal-quiz"><span class="material-symbols-outlined">close</span></button></div>
+          <div class="modal-body" style="max-height:70vh;overflow-y:auto;" id="quiz-body">
+            <div style="text-align:center;padding:30px;">
+              <span class="material-symbols-outlined" style="font-size:48px;color:#f59e0b;margin-bottom:12px;">quiz</span>
+              <div style="font-size:16px;font-weight:600;margin-bottom:4px;">${eh(quiz.title)}</div>
+              ${quiz.description ? `<div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">${eh(quiz.description)}</div>` : ''}
+              <div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px;">
+                <span style="font-size:12px;padding:4px 10px;background:#f5f3ff;border-radius:6px;">${questions.length} questions</span>
+                ${quiz.passing_score ? `<span style="font-size:12px;padding:4px 10px;background:#fffbeb;border-radius:6px;">Pass: ${quiz.passing_score}%</span>` : ''}
+                ${quiz.time_limit ? `<span style="font-size:12px;padding:4px 10px;background:#eff6ff;border-radius:6px;">${quiz.time_limit} min</span>` : ''}
+              </div>
+              <button class="btn btn-primary" data-action="sp-quiz-begin" data-quiz-id="${quiz.id}" data-student-id="${studentId}" data-lesson-id="${lessonId}">Start Quiz</button>
+            </div>
+          </div>
+          <div class="modal-footer"><button class="btn btn-secondary" data-close-modal="modal-quiz">Close</button></div>
+        </div>`;
+        document.body.appendChild(overlay);
+        AppModal.open(overlay.id);
+        initIcons();
+      } catch (err) { AppToast.show(err.message || 'Failed to load quiz.', 'error'); }
+    })();
+    return;
+  }
+  if (action === 'sp-quiz-begin') {
+    const quizId = el.dataset.quizId;
+    const studentId = el.dataset.studentId;
+    (async () => {
+      const eh = AppUtils.escapeHtml;
+      try {
+        const attempt = await window.QuizService?.startAttempt(quizId, studentId);
+        if (!attempt) { AppToast.show('Failed to start quiz attempt.', 'error'); return; }
+        const eh = AppUtils.escapeHtml;
+        const questions = await window.QuizService?.getQuestions(quizId) || [];
+        const body = document.getElementById('quiz-body');
+        if (!body) return;
+        const quiz = await window.QuizService?.getById(quizId);
+        body.innerHTML = `<div style="padding:8px 0;">
+          <form id="quiz-form">
+          ${questions.map((q, i) => {
+            const opts = q.options || [];
+            const optsParsed = typeof opts === 'string' ? (() => { try { return JSON.parse(opts); } catch { return []; } })() : opts;
+            let inputHtml = '';
+            if (q.question_type === 'mcq' && optsParsed.length > 0) {
+              inputHtml = optsParsed.map(o => `<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border-light);border-radius:6px;margin:4px 0;cursor:pointer;"><input type="radio" name="q_${q.id}" value="${eh(o)}" style="width:16px;height:16px;"><span style="font-size:13px;">${eh(o)}</span></label>`).join('');
+            } else if (q.question_type === 'true_false') {
+              inputHtml = ['True','False'].map(o => `<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border-light);border-radius:6px;margin:4px 0;cursor:pointer;"><input type="radio" name="q_${q.id}" value="${eh(o)}" style="width:16px;height:16px;"><span style="font-size:13px;">${eh(o)}</span></label>`).join('');
+            } else {
+              inputHtml = `<textarea class="form-input" name="q_${q.id}" placeholder="Type your answer..." style="height:60px;resize:vertical;"></textarea>`;
+            }
+            return `<div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px;">
+              <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Q${i + 1}. ${eh(q.question_text)} <span style="font-weight:400;color:var(--text-muted);font-size:11px;">(${q.marks || 1} mark${q.marks !== 1 ? 's' : ''})</span></div>
+              ${inputHtml}
+            </div>`;
+          }).join('')}
+          </form>
+          <button class="btn btn-primary" data-action="sp-submit-quiz" data-attempt-id="${attempt.id}" data-quiz-id="${quizId}" data-student-id="${studentId}" style="margin-top:8px;">Submit Answers</button>
+        </div>`;
+        initIcons();
+      } catch (err) { AppToast.show(err.message || 'Failed to start quiz.', 'error'); }
+    })();
+    return;
+  }
+  if (action === 'sp-submit-assignment') {
+    const assignmentId = el.dataset.assignmentId;
+    const studentId = el.dataset.studentId;
+    const lessonId = el.dataset.lessonId;
+    const text = document.getElementById('sp-assignment-text')?.value?.trim();
+    const url = document.getElementById('sp-assignment-url')?.value?.trim() || null;
+    if (!text && !url) { AppToast.show('Please provide an answer or attachment.', 'warn'); return; }
     try {
-      const lesson = await window.LessonService?.getById(lessonId);
-      if (lesson?.content_url) { window.open(lesson.content_url, '_blank'); }
-      else { AppToast.show('No quiz URL configured for this lesson.', 'info'); }
-    } catch (err) { AppToast.show(err.message || 'Failed to start quiz.', 'error'); }
+      await window.AssignmentService?.submitAssignment(assignmentId, studentId, { submissionText: text, fileUrl: url });
+      AppToast.show('Assignment submitted!', 'success');
+      AppModal.close('modal-assignment');
+      setTimeout(() => {
+        const btn = document.querySelector(`[data-action="sp-open-assignment"][data-lesson-id="${lessonId}"]`);
+        if (btn) btn.click();
+      }, 300);
+    } catch (err) { AppToast.show(err.message || 'Failed to submit.', 'error'); }
+    return;
+  }
+  if (action === 'sp-submit-quiz') {
+    const attemptId = el.dataset.attemptId;
+    const quizId = el.dataset.quizId;
+    const studentId = el.dataset.studentId;
+    (async () => {
+      const eh = AppUtils.escapeHtml;
+      try {
+        const questions = await window.QuizService?.getQuestions(quizId) || [];
+        for (const q of questions) {
+          const input = document.querySelector(`[name="q_${q.id}"]`);
+          if (input) {
+            const answer = input.type === 'radio' ? input.value : input.value.trim();
+            if (answer) {
+              await window.QuizService?.submitAnswer(attemptId, q.id, answer);
+            }
+          }
+        }
+        const result = await window.QuizService?.completeAttempt(attemptId);
+        if (!result) { AppToast.show('Failed to complete quiz.', 'error'); return; }
+        const body = document.getElementById('quiz-body');
+        if (body) {
+          body.innerHTML = `<div style="text-align:center;padding:20px;">
+            <span class="material-symbols-outlined" style="font-size:48px;color:${result.passed ? '#10b981' : '#ef4444'};margin-bottom:12px;">${result.passed ? 'check_circle' : 'cancel'}</span>
+            <div style="font-size:20px;font-weight:700;margin-bottom:4px;">${result.passed ? 'Passed!' : 'Not Passed'}</div>
+            <div style="font-size:14px;color:var(--text-secondary);margin-bottom:12px;">Your score: ${result.score} / ${result.total_marks} (${result.percentage}%)</div>
+            ${result.passed ? '' : '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Review the material and try again.</div>'}
+          </div>`;
+        }
+        AppToast.show(result.passed ? 'Quiz passed!' : 'Quiz completed.', result.passed ? 'success' : 'info');
+        initIcons();
+      } catch (err) { AppToast.show(err.message || 'Failed to submit quiz.', 'error'); }
+    })();
     return;
   }
   if (action === 'sp-open-lesson') {
     const studentId = el.dataset.studentId;
-    const lesson = await window.LessonService?.getById(id);
+    const lessonId = el.dataset.lessonId || id;
+    const lesson = await window.LessonService?.getById(lessonId);
     if (lesson) {
       const parentModule = await window.ModuleService?.getById(lesson.module_id);
-      if (parentModule) window.StudentPortal.openCoursePlayer(studentId, parentModule.course_id);
-      setTimeout(() => window.StudentPortal.loadLesson(studentId, id), 300);
+      if (parentModule) { await _ensureStudentPortal(); window.StudentPortal.openCoursePlayer(studentId, parentModule.course_id); }
+      setTimeout(() => window.StudentPortal.loadLesson(studentId, lessonId), 300);
     }
     return;
   }
   if (action === 'sp-view-certificate') {
     const studentId = el.dataset.studentId;
-    window.StudentPortal.viewCertificate(studentId, id);
+    const courseId = el.dataset.courseId || id;
+    await _ensureStudentPortal();
+    window.StudentPortal.viewCertificate(studentId, courseId);
     return;
   }
   if (action === 'sp-download-certificate') {
@@ -2666,7 +3141,8 @@ document.addEventListener('click', async function (e) {
       if (cert && student && course) {
         const win = window.open('', '_blank');
         if (win) {
-          win.document.write(`<!DOCTYPE html><html><head><title>${course.name} - Certificate</title><style>
+          const eh = AppUtils.escapeHtml;
+          win.document.write(`<!DOCTYPE html><html><head><title>${eh(course.name)} - Certificate</title><style>
             body { font-family: Georgia, serif; display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5; }
             .cert { border:3px double #1A56DB; border-radius:12px; padding:60px 40px; max-width:700px; text-align:center; background:linear-gradient(135deg,#faf5ff,#eff6ff); margin:20px; }
             h1 { font-size:12px; text-transform:uppercase; letter-spacing:2px; color:#666; }
@@ -2678,11 +3154,11 @@ document.addEventListener('click', async function (e) {
           </style></head><body>
             <div class="cert">
               <h1>Certificate of Completion</h1>
-              <h2>${course.name}</h2>
+              <h2>${eh(course.name)}</h2>
               <div class="sub">This is to certify that</div>
-              <div class="name">${student.name}</div>
+              <div class="name">${eh(student.name)}</div>
               <div class="sub">has successfully completed the course requirements on ${AppUtils.formatDate(cert.completed_at || cert.issued_at)}</div>
-              <div class="meta">Certificate ID: ${cert.certificate_number || certId}</div>
+              <div class="meta">Certificate ID: ${eh(cert.certificate_number || certId)}</div>
               <div class="footer">LANXGROW INDIA — Learning Management System</div>
             </div>
             <script>window.print();<\/script>
@@ -2696,10 +3172,259 @@ document.addEventListener('click', async function (e) {
     return;
   }
 
+  // ==============================================================
+  // TEACHER LMS MANAGEMENT — Assignments, Quiz Questions, Progress
+  // ==============================================================
+  if (action === 'sp-manage-questions') {
+    const lessonId = el.dataset.lessonId;
+    (async () => {
+      const eh = AppUtils.escapeHtml;
+      try {
+        const lesson = await window.LessonService?.getById(lessonId);
+        if (!lesson) { AppToast.show('Lesson not found.', 'error'); return; }
+        const eh = AppUtils.escapeHtml;
+        const mod = await window.ModuleService?.getById(lesson.module_id);
+        const quizzes = mod ? await window.QuizService?.getByCourse(mod.course_id) || [] : [];
+        const quiz = quizzes.find(q => q.title === lesson.title) || quizzes[0];
+        if (!quiz) { AppToast.show('Create the quiz lesson first.', 'warn'); return; }
+        const questions = await window.QuizService?.getQuestions(quiz.id) || [];
+        const existing = document.getElementById('modal-manage-questions');
+        if (existing) existing.remove();
+        const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; overlay.id = 'modal-manage-questions';
+        const typeLabels = { mcq: 'Multiple Choice', true_false: 'True/False', short_answer: 'Short Answer' };
+        overlay.innerHTML = `<div class="modal" style="max-width:600px;">
+          <div class="modal-header"><h3 class="modal-title">Questions: ${eh(lesson.title)}</h3><button class="modal-close" data-close-modal="modal-manage-questions"><span class="material-symbols-outlined">close</span></button></div>
+          <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+            <button class="btn btn-primary btn-sm" data-action="sp-add-question" data-quiz-id="${quiz.id}" data-lesson-id="${lessonId}" style="margin-bottom:12px;"><span class="material-symbols-outlined" style="font-size:14px;">add</span> Add Question</button>
+            ${questions.length === 0 ? '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">No questions yet.</div>'
+            : questions.map((q, i) => `
+              <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <span style="font-size:13px;font-weight:600;">Q${i + 1}. ${eh(q.question_text)}</span>
+                  <div style="display:flex;gap:4px;">
+                    <button class="btn btn-ghost btn-sm" style="width:26px;height:26px;padding:0;" data-action="sp-add-question" data-quiz-id="${quiz.id}" data-question-id="${q.id}" data-lesson-id="${lessonId}"><span class="material-symbols-outlined" style="font-size:13px;">edit</span></button>
+                    <button class="btn btn-ghost btn-sm btn-danger-ghost" style="width:26px;height:26px;padding:0;" data-action="sp-delete-question" data-question-id="${q.id}"><span class="material-symbols-outlined" style="font-size:13px;">delete</span></button>
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;font-size:11px;color:var(--text-secondary);">
+                  <span>${typeLabels[q.question_type] || eh(q.question_type)}</span>
+                  <span>${q.marks || 1} mark${q.marks !== 1 ? 's' : ''}</span>
+                  <span>Answer: ${q.correct_answer != null ? eh(typeof q.correct_answer === 'object' ? JSON.stringify(q.correct_answer) : String(q.correct_answer)) : '—'}</span>
+                </div>
+              </div>`).join('')}
+          </div>
+          <div class="modal-footer"><button class="btn btn-secondary" data-close-modal="modal-manage-questions">Done</button></div>
+        </div>`;
+        document.body.appendChild(overlay);
+        AppModal.open(overlay.id);
+        initIcons();
+      } catch (err) { AppToast.show(err.message || 'Failed to load questions.', 'error'); }
+    })();
+    return;
+  }
+  if (action === 'sp-add-question') {
+    const quizId = el.dataset.quizId;
+    const questionId = el.dataset.questionId || '';
+    const lessonId = el.dataset.lessonId || document.getElementById('sp-q-lesson-id')?.value || '';
+    (async () => {
+      const eh = AppUtils.escapeHtml;
+      let qData = null;
+      if (questionId) { try { const qs = await window.QuizService?.getQuestions(quizId) || []; qData = qs.find(q => q.id === questionId); } catch {} }
+      const existing = document.getElementById('modal-question-form');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; overlay.id = 'modal-question-form';
+      overlay.innerHTML = `<div class="modal" style="max-width:500px;">
+        <div class="modal-header"><h3 class="modal-title">${qData ? 'Edit Question' : 'Add Question'}</h3><button class="modal-close" data-close-modal="modal-question-form"><span class="material-symbols-outlined">close</span></button></div>
+        <div class="modal-body">
+          <div class="form-group"><label class="form-label">Question Text</label><textarea class="form-input" id="sp-q-text" style="height:60px;resize:vertical;">${eh(qData?.question_text || '')}</textarea></div>
+          <div class="form-group" style="margin-top:10px;"><label class="form-label">Type</label>
+            <select class="form-select" id="sp-q-type">
+              <option value="mcq" ${qData?.question_type === 'mcq' ? 'selected' : ''}>Multiple Choice</option>
+              <option value="true_false" ${qData?.question_type === 'true_false' ? 'selected' : ''}>True/False</option>
+              <option value="short_answer" ${qData?.question_type === 'short_answer' ? 'selected' : ''}>Short Answer</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-top:10px;" id="sp-q-options-group">
+            <label class="form-label">Options (comma-separated)</label>
+            <input type="text" class="form-input" id="sp-q-options" value="${eh(Array.isArray(qData?.options) ? qData.options.join(', ') : (typeof qData?.options === 'string' ? qData.options : ''))}" placeholder="e.g. Option A, Option B, Option C">
+          </div>
+          <div class="form-group" style="margin-top:10px;"><label class="form-label">Correct Answer</label><input type="text" class="form-input" id="sp-q-answer" value="${eh(qData?.correct_answer || '')}"></div>
+          <div class="form-group" style="margin-top:10px;"><label class="form-label">Marks</label><input type="number" class="form-input" id="sp-q-marks" value="${qData?.marks || 1}" min="1" style="width:80px;"></div>
+          <input type="hidden" id="sp-q-quiz-id" value="${quizId}">
+          <input type="hidden" id="sp-q-id" value="${questionId}">
+          <input type="hidden" id="sp-q-lesson-id" value="${lessonId}">
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close-modal="modal-question-form">Cancel</button>
+          <button class="btn btn-primary" data-action="sp-save-question">${qData ? 'Save Changes' : 'Add Question'}</button>
+        </div>
+      </div>`;
+      document.body.appendChild(overlay);
+      AppModal.open(overlay.id);
+      const typeSel = document.getElementById('sp-q-type');
+      const optsGroup = document.getElementById('sp-q-options-group');
+      const toggleOpts = () => { optsGroup.style.display = typeSel.value === 'short_answer' ? 'none' : ''; };
+      typeSel.addEventListener('change', toggleOpts);
+      toggleOpts();
+      initIcons();
+    })();
+    return;
+  }
+  if (action === 'sp-save-question') {
+    const quizId = document.getElementById('sp-q-quiz-id')?.value;
+    const questionId = document.getElementById('sp-q-id')?.value;
+    const questionText = document.getElementById('sp-q-text')?.value?.trim();
+    const questionType = document.getElementById('sp-q-type')?.value;
+    const optionsRaw = document.getElementById('sp-q-options')?.value?.trim();
+    const correctAnswer = document.getElementById('sp-q-answer')?.value?.trim();
+    const marks = parseInt(document.getElementById('sp-q-marks')?.value) || 1;
+    if (!questionText) { AppToast.show('Question text is required.', 'error'); return; }
+    if (!correctAnswer) { AppToast.show('Correct answer is required.', 'error'); return; }
+    const options = questionType !== 'short_answer' && optionsRaw ? optionsRaw.split(',').map(o => o.trim()).filter(Boolean) : null;
+    if (questionType === 'mcq' && (!options || options.length < 2)) { AppToast.show('MCQ requires at least 2 options.', 'error'); return; }
+    const questions = await window.QuizService?.getQuestions(quizId) || [];
+    const sortOrder = questionId ? null : questions.length;
+    try {
+      if (questionId) {
+        await window.QuizService?.updateQuestion(questionId, { question_text: questionText, question_type: questionType, options, correct_answer: correctAnswer, marks });
+        AppToast.show('Question updated.', 'success');
+      } else {
+        await window.QuizService?.createQuestion({ quizId, questionText, questionType, options, correctAnswer, marks, sortOrder });
+        AppToast.show('Question added.', 'success');
+      }
+      AppModal.close('modal-question-form');
+      const qLessonId = document.getElementById('sp-q-lesson-id')?.value;
+      if (qLessonId) { setTimeout(() => { const btn = document.querySelector(`[data-action="sp-manage-questions"][data-lesson-id="${qLessonId}"]`); if (btn) btn.click(); }, 200); }
+    } catch (err) { AppToast.show(err.message || 'Failed to save question.', 'error'); }
+    return;
+  }
+  if (action === 'sp-delete-question') {
+    const questionId = el.dataset.questionId;
+    const confirmed = await AppConfirm.show('Delete this question? This action cannot be undone.', 'Delete Question');
+    if (!confirmed) return;
+    (async () => {
+      const eh = AppUtils.escapeHtml;
+      try {
+        await window.QuizService?.deleteQuestion(questionId);
+        AppToast.show('Question deleted.', 'success');
+        AppModal.close('modal-manage-questions');
+      } catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
+    })();
+    return;
+  }
+  if (action === 'sp-manage-assignment-submissions') {
+    const lessonId = el.dataset.lessonId;
+    (async () => {
+      const eh = AppUtils.escapeHtml;
+      try {
+        const lesson = await window.LessonService?.getById(lessonId);
+        if (!lesson) { AppToast.show('Lesson not found.', 'error'); return; }
+        const eh = AppUtils.escapeHtml;
+        const safeUrl = u => u && u.startsWith('http') ? eh(u) : '';
+        const mod = await window.ModuleService?.getById(lesson.module_id);
+        const assignments = mod ? await window.AssignmentService?.getByCourse(mod.course_id) || [] : [];
+        const assignment = assignments.find(a => a.title === lesson.title) || assignments[0];
+        if (!assignment) { AppToast.show('Assignment not configured.', 'warn'); return; }
+        const submissions = await window.AssignmentService?.getSubmissions(assignment.id) || [];
+        const existing = document.getElementById('modal-assignment-submissions');
+        if (existing) existing.remove();
+        const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; overlay.id = 'modal-assignment-submissions';
+        overlay.innerHTML = `<div class="modal" style="max-width:700px;">
+          <div class="modal-header"><h3 class="modal-title">Submissions: ${eh(lesson.title)}</h3><button class="modal-close" data-close-modal="modal-assignment-submissions"><span class="material-symbols-outlined">close</span></button></div>
+          <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+            ${submissions.length === 0 ? '<div style="padding:30px;text-align:center;color:var(--text-muted);">No submissions yet.</div>'
+            : submissions.map(s => `
+              <div style="border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <span style="font-size:14px;font-weight:600;">${eh(s.student?.name) || 'Unknown Student'}</span>
+                  <span class="status-badge ${s.status === 'reviewed' ? 'status-active' : 'status-suspended'}" style="font-size:11px;">${eh(s.status)}</span>
+                </div>
+                ${s.submission_text ? `<div style="font-size:12px;background:var(--card-bg);padding:8px;border-radius:6px;margin-bottom:6px;">${eh(s.submission_text)}</div>` : ''}
+                ${s.file_url ? `<div style="font-size:12px;margin-bottom:6px;"><a href="${safeUrl(s.file_url)}" target="_blank" rel="noopener noreferrer">View Attachment</a></div>` : ''}
+                ${s.status === 'reviewed' ? `
+                <div style="display:flex;gap:12px;font-size:12px;padding:6px 0;border-top:1px solid var(--border-light);margin-top:6px;">
+                  <span><strong>Marks:</strong> ${eh(s.marks)}${assignment.max_marks ? '/' + assignment.max_marks : ''}</span>
+                  ${s.remarks ? `<span><strong>Feedback:</strong> ${eh(s.remarks)}</span>` : ''}
+                </div>` : `
+                <div style="border-top:1px solid var(--border-light);padding-top:8px;margin-top:6px;">
+                  <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="number" class="form-input" id="grade-marks-${s.id}" placeholder="Marks" min="0" ${assignment.max_marks ? `max="${assignment.max_marks}"` : ''} style="width:80px;height:32px;font-size:12px;">
+                    <input type="text" class="form-input" id="grade-remarks-${s.id}" placeholder="Feedback" style="flex:1;height:32px;font-size:12px;">
+                    <button class="btn btn-primary btn-sm" data-action="sp-grade-submission" data-submission-id="${s.id}" data-assignment-id="${assignment.id}">Grade</button>
+                  </div>
+                </div>`}
+              </div>`).join('')}
+          </div>
+          <div class="modal-footer"><button class="btn btn-secondary" data-close-modal="modal-assignment-submissions">Close</button></div>
+        </div>`;
+        document.body.appendChild(overlay);
+        AppModal.open(overlay.id);
+        initIcons();
+      } catch (err) { AppToast.show(err.message || 'Failed to load submissions.', 'error'); }
+    })();
+    return;
+  }
+  if (action === 'sp-grade-submission') {
+    const submissionId = el.dataset.submissionId;
+    const marks = parseInt(document.getElementById(`grade-marks-${submissionId}`)?.value);
+    const remarks = document.getElementById(`grade-remarks-${submissionId}`)?.value?.trim() || null;
+    if (marks === undefined || isNaN(marks)) { AppToast.show('Please enter marks.', 'warn'); return; }
+    try {
+      const profile = await AuthService.getProfile();
+      await window.AssignmentService?.reviewSubmission(submissionId, marks, remarks, profile?.id || null);
+      AppToast.show('Submission graded.', 'success');
+      AppModal.close('modal-assignment-submissions');
+    } catch (err) { AppToast.show(err.message || 'Failed to grade.', 'error'); }
+    return;
+  }
+  if (action === 'sp-course-progress') {
+    const courseId = el.dataset.courseId;
+    (async () => {
+      const eh = AppUtils.escapeHtml;
+      try {
+        const course = await window.CourseService?.getById(courseId);
+        if (!course) { AppToast.show('Course not found.', 'error'); return; }
+        const eh = AppUtils.escapeHtml;
+        const enrollments = await window.EnrollmentService?.getByCourse(courseId) || [];
+        const validStudents = enrollments.filter(e => e.status === 'active').map(e => e.student).filter(Boolean);
+        const progressData = await Promise.all(validStudents.map(async s => {
+          try {
+            const p = await window.ProgressService?.getCourseProgress(s.id, courseId) || { total_lessons: 0, completed_lessons: 0, percentage: 0 };
+            return { student: s, progress: p };
+          } catch { return { student: s, progress: { total_lessons: 0, completed_lessons: 0, percentage: 0 } }; }
+        }));
+        const existing = document.getElementById('modal-course-progress');
+        if (existing) existing.remove();
+        const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; overlay.id = 'modal-course-progress';
+        overlay.innerHTML = `<div class="modal" style="max-width:600px;">
+          <div class="modal-header"><h3 class="modal-title">Progress: ${eh(course.name)}</h3><button class="modal-close" data-close-modal="modal-course-progress"><span class="material-symbols-outlined">close</span></button></div>
+          <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+            ${progressData.length === 0 ? '<div style="padding:20px;text-align:center;color:var(--text-muted);">No active students enrolled.</div>'
+            : progressData.map(({ student, progress }) => `
+              <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <span style="font-size:13px;font-weight:600;">${eh(student.name)}</span>
+                  <span style="font-size:12px;color:${progress.percentage >= 100 ? '#10b981' : progress.percentage > 0 ? '#3b82f6' : '#9ca3af'};font-weight:600;">${progress.completed_lessons}/${progress.total_lessons} (${progress.percentage}%)</span>
+                </div>
+                <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+                  <div style="height:100%;width:${progress.percentage}%;background:${progress.percentage >= 100 ? '#10b981' : progress.percentage > 0 ? '#3b82f6' : '#e5e7eb'};border-radius:3px;"></div>
+                </div>
+              </div>`).join('')}
+          </div>
+          <div class="modal-footer"><button class="btn btn-secondary" data-close-modal="modal-course-progress">Close</button></div>
+        </div>`;
+        document.body.appendChild(overlay);
+        AppModal.open(overlay.id);
+        initIcons();
+      } catch (err) { AppToast.show(err.message || 'Failed to load progress.', 'error'); }
+    })();
+    return;
+  }
+
   // Enrollments
   if (action === 'sp-remove-enrollment') { window.SchoolAssignments.confirmRemoveEnrollment(id); return; }
   if (action === 'sp-confirm-remove-enrollment') {
-    try { await window.EnrollmentService?.delete(id); AppToast.show('Enrollment removed.', 'success'); AppModal.close('modal-confirm-enrollment'); AppRouter.render(); }
+    try { await window.EnrollmentService?.delete(id); AppToast.show('Enrollment removed.', 'success'); AppStorage.invalidate(); AppModal.close('modal-confirm-enrollment'); AppRouter.render(); }
     catch (err) { AppToast.show(err.message || 'Failed to remove enrollment.', 'error'); }
     return;
   }
@@ -2719,28 +3444,34 @@ document.addEventListener('click', async function (e) {
         AppToast.show('Enrollment removed.', 'success');
       }
     } catch (err) { AppToast.show(err.message || 'Failed to update enrollment.', 'error'); el.checked = !el.checked; }
+    AppStorage.invalidate();
     AppRouter.render();
     return;
   }
 
+  // Audit log pagination
+  if (action === 'audit-page') {
+    AppAuditLog.goToPage(parseInt(id));
+    return;
+  }
   // Notifications
   if (action === 'sp-mark-all-read') {
-    try { const p = await AuthService.getProfile(); if (p) { await window.NotificationService?.markAllAsRead(p.id); AppToast.show('All marked as read.', 'success'); AppRouter.render(); } }
+    try { const p = await AuthService.getProfile(); if (p) { await window.NotificationService?.markAllAsRead(p.id); AppToast.show('All marked as read.', 'success'); AppStorage.invalidate(); AppRouter.render(); } }
     catch (err) { AppToast.show(err.message, 'error'); }
     return;
   }
   if (action === 'sp-mark-notification-read') {
-    try { await window.NotificationService?.markAsRead(id); AppRouter.render(); }
+    try { await window.NotificationService?.markAsRead(id); AppStorage.invalidate(); AppRouter.render(); }
     catch (err) { AppToast.show(err.message, 'error'); }
     return;
   }
   if (action === 'sp-delete-notification') {
-    try { await window.NotificationService?.delete(id); AppRouter.render(); }
+    try { await window.NotificationService?.delete(id); AppStorage.invalidate(); AppRouter.render(); }
     catch (err) { AppToast.show(err.message, 'error'); }
     return;
   }
   if (action === 'sp-delete-all-notifications') {
-    try { const p = await AuthService.getProfile(); if (p) { await window.NotificationService?.deleteAll(p.id); AppToast.show('All notifications cleared.', 'success'); AppRouter.render(); } }
+    try { const p = await AuthService.getProfile(); if (p) { await window.NotificationService?.deleteAll(p.id); AppToast.show('All notifications cleared.', 'success'); AppStorage.invalidate(); AppRouter.render(); } }
     catch (err) { AppToast.show(err.message, 'error'); }
     return;
   }
@@ -2750,7 +3481,7 @@ document.addEventListener('click', async function (e) {
   if (action === 'sp-view-video') { window.SchoolVideos.viewVideo(id); return; }
   if (action === 'sp-delete-content') { window.SchoolVideos.confirmDelete(id); return; }
   if (action === 'sp-confirm-delete-content') {
-    try { await window.ContentService?.delete(id); AppToast.show('Content deleted.', 'success'); AppModal.close('modal-confirm-video'); AppRouter.render(); }
+    try { await window.ContentService?.delete(id); AppToast.show('Content deleted.', 'success'); AppStorage.invalidate(); AppModal.close('modal-confirm-video'); AppRouter.render(); }
     catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
     return;
   }
@@ -2828,8 +3559,8 @@ document.addEventListener('input', debounce(async function (e) {
             <i data-icon="${isVideo ? 'play_circle' : 'image'}" style="width:36px;height:36px;color:${isVideo ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)'};"></i>
           </div>
           <div style="padding:12px;">
-            <div style="font-size:14px;font-weight:600;">${m.name}</div>
-            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${m.type} · ${m.size || '—'} · ${school?.name || '—'}</div>
+            <div style="font-size:14px;font-weight:600;">${AppUtils.escapeHtml(m.name)}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${AppUtils.escapeHtml(m.type)} · ${AppUtils.escapeHtml(m.size || '—')} · ${AppUtils.escapeHtml(school?.name || '—')}</div>
             <div style="display:flex;gap:8px;margin-top:8px;">
               ${isVideo ? `<button class="btn btn-primary btn-sm" style="flex:1;height:32px;font-size:12px;" data-action="play-video" data-id="${m.id}"><span class="material-symbols-outlined" style="font-size:18px;">play_arrow</span> Play</button>` : `<button class="btn btn-primary btn-sm" style="flex:1;height:32px;font-size:12px;" data-action="preview-image" data-id="${m.id}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span> Preview</button>`}
               <button class="btn btn-secondary btn-sm" style="flex:1;height:32px;font-size:12px;" data-action="view-content-file" data-id="${m.id}">Details</button>
@@ -2969,6 +3700,91 @@ async function initApp() {
   AppStorage.init();
   AppModal.init();
 
+  // Password recovery detection — must be set before login check
+  const lc = document.getElementById('login-form-container');
+  const fc = document.getElementById('forgot-password-container');
+  const rc = document.getElementById('reset-password-container');
+  const loginTitle = document.querySelector('#app-login .card h2');
+
+  AuthService.onAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      lc.style.display = 'none';
+      fc.style.display = 'none';
+      rc.style.display = 'block';
+      if (loginTitle) loginTitle.textContent = 'Reset Your Password';
+    }
+  });
+
+  // Forgot Password
+  document.getElementById('btn-forgot-password').addEventListener('click', () => {
+    lc.style.display = 'none';
+    rc.style.display = 'none';
+    fc.style.display = 'block';
+    document.getElementById('forgot-success').style.display = 'none';
+    document.getElementById('forgot-error').style.display = 'none';
+    document.getElementById('forgot-email').value = '';
+    if (loginTitle) loginTitle.textContent = 'Reset Password';
+  });
+
+  document.getElementById('btn-back-to-login').addEventListener('click', () => {
+    fc.style.display = 'none';
+    rc.style.display = 'none';
+    lc.style.display = 'block';
+    document.getElementById('login-error').textContent = '';
+    if (loginTitle) loginTitle.textContent = 'Sign in to your account';
+  });
+
+  document.getElementById('btn-send-reset-link').addEventListener('click', async () => {
+    const email = document.getElementById('forgot-email').value.trim();
+    const successEl = document.getElementById('forgot-success');
+    const errorEl = document.getElementById('forgot-error');
+    successEl.style.display = 'none';
+    errorEl.style.display = 'none';
+    if (!email) { errorEl.textContent = 'Please enter your email.'; errorEl.style.display = 'block'; return; }
+    const result = await AuthService.sendPasswordResetEmail(email);
+    if (!result.success) {
+      errorEl.textContent = result.error;
+      errorEl.style.display = 'block';
+      return;
+    }
+    successEl.style.display = 'block';
+    errorEl.style.display = 'none';
+  });
+
+  document.getElementById('btn-update-password').addEventListener('click', async () => {
+    const password = document.getElementById('reset-new-password').value;
+    const confirm = document.getElementById('reset-confirm-password').value;
+    const successEl = document.getElementById('reset-success');
+    const errorEl = document.getElementById('reset-error');
+    successEl.style.display = 'none';
+    errorEl.style.display = 'none';
+    if (!password || password.length < 6) { errorEl.textContent = 'Password must be at least 6 characters.'; errorEl.style.display = 'block'; return; }
+    if (password !== confirm) { errorEl.textContent = 'Passwords do not match.'; errorEl.style.display = 'block'; return; }
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) {
+      if (error.message?.toLowerCase().includes('expired')) {
+        errorEl.textContent = 'Reset link has expired. Please request a new one.';
+      } else if (error.message?.toLowerCase().includes('invalid')) {
+        errorEl.textContent = 'Invalid reset link. Please request a new one.';
+      } else {
+        errorEl.textContent = error.message || 'Failed to update password.';
+      }
+      errorEl.style.display = 'block';
+      return;
+    }
+    successEl.style.display = 'block';
+    errorEl.style.display = 'none';
+    document.getElementById('reset-new-password').value = '';
+    document.getElementById('reset-confirm-password').value = '';
+    setTimeout(() => {
+      rc.style.display = 'none';
+      lc.style.display = 'block';
+      document.getElementById('login-error').textContent = '';
+      if (loginTitle) loginTitle.textContent = 'Sign in to your account';
+    }, 3000);
+  });
+
+  // Login form
   const loginForm = document.getElementById('login-form');
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -3053,6 +3869,16 @@ async function initApp() {
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebar-overlay').classList.remove('active');
   });
+
+  // Fallback: detect password recovery from URL hash
+  const hash = window.location.hash;
+  if (hash && hash.includes('type=recovery')) {
+    lc.style.display = 'none';
+    fc.style.display = 'none';
+    rc.style.display = 'block';
+    if (loginTitle) loginTitle.textContent = 'Reset Your Password';
+    history.replaceState(null, '', window.location.pathname);
+  }
 
   // Auto-login if session exists
   const session = await AuthService.getSession();

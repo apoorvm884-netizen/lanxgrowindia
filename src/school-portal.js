@@ -5,6 +5,8 @@
 
 
 
+const eh = AppUtils.escapeHtml;
+
 // ==============================================================
 // STUDENTS MANAGEMENT
 // ==============================================================
@@ -21,7 +23,7 @@ window.SchoolStudents = {
 
     let students = [];
     try { students = await window.StudentService?.getBySchool(schoolId) || []; } catch { students = []; }
-    const counselors = data.users.filter(u => u.schoolId === schoolId && u.role === 'school_admin');
+    const counselors = data.users.filter(u => u.schoolId === schoolId && u.role === 'counselor');
 
     if (q) students = students.filter(s => s.name.toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q));
     if (counselorFilter) students = students.filter(s => s.counselor_id === counselorFilter);
@@ -38,9 +40,9 @@ window.SchoolStudents = {
         <div class="page-header-left">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
             <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-            <span style="font-size:12px;color:var(--text-secondary);">${school.name}</span>
+            <span style="font-size:12px;color:var(--text-secondary);">${eh(school.name)}</span>
           </div>
-          <h1 class="page-title">Students</h1><p class="page-subtitle">Manage all students enrolled in ${school.name}.</p>
+          <h1 class="page-title">Students</h1><p class="page-subtitle">Manage all students enrolled in ${eh(school.name)}.</p>
         </div>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-secondary btn-sm" style="height:34px;font-size:11px;" data-action="sp-export-csv" data-entity="students"><span class="material-symbols-outlined" style="font-size:14px;">download</span> Export</button>
@@ -48,14 +50,14 @@ window.SchoolStudents = {
         </div>
       </div>
       <div class="management-bar" style="margin-bottom:16px;">
-        <div class="search-bar" style="max-width:250px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="sp-student-search" placeholder="Search students..." value="${q}"></div>
+        <div class="search-bar" style="max-width:250px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="sp-student-search" placeholder="Search students..." value="${eh(q)}"></div>
         <select class="form-select" id="sp-student-class" style="width:130px;height:40px;font-size:13px;">
           <option value="">All Classes</option>
-          ${classes.map(c => `<option value="${c}" ${classFilter === c ? 'selected' : ''}>${c}</option>`).join('')}
+          ${classes.map(c => `<option value="${eh(c)}" ${classFilter === c ? 'selected' : ''}>${eh(c)}</option>`).join('')}
         </select>
         <select class="form-select" id="sp-student-counselor" style="width:160px;height:40px;font-size:13px;">
           <option value="">All Counselors</option>
-          ${counselors.map(c => `<option value="${c.id}" ${counselorFilter === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+          ${counselors.map(c => `<option value="${c.id}" ${counselorFilter === c.id ? 'selected' : ''}>${eh(c.name)}</option>`).join('')}
         </select>
         <select class="form-select" id="sp-student-status" style="width:130px;height:40px;font-size:13px;">
           <option value="">All Status</option>
@@ -71,13 +73,14 @@ window.SchoolStudents = {
           ${pageItems.map(s => {
             const counselor = counselors.find(c => c.id === s.counselor_id);
             const courses = data.enrollments?.filter(e => e.student_id === s.id) || [];
-            const nameHtml = q ? s.name.replace(new RegExp(q, 'gi'), m => `<mark style="background:#fef08a;padding:0 2px;border-radius:2px;">${m}</mark>`) : s.name;
+            const safeName = eh(s.name);
+            const nameHtml = q ? safeName.replace(new RegExp(eh(q), 'gi'), m => `<mark style="background:#fef08a;padding:0 2px;border-radius:2px;">${m}</mark>`) : safeName;
             return `<tr>
-              <td><div style="display:flex;align-items:center;gap:8px;"><div class="user-avatar" style="width:28px;height:28px;font-size:10px;">${AppUtils.getInitials(s.name)}</div><span class="font-semibold">${nameHtml}</span></div></td>
-              <td style="font-size:13px;">${s.email || '—'}</td>
-              <td style="font-size:13px;">${s.class || '—'}</td>
-              <td style="font-size:13px;">${counselor?.name || '—'}</td>
-              <td><span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-suspended'}">${s.status}</span></td>
+              <td><div style="display:flex;align-items:center;gap:8px;"><div class="user-avatar" style="width:28px;height:28px;font-size:10px;">${AppUtils.getInitials(safeName)}</div><span class="font-semibold">${nameHtml}</span></div></td>
+              <td style="font-size:13px;">${eh(s.email || '—')}</td>
+              <td style="font-size:13px;">${eh(s.class || '—')}</td>
+              <td style="font-size:13px;">${eh(counselor?.name || '—')}</td>
+              <td><span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-suspended'}">${eh(s.status)}</span></td>
               <td style="font-size:13px;">${courses.length}</td>
               <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
                 <button class="btn btn-ghost btn-sm" data-action="sp-view-student" data-id="${s.id}" title="View Profile"><span class="material-symbols-outlined" style="font-size:16px;">person</span></button>
@@ -101,7 +104,7 @@ window.SchoolStudents = {
   },
 
   async openAdd(data, school) {
-    const counselors = data.users.filter(u => u.schoolId === school.id && u.role === 'school_admin');
+    const counselors = data.users.filter(u => u.schoolId === school.id && u.role === 'counselor');
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'modal-student';
@@ -113,7 +116,7 @@ window.SchoolStudents = {
         <div class="form-group"><label class="form-label">Class</label><input type="text" class="form-input" id="sp-input-student-class" placeholder="e.g. Class 9"></div>
         <div class="form-group"><label class="form-label">Section</label><input type="text" class="form-input" id="sp-input-student-section" placeholder="e.g. A"></div>
         <div class="form-group"><label class="form-label">Assign Counselor</label>
-          <select class="form-select" id="sp-input-student-counselor"><option value="">None</option>${counselors.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
+          <select class="form-select" id="sp-input-student-counselor"><option value="">None</option>${counselors.map(c => `<option value="${c.id}">${eh(c.name)}</option>`).join('')}</select>
         </div>
         <div class="form-group"><label class="form-label">Status</label>
           <select class="form-select" id="sp-input-student-status"><option value="active">Active</option><option value="inactive">Inactive</option></select>
@@ -135,7 +138,7 @@ window.SchoolStudents = {
       if (!student) return;
       const data = await AppStorage.load();
       const school = data.schools.find(s => s.id === student.school_id);
-      const counselors = data.users.filter(u => u.schoolId === student.school_id && u.role === 'school_admin');
+      const counselors = data.users.filter(u => u.schoolId === student.school_id && u.role === 'counselor');
       const existing = document.getElementById('modal-student');
       if (existing) existing.remove();
       const overlay = document.createElement('div');
@@ -144,12 +147,12 @@ window.SchoolStudents = {
       overlay.innerHTML = `<div class="modal">
         <div class="modal-header"><h3 class="modal-title">Edit Student</h3><button class="modal-close" data-close-modal="modal-student"><span class="material-symbols-outlined">close</span></button></div>
         <div class="modal-body">
-          <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="sp-input-student-name" value="${student.name}"></div>
-          <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="sp-input-student-email" value="${student.email || ''}"></div>
-          <div class="form-group"><label class="form-label">Class</label><input type="text" class="form-input" id="sp-input-student-class" value="${student.class || ''}"></div>
-          <div class="form-group"><label class="form-label">Section</label><input type="text" class="form-input" id="sp-input-student-section" value="${student.section || ''}"></div>
+          <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="sp-input-student-name" value="${eh(student.name)}"></div>
+          <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="sp-input-student-email" value="${eh(student.email || '')}"></div>
+          <div class="form-group"><label class="form-label">Class</label><input type="text" class="form-input" id="sp-input-student-class" value="${eh(student.class || '')}"></div>
+          <div class="form-group"><label class="form-label">Section</label><input type="text" class="form-input" id="sp-input-student-section" value="${eh(student.section || '')}"></div>
           <div class="form-group"><label class="form-label">Assign Counselor</label>
-            <select class="form-select" id="sp-input-student-counselor"><option value="">None</option>${counselors.map(c => `<option value="${c.id}" ${c.id === student.counselor_id ? 'selected' : ''}>${c.name}</option>`).join('')}</select>
+            <select class="form-select" id="sp-input-student-counselor"><option value="">None</option>${counselors.map(c => `<option value="${c.id}" ${c.id === student.counselor_id ? 'selected' : ''}>${eh(c.name)}</option>`).join('')}</select>
           </div>
           <div class="form-group"><label class="form-label">Status</label>
             <select class="form-select" id="sp-input-student-status"><option value="active" ${student.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${student.status === 'inactive' ? 'selected' : ''}>Inactive</option><option value="suspended" ${student.status === 'suspended' ? 'selected' : ''}>Suspended</option></select>
@@ -189,6 +192,7 @@ window.SchoolStudents = {
         AppToast.show('Student created.', 'success');
       }
       AppModal.close('modal-student');
+      AppStorage.invalidate();
       AppRouter.render();
     } catch (err) {
       AppToast.show(err.message || 'Failed to save student.', 'error');
@@ -209,7 +213,7 @@ window.SchoolStudents = {
         <div class="modal-body">
           <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fef2f2;border-radius:8px;margin-bottom:12px;">
             <span class="material-symbols-outlined" style="font-size:24px;color:#ef4444;">warning</span>
-            <span style="font-size:13px;">Delete <strong>"${student?.name || 'this student'}"</strong>? This will also remove all course enrollments.</span>
+            <span style="font-size:13px;">Delete <strong>"${eh(student?.name || 'this student')}"</strong>? This will also remove all course enrollments.</span>
           </div>
         </div>
         <div class="modal-footer">
@@ -246,12 +250,12 @@ window.SchoolStudents = {
           <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border);">
             <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#1e3a8a,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;flex-shrink:0;">${AppUtils.getInitials(student.name)}</div>
             <div style="flex:1;">
-              <div style="font-size:18px;font-weight:700;">${student.name}</div>
+              <div style="font-size:18px;font-weight:700;">${eh(student.name)}</div>
               <div style="display:flex;gap:12px;margin-top:4px;font-size:12px;color:var(--text-secondary);flex-wrap:wrap;">
-                <span>${student.class || '—'} · ${student.section || '—'}</span>
-                <span>Roll: ${student.roll_number || '—'}</span>
-                <span>Admission: ${student.admission_no || '—'}</span>
-                <span class="status-badge ${student.status === 'active' ? 'status-active' : 'status-suspended'}">${student.status}</span>
+                <span>${eh(student.class || '—')} · ${eh(student.section || '—')}</span>
+                <span>Roll: ${eh(student.roll_number || '—')}</span>
+                <span>Admission: ${eh(student.admission_no || '—')}</span>
+                <span class="status-badge ${student.status === 'active' ? 'status-active' : 'status-suspended'}">${eh(student.status)}</span>
               </div>
             </div>
             <div style="display:flex;gap:6px;">
@@ -265,29 +269,29 @@ window.SchoolStudents = {
               <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Personal Info</div>
               <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
                 <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Date of Birth</span><span style="font-weight:500;">${student.dob ? AppUtils.formatDate(student.dob) : '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Parent Name</span><span style="font-weight:500;">${student.parent_name || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Parent Contact</span><span style="font-weight:500;">${student.parent_contact || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Academic Year</span><span style="font-weight:500;">${student.academic_year || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Email</span><span style="font-weight:500;">${student.email || '—'}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Parent Name</span><span style="font-weight:500;">${eh(student.parent_name || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Parent Contact</span><span style="font-weight:500;">${eh(student.parent_contact || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Academic Year</span><span style="font-weight:500;">${eh(student.academic_year || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Email</span><span style="font-weight:500;">${eh(student.email || '—')}</span></div>
               </div>
             </div>
             <div>
               <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Performance</div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                 <div style="padding:10px;background:#f0fdf4;border-radius:8px;text-align:center;">
-                  <div style="font-size:18px;font-weight:700;color:#10b981;">${student.attendance || '—'}%</div>
+                  <div style="font-size:18px;font-weight:700;color:#10b981;">${eh(student.attendance || '—')}%</div>
                   <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Attendance</div>
                 </div>
                 <div style="padding:10px;background:#eff6ff;border-radius:8px;text-align:center;">
-                  <div style="font-size:18px;font-weight:700;color:#3b82f6;">${a.score}</div>
+                  <div style="font-size:18px;font-weight:700;color:#3b82f6;">${eh(a.score)}</div>
                   <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Learning Score</div>
                 </div>
                 <div style="padding:10px;background:#f5f3ff;border-radius:8px;text-align:center;">
-                  <div style="font-size:18px;font-weight:700;color:#8b5cf6;">#${a.rank}</div>
+                  <div style="font-size:18px;font-weight:700;color:#8b5cf6;">#${eh(a.rank)}</div>
                   <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Rank</div>
                 </div>
                 <div style="padding:10px;background:#fffbeb;border-radius:8px;text-align:center;">
-                  <div style="font-size:18px;font-weight:700;color:#f59e0b;">${a.streak}d</div>
+                  <div style="font-size:18px;font-weight:700;color:#f59e0b;">${eh(a.streak)}d</div>
                   <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Streak</div>
                 </div>
               </div>
@@ -295,11 +299,11 @@ window.SchoolStudents = {
                 <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:6px;">Progress</div>
                 <div style="display:flex;align-items:center;gap:10px;">
                   <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;">
-                    <div style="width:${student.progress || 0}%;height:100%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:4px;"></div>
+                    <div style="width:${Number(student.progress) || 0}%;height:100%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:4px;"></div>
                   </div>
-                  <span style="font-size:13px;font-weight:700;">${student.progress || 0}%</span>
+                  <span style="font-size:13px;font-weight:700;">${eh(student.progress || 0)}%</span>
                 </div>
-                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Last login: ${a.lastLogin}</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Last login: ${eh(a.lastLogin)}</div>
               </div>
             </div>
           </div>
@@ -309,14 +313,14 @@ window.SchoolStudents = {
               <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Assigned Counselor</div>
               <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;">
                 <div style="width:36px;height:36px;border-radius:50%;background:var(--primary)12;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:var(--primary);">${AppUtils.getInitials(counselor?.name || '—')}</div>
-                <div><div style="font-size:13px;font-weight:500;">${counselor?.name || 'Not assigned'}</div><div style="font-size:11px;color:var(--text-secondary);">${counselor?.email || ''}</div></div>
+                <div><div style="font-size:13px;font-weight:500;">${eh(counselor?.name || 'Not assigned')}</div><div style="font-size:11px;color:var(--text-secondary);">${eh(counselor?.email || '')}</div></div>
               </div>
             </div>
             <div>
               <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Activity Summary</div>
               <div style="display:flex;flex-direction:column;gap:4px;font-size:13px;">
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Videos Watched</span><span style="font-weight:600;">${a.videosWatched}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Courses Completed</span><span style="font-weight:600;">${a.coursesCompleted}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Videos Watched</span><span style="font-weight:600;">${eh(a.videosWatched)}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Courses Completed</span><span style="font-weight:600;">${eh(a.coursesCompleted)}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Enrolled Courses</span><span style="font-weight:600;">${enrollments.length}</span></div>
               </div>
             </div>
@@ -324,7 +328,7 @@ window.SchoolStudents = {
 
           ${student.notes ? `<div style="margin-bottom:16px;padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;display:flex;align-items:flex-start;gap:8px;">
             <span class="material-symbols-outlined" style="font-size:18px;color:#f59e0b;flex-shrink:0;">edit_note</span>
-            <div><div style="font-size:12px;font-weight:600;color:#92400e;">Notes</div><div style="font-size:12px;color:#78350f;margin-top:2px;">${student.notes}</div></div>
+            <div><div style="font-size:12px;font-weight:600;color:#92400e;">Notes</div><div style="font-size:12px;color:#78350f;margin-top:2px;">${eh(student.notes)}</div></div>
           </div>` : ''}
 
           <div style="margin-bottom:16px;">
@@ -333,8 +337,8 @@ window.SchoolStudents = {
             : `<div style="display:flex;flex-direction:column;gap:6px;">${courses.map(c => {
               const enr = enrollments.find(e => e.course_id === c.id);
               return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--border-light);border-radius:6px;">
-                <span style="font-size:13px;font-weight:500;">${c.name}</span>
-                <span class="status-badge ${enr?.status === 'active' ? 'status-active' : enr?.status === 'completed' ? 'status-active' : 'status-suspended'}" style="font-size:10px;">${enr?.status || '—'}</span>
+                <span style="font-size:13px;font-weight:500;">${eh(c.name)}</span>
+                <span class="status-badge ${enr?.status === 'active' ? 'status-active' : enr?.status === 'completed' ? 'status-active' : 'status-suspended'}" style="font-size:10px;">${eh(enr?.status || '—')}</span>
               </div>`;
             }).join('')}</div>`}
           </div>
@@ -344,7 +348,7 @@ window.SchoolStudents = {
             <div style="display:flex;flex-direction:column;gap:0;">${activities.map(act => `
               <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);">
                 <span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);flex-shrink:0;">${actIconMap[act.action] || 'circle'}</span>
-                <div style="flex:1;font-size:12px;">${act.description}</div>
+                <div style="flex:1;font-size:12px;">${eh(act.description)}</div>
                 <div style="font-size:10px;color:var(--text-muted);white-space:nowrap;">${AppUtils.timeAgo(act.timestamp)}</div>
               </div>`).join('')}</div>
           </div>` : ''}
@@ -355,7 +359,7 @@ window.SchoolStudents = {
               ${activities.filter(a => a.action === 'certificate_earned').length > 0
                 ? activities.filter(a => a.action === 'certificate_earned').map(a => `
                   <div style="padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;display:flex;align-items:center;gap:6px;font-size:12px;">
-                    <span class="material-symbols-outlined" style="font-size:16px;color:#10b981;">workspace_premium</span> ${a.description.replace('Earned certificate for ', '')}
+                    <span class="material-symbols-outlined" style="font-size:16px;color:#10b981;">workspace_premium</span> ${eh(a.description.replace('Earned certificate for ', ''))}
                   </div>`).join('')
                 : `<div style="padding:8px 12px;border:1px dashed var(--border);border-radius:8px;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);">
                     <span class="material-symbols-outlined" style="font-size:16px;">workspace_premium</span> No certificates yet
@@ -391,7 +395,7 @@ window.SchoolCounselors = {
   async render(main, data, school) {
     const schoolId = school.id;
     const q = (document.getElementById('sp-counselor-search')?.value || '').toLowerCase();
-    let counselors = data.users.filter(u => u.schoolId === schoolId && u.role === 'school_admin');
+    let counselors = data.users.filter(u => u.schoolId === schoolId && u.role === 'counselor');
 
     if (q) counselors = counselors.filter(c => c.name.toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q));
 
@@ -403,13 +407,13 @@ window.SchoolCounselors = {
         <div class="page-header-left">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
             <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-            <span style="font-size:12px;color:var(--text-secondary);">${school.name}</span>
+            <span style="font-size:12px;color:var(--text-secondary);">${eh(school.name)}</span>
           </div>
-          <h1 class="page-title">Counselors</h1><p class="page-subtitle">Manage staff and counselors for ${school.name}.</p>
+          <h1 class="page-title">Counselors</h1><p class="page-subtitle">Manage staff and counselors for ${eh(school.name)}.</p>
         </div>
       </div>
       <div class="management-bar" style="margin-bottom:16px;">
-        <div class="search-bar" style="max-width:280px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="sp-counselor-search" placeholder="Search counselors..." value="${q}"></div>
+        <div class="search-bar" style="max-width:280px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="sp-counselor-search" placeholder="Search counselors..." value="${eh(q)}"></div>
         <span style="font-size:11px;color:var(--text-muted);margin-left:auto;">Showing ${counselors.length} counselor${counselors.length !== 1 ? 's' : ''}</span>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
@@ -418,8 +422,8 @@ window.SchoolCounselors = {
           ${counselors.map(c => {
             const studentCount = students.filter(s => s.counselor_id === c.id).length;
             return `<tr>
-              <td><div style="display:flex;align-items:center;gap:8px;"><div class="user-avatar" style="width:28px;height:28px;font-size:10px;">${AppUtils.getInitials(c.name)}</div><span class="font-semibold">${c.name}</span></div></td>
-              <td style="font-size:13px;">${c.email || '—'}</td>
+              <td><div style="display:flex;align-items:center;gap:8px;"><div class="user-avatar" style="width:28px;height:28px;font-size:10px;">${AppUtils.getInitials(c.name)}</div><span class="font-semibold">${eh(c.name)}</span></div></td>
+              <td style="font-size:13px;">${eh(c.email || '—')}</td>
               <td style="font-size:13px;">${studentCount}</td>
               <td><span class="status-badge" style="background:var(--warning-light);color:#92400e;">Counselor</span></td>
               <td><span class="status-badge status-active">Active</span></td>
@@ -457,8 +461,8 @@ window.SchoolCounselors = {
           <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border);">
             <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#8b5cf6,#a78bfa);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;flex-shrink:0;">${AppUtils.getInitials(counselor.name)}</div>
             <div style="flex:1;">
-              <div style="font-size:18px;font-weight:700;">${counselor.name}</div>
-              <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${counselor.email || '—'}</div>
+              <div style="font-size:18px;font-weight:700;">${eh(counselor.name)}</div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${eh(counselor.email || '—')}</div>
             </div>
           </div>
 
@@ -483,8 +487,8 @@ window.SchoolCounselors = {
               <div style="display:flex;flex-direction:column;gap:4px;">
                 ${students.length > 0 ? students.slice(0, 5).map(s => `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border-light);">
                   <div style="width:24px;height:24px;border-radius:50%;background:var(--primary)12;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--primary);">${AppUtils.getInitials(s.name)}</div>
-                  <span>${s.name}</span>
-                  <span style="margin-left:auto;font-size:10px;color:var(--text-muted);">${s.class || ''}</span>
+                  <span>${eh(s.name)}</span>
+                  <span style="margin-left:auto;font-size:10px;color:var(--text-muted);">${eh(s.class || '')}</span>
                 </div>`).join('') : '<span style="font-size:12px;color:var(--text-muted);">No students assigned</span>'}
                 ${students.length > 5 ? `<div style="font-size:11px;color:var(--primary);text-align:center;margin-top:4px;">+${students.length - 5} more</div>` : ''}
               </div>
@@ -539,9 +543,9 @@ window.SchoolCourses = {
         <div class="page-header-left">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
             <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-            <span style="font-size:12px;color:var(--text-secondary);">${school.name}</span>
+            <span style="font-size:12px;color:var(--text-secondary);">${eh(school.name)}</span>
           </div>
-          <h1 class="page-title">Courses</h1><p class="page-subtitle">Create and manage courses for ${school.name}.</p>
+          <h1 class="page-title">Courses</h1><p class="page-subtitle">Create and manage courses for ${eh(school.name)}.</p>
         </div>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-secondary btn-sm" style="height:34px;font-size:11px;" data-action="sp-export-csv" data-entity="courses"><span class="material-symbols-outlined" style="font-size:14px;">download</span> Export</button>
@@ -559,8 +563,8 @@ window.SchoolCourses = {
             const sections = data.courseSections?.filter(cs => cs.course_id === c.id) || [];
             const enrollments = data.enrollments?.filter(e => e.course_id === c.id) || [];
             return `<tr>
-              <td><span class="font-semibold">${c.name}</span></td>
-              <td style="font-size:13px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.description || '—'}</td>
+              <td><span class="font-semibold">${eh(c.name)}</span></td>
+              <td style="font-size:13px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${eh(c.description || '—')}</td>
               <td style="font-size:13px;">${sections.length}</td>
               <td style="font-size:13px;">${enrollments.length}</td>
               <td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.created_at)}</td>
@@ -606,8 +610,8 @@ window.SchoolCourses = {
           <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border);">
             <div style="width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0;">${AppUtils.getInitials(course.name)}</div>
             <div style="flex:1;">
-              <div style="font-size:18px;font-weight:700;">${course.name}</div>
-              <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${school?.name || '—'} · ${course.status || 'active'}</div>
+              <div style="font-size:18px;font-weight:700;">${eh(course.name)}</div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${eh(school?.name || '—')} · ${eh(course.status || 'active')}</div>
             </div>
             <button class="btn btn-secondary btn-sm" style="height:32px;font-size:12px;" data-action="sp-edit-course" data-id="${course.id}"><span class="material-symbols-outlined" style="font-size:16px;">edit</span> Edit</button>
           </div>
@@ -616,12 +620,12 @@ window.SchoolCourses = {
             <div>
               <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Course Info</div>
               <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Category</span><span style="font-weight:500;">${category?.name || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Subject</span><span style="font-weight:500;">${subject?.name || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Instructor</span><span style="font-weight:500;">${course.instructor || school?.principal_name || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Difficulty</span><span style="font-weight:500;">${course.difficulty || 'Intermediate'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Duration</span><span style="font-weight:500;">${course.duration || '8 weeks'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Status</span><span class="status-badge ${course.status === 'active' ? 'status-active' : 'status-suspended'}" style="font-size:10px;">${course.status || 'active'}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Category</span><span style="font-weight:500;">${eh(category?.name || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Subject</span><span style="font-weight:500;">${eh(subject?.name || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Instructor</span><span style="font-weight:500;">${eh(course.instructor || school?.principal_name || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Difficulty</span><span style="font-weight:500;">${eh(course.difficulty || 'Intermediate')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Duration</span><span style="font-weight:500;">${eh(course.duration || '8 weeks')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Status</span><span class="status-badge ${course.status === 'active' ? 'status-active' : 'status-suspended'}" style="font-size:10px;">${eh(course.status || 'active')}</span></div>
               </div>
             </div>
             <div>
@@ -649,14 +653,14 @@ window.SchoolCourses = {
 
           <div style="margin-bottom:16px;">
             <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Description</div>
-            <div style="font-size:13px;color:var(--text-primary);line-height:1.6;">${course.description || 'No description available.'}</div>
+            <div style="font-size:13px;color:var(--text-primary);line-height:1.6;">${eh(course.description || 'No description available.')}</div>
           </div>
 
           <div style="margin-bottom:16px;">
             <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Sections (${sectionDetails.length})</div>
             ${sectionDetails.length === 0 ? '<div style="font-size:13px;color:var(--text-secondary);">No sections assigned.</div>'
             : `<div style="display:flex;flex-wrap:wrap;gap:6px;">${sectionDetails.map(s => `
-              <span style="padding:4px 10px;background:var(--primary)12;color:var(--primary);border-radius:6px;font-size:11px;font-weight:500;">${s.name}</span>
+              <span style="padding:4px 10px;background:var(--primary)12;color:var(--primary);border-radius:6px;font-size:11px;font-weight:500;">${eh(s.name)}</span>
             `).join('')}</div>`}
           </div>
 
@@ -667,8 +671,8 @@ window.SchoolCourses = {
               const enr = enrollments.find(e => e.student_id === s.id);
               return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:13px;">
                 <div style="width:26px;height:26px;border-radius:50%;background:var(--primary)12;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--primary);">${AppUtils.getInitials(s.name)}</div>
-                <span>${s.name}</span>
-                <span style="margin-left:auto;font-size:11px;" class="status-badge ${enr?.status === 'active' ? 'status-active' : 'status-suspended'}">${enr?.status || '—'}</span>
+                <span>${eh(s.name)}</span>
+                <span style="margin-left:auto;font-size:11px;" class="status-badge ${enr?.status === 'active' ? 'status-active' : 'status-suspended'}">${eh(enr?.status || '—')}</span>
               </div>`;
             }).join('')}</div>`}
             ${students.length > 8 ? `<div style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:6px;">+${students.length - 8} more students</div>` : ''}
@@ -717,8 +721,8 @@ window.SchoolCourses = {
       overlay.innerHTML = `<div class="modal">
         <div class="modal-header"><h3 class="modal-title">Edit Course</h3><button class="modal-close" data-close-modal="modal-course"><span class="material-symbols-outlined">close</span></button></div>
         <div class="modal-body">
-          <div class="form-group"><label class="form-label">Course Name</label><input type="text" class="form-input" id="sp-input-course-name" value="${course.name}"></div>
-          <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" id="sp-input-course-desc" style="height:80px;resize:vertical;">${course.description || ''}</textarea></div>
+          <div class="form-group"><label class="form-label">Course Name</label><input type="text" class="form-input" id="sp-input-course-name" value="${eh(course.name)}"></div>
+          <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" id="sp-input-course-desc" style="height:80px;resize:vertical;">${eh(course.description || '')}</textarea></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-close-modal="modal-course">Cancel</button>
@@ -746,6 +750,7 @@ window.SchoolCourses = {
         AppToast.show('Course created.', 'success');
       }
       AppModal.close('modal-course');
+      AppStorage.invalidate();
       AppRouter.render();
     } catch (err) { AppToast.show(err.message || 'Failed to save course.', 'error'); }
     if (btn) { btn.disabled = false; btn.textContent = isUpdate ? 'Save Changes' : 'Add Course'; }
@@ -765,7 +770,7 @@ window.SchoolCourses = {
     overlay.className = 'modal-overlay';
     overlay.id = 'modal-course-manage';
     overlay.innerHTML = `<div class="modal" style="max-width:600px;">
-      <div class="modal-header"><h3 class="modal-title">Manage Course: ${course.name}</h3><button class="modal-close" data-close-modal="modal-course-manage"><span class="material-symbols-outlined">close</span></button></div>
+      <div class="modal-header"><h3 class="modal-title">Manage Course: ${eh(course.name)}</h3><button class="modal-close" data-close-modal="modal-course-manage"><span class="material-symbols-outlined">close</span></button></div>
       <div class="modal-body">
         <div style="margin-bottom:16px;"><strong>Sections</strong> — Add sections to this course</div>
         <div style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;">
@@ -774,7 +779,7 @@ window.SchoolCourses = {
             const isEnrolled = enrolledSectionIds.includes(sec.id);
             return `<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;cursor:pointer;">
               <input type="checkbox" data-action="sp-toggle-section" data-course-id="${courseId}" data-section-id="${sec.id}" ${isEnrolled ? 'checked' : ''} style="width:16px;height:16px;">
-              <span>${sec.name}</span>
+              <span>${eh(sec.name)}</span>
               <span style="margin-left:auto;font-size:11px;color:var(--text-muted);">${isEnrolled ? '✓ Added' : 'Not added'}</span>
             </label>`;
           }).join('')}
@@ -829,7 +834,7 @@ window.SchoolCourses = {
       overlay.innerHTML = `<div class="modal" style="max-width:600px;">
         <div class="modal-header"><h3 class="modal-title">Assign Courses</h3><button class="modal-close" data-close-modal="modal-assign-courses"><span class="material-symbols-outlined">close</span></button></div>
         <div class="modal-body">
-          <div style="margin-bottom:16px;font-size:14px;font-weight:600;">${student.name} <span style="font-weight:400;color:var(--text-secondary);">— ${student.class ? student.class + (student.section ? ' · ' + student.section : '') : ''}</span></div>
+          <div style="margin-bottom:16px;font-size:14px;font-weight:600;">${eh(student.name)} <span style="font-weight:400;color:var(--text-secondary);">— ${eh(student.class ? student.class + (student.section ? ' · ' + student.section : '') : '')}</span></div>
           <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Toggle courses to enroll or unenroll this student.</div>
           <div style="display:flex;flex-direction:column;gap:2px;max-height:350px;overflow-y:auto;">
             ${courses.length === 0 ? '<p style="color:var(--text-muted);font-size:13px;">No courses available. Create courses first.</p>'
@@ -837,7 +842,7 @@ window.SchoolCourses = {
               const isEnrolled = enrolledIds.includes(c.id);
               return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;background:${isEnrolled ? 'var(--primary)08' : 'transparent'};border:1px solid ${isEnrolled ? 'var(--primary)20' : 'var(--border-light)'};font-size:13px;cursor:pointer;">
                 <input type="checkbox" data-action="sp-toggle-enrollment" data-student-id="${studentId}" data-course-id="${c.id}" ${isEnrolled ? 'checked' : ''} style="width:16px;height:16px;">
-                <span style="font-weight:500;">${c.name}</span>
+                <span style="font-weight:500;">${eh(c.name)}</span>
                 <span style="margin-left:auto;font-size:11px;color:${isEnrolled ? 'var(--primary)' : 'var(--text-muted)'};">${isEnrolled ? 'Enrolled' : 'Not enrolled'}</span>
               </label>`;
             }).join('')}
@@ -858,9 +863,15 @@ window.SchoolCourses = {
       const course = await window.CourseService?.getById(courseId);
       if (!course) { AppToast.show('Course not found.', 'error'); return; }
       const modules = await window.ModuleService?.getByCourse(courseId) || [];
+      const moduleIds = modules.map(m => m.id);
       const allLessons = {};
-      for (const m of modules) {
-        allLessons[m.id] = await window.LessonService?.getByModule(m.id) || [];
+      if (moduleIds.length > 0) {
+        try {
+          const batchLessons = await window.LessonService?.getByModules(moduleIds) || {};
+          for (const m of modules) {
+            allLessons[m.id] = batchLessons[m.id] || [];
+          }
+        } catch (e) { console.error('Failed to fetch lessons batch:', e); }
       }
 
       const existing = document.getElementById('modal-course-structure');
@@ -868,24 +879,28 @@ window.SchoolCourses = {
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
       overlay.id = 'modal-course-structure';
+      const eh = AppUtils.escapeHtml;
       overlay.innerHTML = `<div class="modal" style="max-width:700px;">
         <div class="modal-header">
-          <h3 class="modal-title">Course Structure: ${course.name}</h3>
+          <h3 class="modal-title">Course Structure: ${eh(course.name)}</h3>
           <button class="modal-close" data-close-modal="modal-course-structure"><span class="material-symbols-outlined">close</span></button>
         </div>
         <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
           <div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
             <span style="font-size:13px;font-weight:600;">Modules & Lessons</span>
-            <button class="btn btn-primary btn-sm" data-action="sp-add-module" data-course-id="${courseId}" style="font-size:11px;height:30px;"><span class="material-symbols-outlined" style="font-size:14px;">add</span> Add Module</button>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-ghost btn-sm" data-action="sp-course-progress" data-course-id="${courseId}" style="font-size:11px;height:30px;" title="Student Progress"><span class="material-symbols-outlined" style="font-size:14px;">monitoring</span> Progress</button>
+              <button class="btn btn-primary btn-sm" data-action="sp-add-module" data-course-id="${courseId}" style="font-size:11px;height:30px;"><span class="material-symbols-outlined" style="font-size:14px;">add</span> Add Module</button>
+            </div>
           </div>
           ${modules.length === 0 ? '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;border:1px dashed var(--border);border-radius:8px;">No modules yet. Add your first module to start building the course.</div>'
           : modules.map((m, mi) => `
             <div style="border:1px solid var(--border);border-radius:8px;margin-bottom:12px;">
               <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--card-bg);border-bottom:1px solid var(--border-light);border-radius:8px 8px 0 0;">
                 <span style="font-size:12px;color:var(--text-muted);font-weight:600;">Module ${mi + 1}</span>
-                <span style="flex:1;font-size:13px;font-weight:500;">${m.title}</span>
+                <span style="flex:1;font-size:13px;font-weight:500;">${eh(m.title)}</span>
                 <button class="btn btn-ghost btn-sm" style="width:28px;height:28px;padding:0;" data-action="sp-edit-module" data-module-id="${m.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:14px;">edit</span></button>
-                <button class="btn btn-ghost btn-sm btn-danger-ghost" style="width:28px;height:28px;padding:0;" data-action="sp-delete-module" data-module-id="${m.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:14px;">delete</span></button>
+                <button class="btn btn-ghost btn-sm btn-danger-ghost" style="width:28px;height:28px;padding:0;" data-action="sp-delete-module" data-module-id="${m.id}" data-course-id="${courseId}" title="Delete"><span class="material-symbols-outlined" style="font-size:14px;">delete</span></button>
                 ${mi > 0 ? `<button class="btn btn-ghost btn-sm" style="width:28px;height:28px;padding:0;" data-action="sp-move-module" data-module-id="${m.id}" data-direction="up" title="Move Up"><span class="material-symbols-outlined" style="font-size:14px;">arrow_upward</span></button>` : ''}
                 ${mi < modules.length - 1 ? `<button class="btn btn-ghost btn-sm" style="width:28px;height:28px;padding:0;" data-action="sp-move-module" data-module-id="${m.id}" data-direction="down" title="Move Down"><span class="material-symbols-outlined" style="font-size:14px;">arrow_downward</span></button>` : ''}
               </div>
@@ -893,12 +908,15 @@ window.SchoolCourses = {
                 ${(allLessons[m.id] || []).length === 0 ? '<div style="font-size:12px;color:var(--text-muted);padding:4px 0;">No lessons yet.</div>'
                 : (allLessons[m.id] || []).map((l, li) => {
                   const icons = { video: 'play_circle', pdf: 'picture_as_pdf', document: 'description', image: 'image', drive_link: 'folder_open', assignment: 'assignment', quiz: 'quiz' };
+                  const extraBtn = l.content_type === 'quiz' ? `<button class="btn btn-ghost btn-sm" style="width:24px;height:24px;padding:0;" data-action="sp-manage-questions" data-lesson-id="${l.id}" title="Questions"><span class="material-symbols-outlined" style="font-size:12px;">quiz</span></button>`
+                    : l.content_type === 'assignment' ? `<button class="btn btn-ghost btn-sm" style="width:24px;height:24px;padding:0;" data-action="sp-manage-assignment-submissions" data-lesson-id="${l.id}" title="Submissions"><span class="material-symbols-outlined" style="font-size:12px;">assignment</span></button>` : '';
                   return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:4px;margin:2px 0;">
                     <span class="material-symbols-outlined" style="font-size:14px;color:var(--text-muted);">${icons[l.content_type] || 'radio_button_unchecked'}</span>
-                    <span style="font-size:12px;flex:1;">${l.title}</span>
-                    <span style="font-size:10px;color:var(--text-muted);padding:1px 6px;background:var(--border-light);border-radius:4px;">${l.content_type}</span>
+                    <span style="font-size:12px;flex:1;">${eh(l.title)}</span>
+                    <span style="font-size:10px;color:var(--text-muted);padding:1px 6px;background:var(--border-light);border-radius:4px;">${eh(l.content_type)}</span>
+                    ${extraBtn}
                     <button class="btn btn-ghost btn-sm" style="width:24px;height:24px;padding:0;" data-action="sp-edit-lesson" data-lesson-id="${l.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:12px;">edit</span></button>
-                    <button class="btn btn-ghost btn-sm btn-danger-ghost" style="width:24px;height:24px;padding:0;" data-action="sp-delete-lesson" data-lesson-id="${l.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:12px;">delete</span></button>
+                    <button class="btn btn-ghost btn-sm btn-danger-ghost" style="width:24px;height:24px;padding:0;" data-action="sp-delete-lesson" data-lesson-id="${l.id}" data-course-id="${courseId}" title="Delete"><span class="material-symbols-outlined" style="font-size:12px;">delete</span></button>
                     ${li > 0 ? `<button class="btn btn-ghost btn-sm" style="width:24px;height:24px;padding:0;" data-action="sp-move-lesson" data-lesson-id="${l.id}" data-direction="up" title="Up"><span class="material-symbols-outlined" style="font-size:12px;">arrow_upward</span></button>` : ''}
                     ${li < (allLessons[m.id] || []).length - 1 ? `<button class="btn btn-ghost btn-sm" style="width:24px;height:24px;padding:0;" data-action="sp-move-lesson" data-lesson-id="${l.id}" data-direction="down" title="Down"><span class="material-symbols-outlined" style="font-size:12px;">arrow_downward</span></button>` : ''}
                   </div>`;
@@ -930,8 +948,8 @@ window.SchoolCourses = {
     overlay.innerHTML = `<div class="modal" style="max-width:450px;">
       <div class="modal-header"><h3 class="modal-title">${moduleId ? 'Edit Module' : 'Add Module'}</h3><button class="modal-close" data-close-modal="modal-module-form"><span class="material-symbols-outlined">close</span></button></div>
       <div class="modal-body">
-        <div class="form-group"><label class="form-label">Module Title</label><input type="text" class="form-input" id="sp-input-module-title" value="${moduleData?.title || ''}" placeholder="e.g. Introduction"></div>
-        <div class="form-group" style="margin-top:12px;"><label class="form-label">Description</label><textarea class="form-input" id="sp-input-module-desc" placeholder="Optional description..." style="height:60px;resize:vertical;">${moduleData?.description || ''}</textarea></div>
+        <div class="form-group"><label class="form-label">Module Title</label><input type="text" class="form-input" id="sp-input-module-title" value="${eh(moduleData?.title || '')}" placeholder="e.g. Introduction"></div>
+        <div class="form-group" style="margin-top:12px;"><label class="form-label">Description</label><textarea class="form-input" id="sp-input-module-desc" placeholder="Optional description..." style="height:60px;resize:vertical;">${eh(moduleData?.description || '')}</textarea></div>
         <input type="hidden" id="sp-input-module-id" value="${moduleId || ''}">
       </div>
       <div class="modal-footer">
@@ -958,12 +976,12 @@ window.SchoolCourses = {
     overlay.innerHTML = `<div class="modal" style="max-width:500px;">
       <div class="modal-header"><h3 class="modal-title">${lessonId ? 'Edit Lesson' : 'Add Lesson'}</h3><button class="modal-close" data-close-modal="modal-lesson-form"><span class="material-symbols-outlined">close</span></button></div>
       <div class="modal-body">
-        <div class="form-group"><label class="form-label">Lesson Title</label><input type="text" class="form-input" id="sp-input-lesson-title" value="${lessonData?.title || ''}" placeholder="e.g. Introduction to Algebra"></div>
+        <div class="form-group"><label class="form-label">Lesson Title</label><input type="text" class="form-input" id="sp-input-lesson-title" value="${eh(lessonData?.title || '')}" placeholder="e.g. Introduction to Algebra"></div>
         <div class="form-group" style="margin-top:10px;"><label class="form-label">Content Type</label>
           <select class="form-select" id="sp-input-lesson-type">${types.map(t => `<option value="${t}" ${lessonData?.content_type === t ? 'selected' : ''}>${t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ')}</option>`).join('')}</select>
         </div>
-        <div class="form-group" style="margin-top:10px;"><label class="form-label">Content URL</label><input type="text" class="form-input" id="sp-input-lesson-url" value="${lessonData?.content_url || ''}" placeholder="https://..."></div>
-        <div class="form-group" style="margin-top:10px;"><label class="form-label">Duration (minutes)</label><input type="number" class="form-input" id="sp-input-lesson-duration" value="${lessonData?.duration || ''}" placeholder="e.g. 15" min="0" style="width:120px;"></div>
+        <div class="form-group" style="margin-top:10px;"><label class="form-label">Content URL</label><input type="text" class="form-input" id="sp-input-lesson-url" value="${eh(lessonData?.content_url || '')}" placeholder="https://..."></div>
+        <div class="form-group" style="margin-top:10px;"><label class="form-label">Duration (minutes)</label><input type="number" class="form-input" id="sp-input-lesson-duration" value="${eh(lessonData?.duration || '')}" placeholder="e.g. 15" min="0" style="width:120px;"></div>
         <input type="hidden" id="sp-input-lesson-module" value="${moduleId}">
         <input type="hidden" id="sp-input-lesson-id" value="${lessonId || ''}">
       </div>
@@ -996,7 +1014,7 @@ window.SchoolAssignments = {
         <div class="page-header-left">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
             <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-            <span style="font-size:12px;color:var(--text-secondary);">${school.name}</span>
+            <span style="font-size:12px;color:var(--text-secondary);">${eh(school.name)}</span>
           </div>
           <h1 class="page-title">Assignments</h1><p class="page-subtitle">Enroll students in courses.</p>
         </div>
@@ -1011,9 +1029,9 @@ window.SchoolAssignments = {
             const student = students.find(s => s.id === e.student_id);
             const course = courses.find(c => c.id === e.course_id);
             return `<tr>
-              <td><div style="display:flex;align-items:center;gap:8px;"><div class="user-avatar" style="width:28px;height:28px;font-size:10px;">${AppUtils.getInitials(student?.name || '')}</div><span class="font-semibold">${student?.name || 'Unknown'}</span></div></td>
-              <td style="font-size:13px;">${course?.name || 'Unknown'}</td>
-              <td><span class="status-badge ${e.status === 'active' ? 'status-active' : e.status === 'completed' ? 'status-active' : 'status-suspended'}">${e.status}</span></td>
+              <td><div style="display:flex;align-items:center;gap:8px;"><div class="user-avatar" style="width:28px;height:28px;font-size:10px;">${AppUtils.getInitials(student?.name || '')}</div><span class="font-semibold">${eh(student?.name || 'Unknown')}</span></div></td>
+              <td style="font-size:13px;">${eh(course?.name || 'Unknown')}</td>
+              <td><span class="status-badge ${e.status === 'active' ? 'status-active' : e.status === 'completed' ? 'status-active' : 'status-suspended'}">${eh(e.status)}</span></td>
               <td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(e.created_at)}</td>
               <td class="td-actions"><button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="sp-remove-enrollment" data-id="${e.id}" title="Remove"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button></td>
             </tr>`;
@@ -1068,9 +1086,9 @@ window.SchoolReports = {
         <div class="page-header-left">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
             <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-            <span style="font-size:12px;color:var(--text-secondary);">${school.name}</span>
+            <span style="font-size:12px;color:var(--text-secondary);">${eh(school.name)}</span>
           </div>
-          <h1 class="page-title">Reports</h1><p class="page-subtitle">Platform analytics and insights for ${school.name}.</p>
+          <h1 class="page-title">Reports</h1><p class="page-subtitle">Platform analytics and insights for ${eh(school.name)}.</p>
         </div>
         <button class="btn btn-secondary btn-sm" style="height:34px;font-size:11px;" data-action="sp-export-csv" data-entity="reports"><span class="material-symbols-outlined" style="font-size:14px;">download</span> Export Report</button>
       </div>
@@ -1109,7 +1127,7 @@ window.SchoolReports = {
           const cEnrollments = enrollments.filter(e => e.course_id === c.id);
           const completed = cEnrollments.filter(e => e.status === 'completed').length;
           const rate = cEnrollments.length > 0 ? Math.round((completed / cEnrollments.length) * 100) : 0;
-          return `<tr><td><span class="font-semibold">${c.name}</span></td><td>${cEnrollments.length}</td><td>${cEnrollments.filter(e => e.status === 'active').length}</td><td>${completed}</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${rate}%;background:${rate > 50 ? 'var(--success)' : rate > 20 ? 'var(--warning)' : 'var(--danger)'};border-radius:3px;"></div></div><span style="font-size:12px;font-weight:600;">${rate}%</span></div></td></tr>`;
+          return `<tr><td><span class="font-semibold">${eh(c.name)}</span></td><td>${cEnrollments.length}</td><td>${cEnrollments.filter(e => e.status === 'active').length}</td><td>${completed}</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${rate}%;background:${rate > 50 ? 'var(--success)' : rate > 20 ? 'var(--warning)' : 'var(--danger)'};border-radius:3px;"></div></div><span style="font-size:12px;font-weight:600;">${rate}%</span></div></td></tr>`;
         }).join('')}</tbody></table></div>`}
       </div>
     </div>`;
@@ -1137,7 +1155,7 @@ window.SchoolNotifications = {
         <div class="page-header-left">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
             <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-            <span style="font-size:12px;color:var(--text-secondary);">${school.name}</span>
+            <span style="font-size:12px;color:var(--text-secondary);">${eh(school.name)}</span>
           </div>
           <h1 class="page-title">Notifications</h1><p class="page-subtitle">Stay updated with platform activity.</p>
         </div>
@@ -1159,8 +1177,8 @@ window.SchoolNotifications = {
           <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border);${!n.is_read ? 'background:var(--primary-subtle);' : ''}">
             <div style="width:8px;height:8px;border-radius:50%;background:${n.is_read ? 'var(--border)' : 'var(--primary)'};margin-top:6px;flex-shrink:0;cursor:pointer;" data-action="sp-mark-notification-read" data-id="${n.id}" title="${n.is_read ? 'Read' : 'Mark as read'}"></div>
             <div style="flex:1;">
-              <div style="font-size:13px;font-weight:600;">${n.title}</div>
-              ${n.message ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${n.message}</div>` : ''}
+              <div style="font-size:13px;font-weight:600;">${eh(n.title)}</div>
+              ${n.message ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${eh(n.message)}</div>` : ''}
               <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">${AppUtils.formatDate(n.created_at)}</div>
             </div>
             <div style="display:flex;gap:4px;">
@@ -1184,7 +1202,7 @@ window.SchoolSettings = {
         <div class="page-header-left">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
             <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-            <span style="font-size:12px;color:var(--text-secondary);">${school.name}</span>
+            <span style="font-size:12px;color:var(--text-secondary);">${eh(school.name)}</span>
           </div>
           <h1 class="page-title">School Settings</h1><p class="page-subtitle">Manage school configuration.</p>
         </div>
@@ -1192,9 +1210,9 @@ window.SchoolSettings = {
       <div class="card" style="max-width:600px;">
         <div class="card-header"><h3 class="card-title">General</h3></div>
         <div style="padding:20px;">
-          <div class="form-group"><label class="form-label">School Name</label><input type="text" class="form-input" id="sp-setting-name" value="${school.name}"></div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">School Code</label><input type="text" class="form-input" id="sp-setting-code" value="${school.code || ''}"></div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">Principal Name</label><input type="text" class="form-input" id="sp-setting-principal" value="${school.principal_name || ''}"></div>
+          <div class="form-group"><label class="form-label">School Name</label><input type="text" class="form-input" id="sp-setting-name" value="${eh(school.name)}"></div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">School Code</label><input type="text" class="form-input" id="sp-setting-code" value="${eh(school.code || '')}"></div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">Principal Name</label><input type="text" class="form-input" id="sp-setting-principal" value="${eh(school.principal_name || '')}"></div>
           <div class="form-group" style="margin-top:16px;"><label class="form-label">Status</label>
             <select class="form-select" id="sp-setting-status">
               <option value="active" ${school.status === 'active' ? 'selected' : ''}>Active</option>
@@ -1220,6 +1238,7 @@ window.SchoolSettings = {
     try {
       await SchoolService.update(schoolId, { name, code, principal_name: principal, status });
       AppToast.show('School settings updated.', 'success');
+      AppStorage.invalidate();
       AppRouter.render();
     } catch (err) { AppToast.show(err.message || 'Failed to save settings.', 'error'); }
   }
@@ -1236,25 +1255,25 @@ window.SchoolProfile = {
         <div class="page-header-left">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
             <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-            <span style="font-size:12px;color:var(--text-secondary);">${school.name}</span>
+            <span style="font-size:12px;color:var(--text-secondary);">${eh(school.name)}</span>
           </div>
           <h1 class="page-title">My Profile</h1></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 2fr;gap:20px;">
         <div class="card" style="text-align:center;">
           <div class="user-avatar" style="width:64px;height:64px;font-size:24px;margin:0 auto 12px;">${AppUtils.getInitials(profile?.name || '')}</div>
-          <div style="font-size:16px;font-weight:600;">${profile?.name || 'User'}</div>
-          <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${profile?.role || ''}</div>
+          <div style="font-size:16px;font-weight:600;">${eh(profile?.name || 'User')}</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${eh(profile?.role || '')}</div>
           <div style="margin-top:12px;"><span class="status-badge status-active">Active</span></div>
         </div>
         <div class="card">
           <div class="card-header"><h3 class="card-title">Account Details</h3></div>
           <div style="padding:12px 0;">
             <div style="display:grid;grid-template-columns:120px 1fr;gap:12px;font-size:13px;">
-              <span style="color:var(--text-secondary);">Name:</span><span>${profile?.name || '—'}</span>
-              <span style="color:var(--text-secondary);">Role:</span><span><span class="status-badge" style="background:var(--primary-subtle);color:var(--primary);">${profile?.role === 'super_admin' ? 'Super Admin' : 'School Admin'}</span></span>
-              <span style="color:var(--text-secondary);">School:</span><span>${school.name}</span>
-              <span style="color:var(--text-secondary);">Principal:</span><span>${school.principal_name || '—'}</span>
+              <span style="color:var(--text-secondary);">Name:</span><span>${eh(profile?.name || '—')}</span>
+              <span style="color:var(--text-secondary);">Role:</span><span><span class="status-badge" style="background:var(--primary-subtle);color:var(--primary);">${AppUtils.escapeHtml(window.ROLE_LABELS?.[profile?.role] || profile?.role || 'School Admin')}</span></span>
+              <span style="color:var(--text-secondary);">School:</span><span>${eh(school.name)}</span>
+              <span style="color:var(--text-secondary);">Principal:</span><span>${eh(school.principal_name || '—')}</span>
               <span style="color:var(--text-secondary);">Joined:</span><span>${AppUtils.formatDate(profile?.created_at)}</span>
             </div>
           </div>
@@ -1287,9 +1306,9 @@ window.SchoolVideos = {
         <div class="page-header-left">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
             <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-            <span style="font-size:12px;color:var(--text-secondary);">${school.name}</span>
+            <span style="font-size:12px;color:var(--text-secondary);">${eh(school.name)}</span>
           </div>
-          <h1 class="page-title">Video Library</h1><p class="page-subtitle">Manage videos and media for ${school.name}.</p>
+          <h1 class="page-title">Video Library</h1><p class="page-subtitle">Manage videos and media for ${eh(school.name)}.</p>
         </div>
         <div style="display:flex;gap:8px;">
           <span style="font-size:11px;color:var(--text-muted);align-self:center;">${items.length} items</span>
@@ -1310,12 +1329,12 @@ window.SchoolVideos = {
         return `<div class="subject-card" style="padding:0;overflow:hidden;">
           <div style="aspect-ratio:16/9;background:${isVideo ? 'linear-gradient(135deg,#1A56DB 0%,#0A0D14 100%)' : '#F5F6F8'};display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" data-action="${isVideo ? 'sp-view-video' : 'preview-image'}" data-id="${m.id}">
             <i data-icon="${isVideo ? 'play_circle' : 'image'}" style="width:36px;height:36px;color:${isVideo ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)'};"></i>
-            ${isVideo && m.duration ? `<span style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.7);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;">${m.duration}</span>` : ''}
+            ${isVideo && m.duration ? `<span style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.7);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;">${eh(m.duration)}</span>` : ''}
           </div>
           <div style="padding:12px;">
-            <div style="font-size:14px;font-weight:600;">${m.name}</div>
-            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${m.type} · ${m.size || '—'}</div>
-            ${isVideo && stats.views ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${stats.views} views · ${stats.likes || 0} likes</div>` : ''}
+            <div style="font-size:14px;font-weight:600;">${eh(m.name)}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${eh(m.type)} · ${eh(m.size || '—')}</div>
+            ${isVideo && stats.views ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${eh(stats.views)} views · ${eh(stats.likes || 0)} likes</div>` : ''}
             <div style="display:flex;gap:8px;margin-top:8px;">
               ${isVideo ? `<button class="btn btn-primary btn-sm" style="flex:1;height:32px;font-size:12px;" data-action="sp-view-video" data-id="${m.id}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span> Details</button>` : `<button class="btn btn-primary btn-sm" style="flex:1;height:32px;font-size:12px;" data-action="preview-image" data-id="${m.id}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span> View</button>`}
               <button class="btn btn-ghost btn-sm" style="width:32px;height:32px;padding:0;" data-action="edit-content" data-id="${m.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
@@ -1352,16 +1371,16 @@ window.SchoolVideos = {
             <i data-icon="play_circle" style="width:48px;height:48px;color:rgba(255,255,255,0.8);"></i>
           </div>
 
-          <h2 style="font-size:18px;font-weight:700;margin:0 0 4px;">${video.name}</h2>
-          <p style="font-size:13px;color:var(--text-secondary);margin:0 0 16px;">${video.description || 'No description available.'}</p>
+          <h2 style="font-size:18px;font-weight:700;margin:0 0 4px;">${eh(video.name)}</h2>
+          <p style="font-size:13px;color:var(--text-secondary);margin:0 0 16px;">${eh(video.description || 'No description available.')}</p>
 
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
             <div style="padding:10px;background:#eff6ff;border-radius:8px;text-align:center;">
-              <div style="font-size:18px;font-weight:700;color:#3b82f6;">${stats.views}</div>
+              <div style="font-size:18px;font-weight:700;color:#3b82f6;">${eh(stats.views)}</div>
               <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Views</div>
             </div>
             <div style="padding:10px;background:#f0fdf4;border-radius:8px;text-align:center;">
-              <div style="font-size:18px;font-weight:700;color:#10b981;">${stats.likes}</div>
+              <div style="font-size:18px;font-weight:700;color:#10b981;">${eh(stats.likes)}</div>
               <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Likes</div>
             </div>
             <div style="padding:10px;background:#fffbeb;border-radius:8px;text-align:center;">
@@ -1369,7 +1388,7 @@ window.SchoolVideos = {
               <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Completion</div>
             </div>
             <div style="padding:10px;background:#f5f3ff;border-radius:8px;text-align:center;">
-              <div style="font-size:18px;font-weight:700;color:#8b5cf6;">${stats.avgWatch}</div>
+              <div style="font-size:18px;font-weight:700;color:#8b5cf6;">${eh(stats.avgWatch)}</div>
               <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Avg Watch</div>
             </div>
           </div>
@@ -1378,11 +1397,11 @@ window.SchoolVideos = {
             <div>
               <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Details</div>
               <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Duration</span><span style="font-weight:500;">${video.duration || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Category</span><span style="font-weight:500;">${category?.name || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Subject</span><span style="font-weight:500;">${subject?.name || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Section</span><span style="font-weight:500;">${section?.name || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Uploaded By</span><span style="font-weight:500;">${video.uploaded_by || '—'}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Duration</span><span style="font-weight:500;">${eh(video.duration || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Category</span><span style="font-weight:500;">${eh(category?.name || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Subject</span><span style="font-weight:500;">${eh(subject?.name || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Section</span><span style="font-weight:500;">${eh(section?.name || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Uploaded By</span><span style="font-weight:500;">${eh(video.uploaded_by || '—')}</span></div>
               </div>
             </div>
             <div>
@@ -1391,7 +1410,7 @@ window.SchoolVideos = {
                 <div style="width:72px;height:72px;border-radius:50%;background:conic-gradient(#10b981 ${completionPct * 3.6}deg, var(--border) ${completionPct * 3.6}deg);display:flex;align-items:center;justify-content:center;">
                   <div style="width:56px;height:56px;border-radius:50%;background:var(--card-bg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#10b981;">${completionPct}%</div>
                 </div>
-                <div style="font-size:12px;color:var(--text-secondary);">${stats.completions} of ${stats.views} viewers completed this video</div>
+                <div style="font-size:12px;color:var(--text-secondary);">${eh(stats.completions)} of ${eh(stats.views)} viewers completed this video</div>
               </div>
             </div>
           </div>
@@ -1403,8 +1422,8 @@ window.SchoolVideos = {
               return `<div style="display:flex;gap:10px;padding:8px;border:1px solid var(--border-light);border-radius:8px;cursor:pointer;" data-action="sp-view-video" data-id="${r.id}">
                 <div style="width:60px;height:40px;border-radius:6px;background:linear-gradient(135deg,#1A56DB 0%,#0A0D14 100%);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span class="material-symbols-outlined" style="font-size:16px;color:rgba(255,255,255,0.6);">play_circle</span></div>
                 <div style="flex:1;min-width:0;">
-                  <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.name}</div>
-                  <div style="font-size:10px;color:var(--text-muted);">${rStats.views || 0} views</div>
+                  <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${eh(r.name)}</div>
+                  <div style="font-size:10px;color:var(--text-muted);">${eh(rStats.views || 0)} views</div>
                 </div>
               </div>`;
             }).join('')}</div>

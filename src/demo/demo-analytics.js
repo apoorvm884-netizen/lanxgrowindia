@@ -7,6 +7,8 @@
 // No Supabase queries. No production backend.
 // ============================================================
 
+const eh = window.AppUtils.escapeHtml;
+
 // ------------------------------------------------------------------
 // ANALYTICS DATA GENERATION
 // ------------------------------------------------------------------
@@ -266,7 +268,7 @@ function renderVideoAnalytics(container, content) {
             <div style="display:flex;align-items:center;gap:10px;">
               <span style="font-size:13px;font-weight:600;width:20px;color:var(--text-muted);">${i + 1}</span>
               <div style="flex:1;">
-                <div style="font-size:13px;font-weight:500;">${v.name}</div>
+                <div style="font-size:13px;font-weight:500;">${eh(v.name)}</div>
                 <div style="font-size:11px;color:var(--text-secondary);">${v.stats.views} views · ${v.stats.completions} completed</div>
               </div>
               <div style="text-align:right;">
@@ -284,7 +286,7 @@ function renderVideoAnalytics(container, content) {
             <div style="display:flex;align-items:center;gap:10px;">
               <span style="font-size:13px;font-weight:600;width:20px;color:var(--text-muted);">${i + 1}</span>
               <div style="flex:1;">
-                <div style="font-size:13px;font-weight:500;">${v.name}</div>
+                <div style="font-size:13px;font-weight:500;">${eh(v.name)}</div>
                 <div style="font-size:11px;color:var(--text-secondary);">${v.stats.views} views · ${v.stats.likes} likes</div>
               </div>
               <div style="text-align:right;">
@@ -348,10 +350,10 @@ function renderStudentAnalytics(container, students) {
             <div style="display:grid;grid-template-columns:40px 1fr 80px 100px 100px 80px;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border-light);background:${i === 0 ? 'linear-gradient(135deg,rgba(255,215,0,0.05),transparent)' : ''};">
               <div style="display:flex;align-items:center;justify-content:center;">${medal}</div>
               <div>
-                <div style="font-size:13px;font-weight:600;">${s.name}</div>
+                <div style="font-size:13px;font-weight:600;">${eh(s.name)}</div>
                 <div style="font-size:11px;color:var(--text-secondary);">${a.videosWatched} videos · ${a.coursesCompleted} courses</div>
               </div>
-              <div style="font-size:13px;color:var(--text-secondary);">${s.class}</div>
+              <div style="font-size:13px;color:var(--text-secondary);">${eh(s.class)}</div>
               <div style="font-size:13px;">${s.attendance}% ${s.attendance >= 90 ? badge('Excellent', '#10b981') : s.attendance < 80 ? badge('Low', '#ef4444') : ''}</div>
               <div style="font-size:15px;font-weight:700;color:${scoreColor};">${a.score}</div>
               <div style="display:flex;align-items:center;gap:6px;">
@@ -447,8 +449,8 @@ function renderCounselorAnalytics(container, counselors, students) {
           return `
             <div style="display:grid;grid-template-columns:1fr 100px 100px 100px 100px 80px;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border-light);background:${i === 0 ? 'linear-gradient(135deg,rgba(16,185,129,0.05),transparent)' : ''};">
               <div>
-                <div style="font-size:13px;font-weight:600;">${c.name}</div>
-                <div style="font-size:11px;color:var(--text-secondary);">${c.department} · Top: ${c.perf.topStudent}</div>
+                <div style="font-size:13px;font-weight:600;">${eh(c.name)}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">${eh(c.department)} · Top: ${eh(c.perf.topStudent)}</div>
               </div>
               <div style="font-size:14px;font-weight:600;">${c.assignedStudents}</div>
               <div style="font-size:13px;">${c.avgProgress}%</div>
@@ -496,7 +498,7 @@ function renderAttendanceInsights(container, students) {
           ? '<div style="font-size:13px;color:var(--text-secondary);">No students with critically low attendance.</div>'
           : `<div style="display:flex;flex-direction:column;gap:8px;">${lowAttendance.map(s => `
             <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:#fef2f2;border-radius:8px;">
-              <span style="font-size:13px;font-weight:500;">${s.name}</span>
+              <span style="font-size:13px;font-weight:500;">${eh(s.name)}</span>
               <span style="font-size:13px;font-weight:600;color:#ef4444;">${s.attendance}%</span>
             </div>`).join('')}</div>`, '')
         }
@@ -504,7 +506,7 @@ function renderAttendanceInsights(container, students) {
           ? '<div style="font-size:13px;color:var(--text-secondary);">No students with exceptional attendance.</div>'
           : `<div style="display:flex;flex-direction:column;gap:8px;">${highAttendance.map(s => `
             <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:#f0fdf4;border-radius:8px;">
-              <span style="font-size:13px;font-weight:500;">${s.name}</span>
+              <span style="font-size:13px;font-weight:500;">${eh(s.name)}</span>
               <span style="font-size:13px;font-weight:600;color:#10b981;">${s.attendance}%</span>
             </div>`).join('')}</div>`, '')
         }
@@ -572,8 +574,8 @@ function renderAtRiskStudents(container, students) {
                     <span class="material-symbols-outlined" style="font-size:18px;color:#ef4444;">warning</span>
                   </div>
                   <div>
-                    <div style="font-size:14px;font-weight:600;">${s.name}</div>
-                    <div style="font-size:11px;color:var(--text-secondary);">${s.class} · ${s.section}</div>
+                    <div style="font-size:14px;font-weight:600;">${eh(s.name)}</div>
+                    <div style="font-size:11px;color:var(--text-secondary);">${eh(s.class)} · ${eh(s.section)}</div>
                   </div>
                   <span style="margin-left:auto;font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;background:#fef2f2;color:#ef4444;">At Risk</span>
                 </div>
@@ -606,7 +608,7 @@ function renderRecommendations(container) {
             <div style="width:36px;height:36px;border-radius:8px;background:${c}15;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
               <span class="material-symbols-outlined" style="font-size:18px;color:${c};">${r.icon}</span>
             </div>
-            <div style="font-size:13px;line-height:1.5;color:var(--text-primary);">${r.text}</div>
+            <div style="font-size:13px;line-height:1.5;color:var(--text-primary);">${eh(r.text)}</div>
           </div>`;
       }).join('')}
     </div>
@@ -658,7 +660,7 @@ function renderLeaderboards(container, students, content, courses, counselors) {
       ${items.map((item, i) => `
         <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:${i === 0 ? `linear-gradient(135deg,${color}08,transparent)` : 'transparent'};border-radius:8px;">
           ${i < 3 ? MEDAL_HTML[i] : `<span style="font-size:12px;font-weight:700;color:var(--text-muted);width:20px;text-align:center;">#${i + 1}</span>`}
-          <div style="flex:1;font-size:13px;font-weight:500;">${item[nameKey]}</div>
+          <div style="flex:1;font-size:13px;font-weight:500;">${eh(item[nameKey])}</div>
           <div style="font-size:13px;font-weight:600;color:${color};">${item[valueKey]}${valueLabel ? ` ${valueLabel}` : ''}</div>
         </div>
       `).join('')}
@@ -666,12 +668,12 @@ function renderLeaderboards(container, students, content, courses, counselors) {
 
   container.innerHTML += section('Leaderboards', 'Top performers across all categories', `
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
-      ${card('Top Students', renderLeaderboard(topStudents, 'name', 'analytics', 'score', '#3b82f6'), '<span style="font-size:11px;color:var(--text-secondary);">By Learning Score</span>')}
+      ${card('Top Students', renderLeaderboard(topStudents.map(s => ({ ...s, score: s.analytics.score })), 'name', 'score', '', '#3b82f6'), '<span style="font-size:11px;color:var(--text-secondary);">By Learning Score</span>')}
       ${card('Top Courses', renderLeaderboard(topCourses, 'name', 'enrollCount', 'enrolled', '#8b5cf6'), '<span style="font-size:11px;color:var(--text-secondary);">By Enrollments</span>')}
       ${card('Top Videos', renderLeaderboard(topContent, 'name', 'views', 'views', '#f59e0b'), '<span style="font-size:11px;color:var(--text-secondary);">By Views</span>')}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
-      ${card('Top Counselors', renderLeaderboard(counselors.sort((a, b) => (COUNSELOR_PERF[b.id]?.completionRate || 0) - (COUNSELOR_PERF[a.id]?.completionRate || 0)).slice(0, 5), 'name', 'perf', 'completionRate', '#10b981'), '<span style="font-size:11px;color:var(--text-secondary);">By Completion Rate</span>')}
+      ${card('Top Counselors', renderLeaderboard(counselors.map(c => ({ ...c, completionRate: COUNSELOR_PERF[c.id]?.completionRate || 0 })).sort((a, b) => b.completionRate - a.completionRate).slice(0, 5), 'name', 'completionRate', '%', '#10b981'), '<span style="font-size:11px;color:var(--text-secondary);">By Completion Rate</span>')}
       ${card('Top Categories', renderLeaderboard(TRENDING_CATEGORIES, 'name', 'count', 'activities', '#ef4444'), '<span style="font-size:11px;color:var(--text-secondary);">By Activity</span>')}
     </div>
   `);
@@ -715,10 +717,10 @@ export function renderSchoolIntelligence(container, school, data) {
             <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard">
               <span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span>
             </button>
-            <span style="font-size:12px;color:var(--text-secondary);">${school?.name || 'School'}</span>
+            <span style="font-size:12px;color:var(--text-secondary);">${eh(school?.name || 'School')}</span>
           </div>
           <h1 style="font-size:22px;font-weight:700;margin:0;">School Intelligence</h1>
-          <p style="margin:4px 0 0;font-size:13px;color:var(--text-secondary);">AI-powered analytics and insights for ${school?.name || 'your school'}</p>
+          <p style="margin:4px 0 0;font-size:13px;color:var(--text-secondary);">AI-powered analytics and insights for ${eh(school?.name || 'your school')}</p>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="font-size:11px;padding:4px 10px;border-radius:20px;background:#f0fdf4;color:#10b981;font-weight:600;display:flex;align-items:center;gap:4px;">

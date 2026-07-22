@@ -337,15 +337,43 @@ tr:hover td { background: var(--surface-low); }
     <div class="card" style="padding:32px;">
       <h2 style="font-size:18px;font-weight:600;margin-bottom:24px;color:var(--on-surface);text-align:center;">Sign in to your account</h2>
       <form id="login-form" autocomplete="off">
-        <div style="margin-bottom:16px;">
-          <label class="form-label" for="login-email">Email</label>
-          <input class="form-input" type="email" id="login-email" placeholder="Enter your email" required autocomplete="email">
+        <div id="login-form-container">
+          <div style="margin-bottom:16px;">
+            <label class="form-label" for="login-email">Email</label>
+            <input class="form-input" type="email" id="login-email" placeholder="Enter your email" required autocomplete="email">
+          </div>
+          <div style="margin-bottom:16px;">
+            <label class="form-label" for="login-password">Password</label>
+            <input class="form-input" type="password" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
+          </div>
+          <div style="text-align:right;margin-bottom:4px;">
+            <button type="button" id="btn-forgot-password" style="background:none;border:none;font-size:12px;color:var(--primary);cursor:pointer;font-weight:500;">Forgot Password?</button>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full" style="margin-top:4px;">Sign In</button>
         </div>
-        <div style="margin-bottom:16px;">
-          <label class="form-label" for="login-password">Password</label>
-          <input class="form-input" type="password" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
+        <div id="forgot-password-container" style="display:none;">
+          <div style="margin-bottom:12px;">
+            <label class="form-label" for="forgot-email">Email Address</label>
+            <input class="form-input" type="email" id="forgot-email" placeholder="Enter your registered email">
+          </div>
+          <button type="button" class="btn btn-primary btn-full" id="btn-send-reset-link" style="margin-bottom:12px;">Send Reset Link</button>
+          <div id="forgot-success" style="display:none;text-align:center;font-size:13px;color:var(--success);margin-bottom:12px;padding:12px;background:var(--success-light);border-radius:var(--radius-md);">Reset link sent! Check your email.</div>
+          <div id="forgot-error" style="display:none;text-align:center;font-size:13px;color:var(--danger);margin-bottom:12px;"></div>
+          <button type="button" class="btn btn-ghost btn-full" id="btn-back-to-login" style="font-size:12px;">Back to Sign In</button>
         </div>
-        <button type="submit" class="btn btn-primary btn-full" style="margin-top:4px;">Sign In</button>
+        <div id="reset-password-container" style="display:none;">
+          <div style="margin-bottom:12px;">
+            <label class="form-label" for="reset-new-password">New Password</label>
+            <input class="form-input" type="password" id="reset-new-password" placeholder="At least 6 characters" minlength="6">
+          </div>
+          <div style="margin-bottom:12px;">
+            <label class="form-label" for="reset-confirm-password">Confirm New Password</label>
+            <input class="form-input" type="password" id="reset-confirm-password" placeholder="Re-enter new password">
+          </div>
+          <button type="button" class="btn btn-primary btn-full" id="btn-update-password" style="margin-bottom:12px;">Update Password</button>
+          <div id="reset-success" style="display:none;text-align:center;font-size:13px;color:var(--success);margin-bottom:12px;padding:12px;background:var(--success-light);border-radius:var(--radius-md);">Password updated successfully! Sign in with your new password.</div>
+          <div id="reset-error" style="display:none;text-align:center;font-size:13px;color:var(--danger);margin-bottom:12px;"></div>
+        </div>
         <div style="position:relative;text-align:center;margin:16px 0;">
           <span style="background:var(--surface);padding:0 10px;font-size:12px;color:var(--text-muted);position:relative;z-index:1;">or continue with</span>
           <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:var(--border);"></div>
