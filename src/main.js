@@ -501,7 +501,8 @@ window.AppRouter = {
   _currentProfile: null,
   SCHOOL_ROUTES: ['school-dashboard','school-categories','school-subjects','school-sections',
     'school-students','school-counselors','school-courses','school-videos',
-    'school-assignments','school-reports','school-notifications','school-settings','school-profile'],
+    'school-drive','school-assignments','school-reports','school-notifications',
+    'school-settings','school-profile'],
   COMPANY_ROUTES: ['company-dashboard','schools','content-manager','drive-manager',
     'media-library','school-admins','roles-permissions','company-settings','audit-log'],
 
@@ -805,6 +806,45 @@ window.AppRouter = {
             </div>
           </div>
         </div>
+
+        ${recentContent.length > 0 ? `<div class="card" style="padding:20px;margin-top:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h3 style="margin:0;font-size:14px;font-weight:600;">Recently Uploaded Content</h3>
+            <button class="btn btn-ghost btn-sm" style="font-size:11px;" data-action="navigate" data-route="school-videos">View All</button>
+          </div>
+          <div class="subjects-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;">${recentContent.map(c => {
+            const isVideo = c.type === 'Video';
+            return `<div class="subject-card" style="padding:0;overflow:hidden;cursor:pointer;" data-action="${isVideo ? 'play-video' : 'preview-image'}" data-id="${c.id}">
+              <div style="aspect-ratio:16/9;background:${isVideo ? 'linear-gradient(135deg,#1A56DB 0%,#0A0D14 100%)' : '#F5F6F8'};display:flex;align-items:center;justify-content:center;">
+                <i data-icon="${isVideo ? 'play_circle' : 'image'}" style="width:32px;height:32px;color:${isVideo ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)'};"></i>
+              </div>
+              <div style="padding:10px;">
+                <div style="font-size:13px;font-weight:600;">${AppUtils.escapeHtml(c.name)}</div>
+                <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">${AppUtils.escapeHtml(c.type)} · ${AppUtils.escapeHtml(c.size || '—')}</div>
+              </div>
+            </div>`;
+          }).join('')}</div>
+        </div>` : ''}
+
+        ${schoolCourses.slice(0, 5).length > 0 ? `<div class="card" style="padding:20px;margin-top:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h3 style="margin:0;font-size:14px;font-weight:600;">Recent Courses</h3>
+            <button class="btn btn-ghost btn-sm" style="font-size:11px;" data-action="navigate" data-route="school-courses">View All</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;">${schoolCourses.slice(0, 5).map(c => {
+            const cat = data.categories.find(cat => cat.id === c.category_id);
+            const sub = data.subjects.find(sub => sub.id === c.subject_id);
+            return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);">
+              <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--primary),#6366f1);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;">${AppUtils.getInitials(c.name)}</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:500;">${AppUtils.escapeHtml(c.name)}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">${cat ? AppUtils.escapeHtml(cat.name) : ''}${sub ? ' · ' + AppUtils.escapeHtml(sub.name) : ''}</div>
+              </div>
+              <span style="font-size:11px;padding:2px 6px;border-radius:4px;background:${c.difficulty === 'beginner' ? '#f0fdf4' : c.difficulty === 'advanced' ? '#fef2f2' : '#fffbeb'};color:${c.difficulty === 'beginner' ? '#16a34a' : c.difficulty === 'advanced' ? '#dc2626' : '#d97706'};">${AppUtils.escapeHtml(c.difficulty || 'intermediate')}</span>
+              <span class="status-badge ${c.publish_status === 'published' ? 'status-active' : 'status-pending'}">${AppUtils.escapeHtml(c.publish_status || 'draft')}</span>
+            </div>`;
+          }).join('')}</div>
+        </div>` : ''}
       </div>`;
       initIcons();
       return;
@@ -991,6 +1031,10 @@ window.AppRouter = {
       window.SchoolCourses.render(main, data, school);
       return;
     }
+    if (this.currentRoute === 'school-drive') {
+      await this.renderSchoolDrive(main, data, school, schoolId);
+      return;
+    }
     if (this.currentRoute === 'school-videos') {
       window.SchoolVideos.render(main, data, school);
       return;
@@ -1020,6 +1064,42 @@ window.AppRouter = {
     initIcons();
   },
 
+  // --- SCHOOL DRIVE MANAGER ---
+  async renderSchoolDrive(main, data, school, schoolId) {
+    const cats = data.categories.filter(c => c.school_id === schoolId);
+    const subjects = data.subjects.filter(s => s.school_id === schoolId);
+    const content = data.content.filter(c => c.school_id === schoolId);
+    const sections = data.sections.filter(s => s.school_id === schoolId);
+    main.innerHTML = `<div class="fade-in">
+      <div class="page-header">
+        <div class="page-header-left">
+          <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;margin-bottom:4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
+          <h1 class="page-title">Drive</h1><p class="page-subtitle">Google Drive folders linked to ${AppUtils.escapeHtml(school.name)}.</p>
+        </div>
+      </div>
+      <div class="explorer-layout" style="min-height:400px;">
+        <div class="explorer-panel" style="width:240px;">
+          <div class="explorer-header"><span class="material-symbols-outlined" style="font-size:18px;">folder</span> Structure</div>
+          <div class="explorer-tree" id="school-drive-tree">${['school','category','subject','section'].map(type => {
+            const items = type === 'school' ? [school] : type === 'category' ? cats : type === 'subject' ? subjects : sections;
+            return items.map(item => {
+              const label = item.name || item.code || item.id;
+              const hasDrive = item.drive_folder_id ? '<span style="margin-left:auto;font-size:10px;color:var(--primary);">🔗</span>' : '';
+              return `<div class="explorer-item" data-action="school-drive-select" data-type="${type}" data-id="${item.id}" style="${type !== 'school' ? `padding-left:${type === 'category' ? 16 : type === 'subject' ? 32 : 48}px` : ''}">
+                <i data-icon="${type === 'school' ? 'building-2' : type === 'category' ? 'folder' : type === 'subject' ? 'book-open' : 'folder-kanban'}" style="width:16px;height:16px;"></i>
+                <span>${AppUtils.escapeHtml(label)}</span>${hasDrive}
+              </div>`;
+            }).join('');
+          }).join('')}</div>
+        </div>
+        <div class="explorer-content" id="school-drive-content">
+          <div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">cloud</span><h3>Select an item</h3><p>Choose a category, subject, or section from the tree to view or link a Google Drive folder.</p></div>
+        </div>
+      </div>
+    </div>`;
+    initIcons();
+  },
+
   // --- CONTENT MANAGER ---
   async renderContentManager(main) {
     const data = await AppStorage.load();
@@ -1029,7 +1109,7 @@ window.AppRouter = {
     schools.forEach(s => { schoolsById[s.id] = s; });
     main.innerHTML = `<div class="fade-in">
       <div class="page-header">
-        <div class="page-header-left"><h1 class="page-title">Content Manager</h1><p class="page-subtitle">Manage all content across the platform.</p></div>
+        <div class="page-header-left"><h1 class="page-title">Content Library</h1><p class="page-subtitle">Manage all content across the platform — videos, PDFs, images, documents, and more.</p></div>
         <button class="btn btn-primary" data-action="add-content"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add Content</button>
       </div>
       <div class="management-bar">
@@ -1039,15 +1119,18 @@ window.AppRouter = {
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
         ${items.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">folder</span><h3>No content yet</h3><p>Create your first content item.</p></div>`
-        : `<div class="table-container" id="content-table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>School</th><th>Status</th><th>Description</th><th>Updated</th><th style="width:120px;"></th></tr></thead><tbody>${items.map(c => {
+        : `<div class="table-container" id="content-table-wrapper"><table><thead><tr><th>Name</th><th>Type</th><th>School</th><th>Category</th><th>Subject</th><th>Status</th><th>Updated</th><th style="width:120px;"></th></tr></thead><tbody>${items.map(c => {
           const school = schoolsById[c.school_id] || {};
+          const cat = data.categories.find(cat => cat.id === c.category_id);
+          const sub = data.subjects.find(sub => sub.id === c.subject_id);
           const typeIcons = { Video: 'videocam', PDF: 'description', Image: 'image', Document: 'description' };
           return `<tr>
             <td><div class="flex-center gap-10" style="justify-content:flex-start;"><i data-icon="${typeIcons[c.type] || 'insert_drive_file'}" style="width:16px;height:16px;color:var(--primary);"></i><span class="font-semibold">${AppUtils.escapeHtml(c.name)}</span></div></td>
             <td style="font-size:13px;">${AppUtils.escapeHtml(c.type)}</td>
             <td style="font-size:13px;">${AppUtils.escapeHtml(school.name || '—')}</td>
+            <td style="font-size:13px;color:var(--text-secondary);">${cat ? AppUtils.escapeHtml(cat.name) : '—'}</td>
+            <td style="font-size:13px;color:var(--text-secondary);">${sub ? AppUtils.escapeHtml(sub.name) : '—'}</td>
             <td><span class="status-badge ${c.status === 'published' ? 'status-active' : c.status === 'draft' ? 'status-suspended' : 'status-pending'}">${AppUtils.escapeHtml(c.status)}</span></td>
-            <td style="font-size:13px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${AppUtils.escapeHtml(c.description || '')}</td>
             <td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.updated_at)}</td>
             <td class="td-actions"><button class="btn btn-ghost btn-sm" data-action="play-video" data-id="${c.id}" title="View"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span></button><button class="btn btn-ghost btn-sm" data-action="edit-content" data-id="${c.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:18px;">edit</span></button><button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-content" data-id="${c.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:18px;">delete</span></button></td></tr>`;
         }).join('')}</tbody></table></div>`}
@@ -2140,13 +2223,16 @@ window.AppGlobalSearch = {
     data.sections.forEach(sec => {
       if (sec.name.toLowerCase().includes(ql)) { const school = data.schools.find(s => s.id === sec.school_id); matches.push({ type: 'Section', label: sec.name, sub: school ? `in ${school.name}` : '', route: 'school-sections', schoolId: sec.school_id }); }
     });
+    (data.courses || []).forEach(c => {
+      if (c.name.toLowerCase().includes(ql)) { const school = data.schools.find(s => s.id === c.school_id); matches.push({ type: 'Course', label: c.name, sub: school ? `in ${school.name}` : `${c.difficulty || ''}`, route: 'school-courses', schoolId: c.school_id }); }
+    });
     data.content.forEach(c => {
       if (c.name.toLowerCase().includes(ql) || (c.tags && c.tags.some(t => t.toLowerCase().includes(ql)))) { const school = data.schools.find(s => s.id === c.school_id); matches.push({ type: `Content (${c.type})`, label: c.name, sub: school ? `in ${school.name}` : '', action: c.type === 'Video' ? 'play-video' : null, id: c.id }); }
     });
     if (matches.length === 0) {
       results.innerHTML = '<div class="empty-state" style="padding:32px 24px;"><i data-icon="search-x" style="width:32px;height:32px;color:var(--text-muted);"></i><h3 style="font-size:14px;">No results</h3><p style="font-size:13px;">Try a different search term.</p></div>';
     } else {
-      const typeIcons = { School: 'building-2', Category: 'folder-tree', Subject: 'book-open', Section: 'folder-kanban' };
+      const typeIcons = { School: 'building-2', Category: 'folder-tree', Subject: 'book-open', Section: 'folder-kanban', Course: 'auto_stories' };
       const eh = AppUtils.escapeHtml;
       results.innerHTML = `<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;padding:8px 20px 4px;">${matches.length} result${matches.length > 1 ? 's' : ''}</div>
       ${matches.slice(0, 15).map(m => { const icon = typeIcons[m.type.split(' ')[0]] || 'file'; const action = m.action || 'global-search-nav'; return `<div class="explorer-item" style="padding:10px 20px;border-radius:0;" data-action="${action}" data-route="${m.route || ''}" data-id="${m.id || ''}" data-school-id="${m.schoolId || ''}" data-cat-id="${m.catId || ''}"><i data-icon="${icon}" style="width:16px;height:16px;color:var(--primary);"></i><div style="flex:1;"><div style="font-size:13px;font-weight:500;">${eh(m.label)}</div><div style="font-size:11px;color:var(--text-muted);">${eh(m.type)} ${eh(m.sub)}</div></div></div>`; }).join('')}`;
@@ -2619,6 +2705,38 @@ document.addEventListener('click', async function (e) {
     const schoolId = el.dataset.schoolId;
     const isCategory = data.categories.some(c => c.id === id);
     AppDriveManager.showFolder(data, schoolId, id, isCategory ? 'category' : 'subject');
+    return;
+  }
+  if (action === 'school-drive-select') {
+    const data = await AppStorage.load();
+    const type = el.dataset.type;
+    const container = document.getElementById('school-drive-content');
+    if (!container) return;
+    const entity = type === 'school' ? data.schools.find(s => s.id === id) : type === 'category' ? data.categories.find(c => c.id === id) : type === 'subject' ? data.subjects.find(s => s.id === id) : data.sections.find(s => s.id === id);
+    if (!entity) return;
+    const driveId = entity.drive_folder_id || '';
+    const entityType = type;
+    const contentFiles = type === 'section' ? data.content.filter(c => c.section_id === id) : [];
+    container.innerHTML = `<div style="padding:20px 24px;border-bottom:1px solid var(--border);">
+      <div style="font-size:12px;color:var(--text-secondary);">${AppUtils.escapeHtml(school.name)} / ${type}</div>
+      <div style="font-size:16px;font-weight:600;margin-top:2px;">${AppUtils.escapeHtml(entity.name || '')}</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${contentFiles.length} files</div>
+    </div>
+    <div style="padding:16px 24px;border-bottom:1px solid var(--border);">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Google Drive Folder</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" class="form-input" id="drive-link-input" placeholder="Paste Google Drive folder link..." value="${driveId ? `https://drive.google.com/drive/folders/${driveId}` : ''}" style="flex:1;height:40px;font-size:13px;">
+        <button class="btn btn-primary btn-sm" data-action="drive-link-save" data-entity-type="${entityType}" data-entity-id="${id}" style="height:40px;">${driveId ? 'Update' : 'Link'}</button>
+        ${driveId ? `<button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="drive-link-remove" data-entity-type="${entityType}" data-entity-id="${id}" style="height:40px;"><span class="material-symbols-outlined" style="font-size:18px;">delete</span></button>` : ''}
+      </div>
+      <div id="drive-link-status" style="font-size:12px;margin-top:6px;color:${driveId ? 'var(--success)' : 'var(--text-muted)'};">${driveId ? `Linked folder: <code style="background:var(--border-light);padding:2px 6px;border-radius:4px;">${driveId}</code>` : 'No Drive folder linked yet.'}</div>
+    </div>
+    <div style="padding:16px 24px;">
+      ${contentFiles.length === 0 ? `<div class="empty-state" style="padding:24px;"><span class="material-symbols-outlined" style="font-size:36px;">folder_open</span><h3>No files</h3><p>Content uploaded to this ${type} will appear here.</p></div>`
+      : `<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Files</div>
+        <div class="table-container"><table><thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Updated</th></tr></thead><tbody>${contentFiles.map(f => `<tr><td><span class="font-semibold">${AppUtils.escapeHtml(f.name)}</span></td><td style="font-size:13px;">${AppUtils.escapeHtml(f.type)}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.escapeHtml(f.size || '—')}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(f.updated_at)}</td></tr>`).join('')}</tbody></table></div>`}
+    </div>`;
+    initIcons();
     return;
   }
 

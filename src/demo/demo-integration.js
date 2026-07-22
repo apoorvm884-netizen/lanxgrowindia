@@ -445,7 +445,7 @@ if (DEMO_MODE) {
       w.CourseService.getBySchool = async (schoolId) => COURSES.filter((c) => c.school_id === schoolId);
       w.CourseService.getById = async (id) => COURSES.find((c) => c.id === id);
       w.CourseService.create = async (data) => {
-        const c = { id: newDemoId('course'), ...data, status: data.status || 'active', created_at: new Date().toISOString() };
+        const c = { id: newDemoId('course'), ...data, status: data.status || 'active', publish_status: data.publishStatus || 'draft', version: data.version || 1, difficulty: data.difficulty || 'intermediate', created_at: new Date().toISOString() };
         COURSES.push(c);
         return c;
       };
@@ -458,6 +458,16 @@ if (DEMO_MODE) {
         const idx = COURSES.findIndex((c) => c.id === id);
         if (idx >= 0) COURSES.splice(idx, 1);
       };
+      w.CourseService.getByCategory = async (categoryId) => COURSES.filter((c) => c.category_id === categoryId);
+      w.CourseService.getBySubject = async (subjectId) => COURSES.filter((c) => c.subject_id === subjectId);
+      w.CourseService.getByStatus = async (schoolId, status) => COURSES.filter((c) => c.school_id === schoolId && c.publish_status === status);
+      w.CourseService.getPublished = async (schoolId) => COURSES.filter((c) => c.school_id === schoolId && c.publish_status === 'published');
+      w.CourseService.archive = async (id) => {
+        const idx = COURSES.findIndex((c) => c.id === id);
+        if (idx >= 0) { COURSES[idx].publish_status = 'archived'; return COURSES[idx]; }
+        throw new Error('Course not found');
+      };
+      w.CourseService.search = async (query) => COURSES.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()));
       w.CourseService.getSections = async (courseId) => {
         return COURSE_SECTIONS.filter((cs) => cs.course_id === courseId).map((cs) => {
           const section = SECTIONS.find((s) => s.id === cs.section_id);

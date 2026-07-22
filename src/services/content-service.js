@@ -32,6 +32,26 @@ export const ContentService = {
     return data || [];
   },
 
+  async getByCategory(categoryId) {
+    const { data, error } = await supabase
+      .from('content')
+      .select('*')
+      .eq('category_id', categoryId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getBySubject(subjectId) {
+    const { data, error } = await supabase
+      .from('content')
+      .select('*')
+      .eq('subject_id', subjectId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
   async getById(id) {
     const { data, error } = await supabase
       .from('content')
@@ -52,9 +72,15 @@ export const ContentService = {
         size: item.size || null,
         school_id: item.schoolId,
         section_id: item.sectionId || null,
+        category_id: item.categoryId || null,
+        subject_id: item.subjectId || null,
         description: item.description || null,
         tags: item.tags || [],
-        status: item.status || 'draft'
+        status: item.status || 'draft',
+        thumbnail: item.thumbnail || null,
+        duration: item.duration || null,
+        author: item.author || null,
+        visibility: item.visibility || 'school'
       })
       .select()
       .single();
@@ -71,9 +97,15 @@ export const ContentService = {
     if (updates.url !== undefined) payload.url = updates.url;
     if (updates.size !== undefined) payload.size = updates.size;
     if (updates.sectionId !== undefined) payload.section_id = updates.sectionId;
+    if (updates.categoryId !== undefined) payload.category_id = updates.categoryId;
+    if (updates.subjectId !== undefined) payload.subject_id = updates.subjectId;
     if (updates.description !== undefined) payload.description = updates.description;
     if (updates.tags !== undefined) payload.tags = updates.tags;
     if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.thumbnail !== undefined) payload.thumbnail = updates.thumbnail;
+    if (updates.duration !== undefined) payload.duration = updates.duration;
+    if (updates.author !== undefined) payload.author = updates.author;
+    if (updates.visibility !== undefined) payload.visibility = updates.visibility;
 
     const { data, error } = await supabase
       .from('content')

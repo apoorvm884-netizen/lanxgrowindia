@@ -120,22 +120,22 @@ const SUBJECTS = [
 // 4. SECTIONS
 // ------------------------------------------------------------------
 const SECTIONS = [
-  { id: 'sec-1', name: 'Introduction', school_id: 'school-1', subject_id: 'sub-1', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-2', name: 'Intermediate', school_id: 'school-1', subject_id: 'sub-1', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-3', name: 'Advanced', school_id: 'school-1', subject_id: 'sub-1', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-4', name: 'Fundamentals', school_id: 'school-1', subject_id: 'sub-2', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-5', name: 'Team Building', school_id: 'school-1', subject_id: 'sub-2', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-6', name: 'Basics', school_id: 'school-1', subject_id: 'sub-3', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-7', name: 'Public Speaking', school_id: 'school-1', subject_id: 'sub-3', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-8', name: 'Savings', school_id: 'school-1', subject_id: 'sub-4', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-9', name: 'Investing', school_id: 'school-1', subject_id: 'sub-4', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-10', name: 'Career Options', school_id: 'school-1', subject_id: 'sub-5', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-11', name: 'Business Basics', school_id: 'school-1', subject_id: 'sub-6', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-12', name: 'Algebra', school_id: 'school-1', subject_id: 'sub-7', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-13', name: 'Physics', school_id: 'school-1', subject_id: 'sub-8', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-14', name: 'Introduction', school_id: 'school-2', subject_id: 'sub-9', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-15', name: 'Fundamentals', school_id: 'school-2', subject_id: 'sub-10', drive_folder_id: null, created_at: NOW },
-  { id: 'sec-16', name: 'Savings Basics', school_id: 'school-2', subject_id: 'sub-11', drive_folder_id: null, created_at: NOW },
+  { id: 'sec-1', name: 'Introduction', school_id: 'school-1', subject_id: 'sub-1', drive_folder_id: null, description: 'Getting started with soft skills', sort_order: 1, created_at: NOW },
+  { id: 'sec-2', name: 'Intermediate', school_id: 'school-1', subject_id: 'sub-1', drive_folder_id: null, description: 'Building on core skills', sort_order: 2, created_at: NOW },
+  { id: 'sec-3', name: 'Advanced', school_id: 'school-1', subject_id: 'sub-1', drive_folder_id: null, description: 'Mastering advanced techniques', sort_order: 3, created_at: NOW },
+  { id: 'sec-4', name: 'Fundamentals', school_id: 'school-1', subject_id: 'sub-2', drive_folder_id: null, description: 'Core leadership principles', sort_order: 1, created_at: NOW },
+  { id: 'sec-5', name: 'Team Building', school_id: 'school-1', subject_id: 'sub-2', drive_folder_id: null, description: 'Building and managing effective teams', sort_order: 2, created_at: NOW },
+  { id: 'sec-6', name: 'Basics', school_id: 'school-1', subject_id: 'sub-3', drive_folder_id: null, description: 'Fundamental communication skills', sort_order: 1, created_at: NOW },
+  { id: 'sec-7', name: 'Public Speaking', school_id: 'school-1', subject_id: 'sub-3', drive_folder_id: null, description: 'Presenting with confidence', sort_order: 2, created_at: NOW },
+  { id: 'sec-8', name: 'Savings', school_id: 'school-1', subject_id: 'sub-4', drive_folder_id: null, description: 'Building smart saving habits', sort_order: 1, created_at: NOW },
+  { id: 'sec-9', name: 'Investing', school_id: 'school-1', subject_id: 'sub-4', drive_folder_id: null, description: 'Introduction to investments', sort_order: 2, created_at: NOW },
+  { id: 'sec-10', name: 'Career Options', school_id: 'school-1', subject_id: 'sub-5', drive_folder_id: null, description: 'Exploring career paths', sort_order: 1, created_at: NOW },
+  { id: 'sec-11', name: 'Business Basics', school_id: 'school-1', subject_id: 'sub-6', drive_folder_id: null, description: 'Starting your own business', sort_order: 1, created_at: NOW },
+  { id: 'sec-12', name: 'Algebra', school_id: 'school-1', subject_id: 'sub-7', drive_folder_id: null, description: 'Understanding algebraic concepts', sort_order: 1, created_at: NOW },
+  { id: 'sec-13', name: 'Physics', school_id: 'school-1', subject_id: 'sub-8', drive_folder_id: null, description: 'Motion, forces, and energy', sort_order: 1, created_at: NOW },
+  { id: 'sec-14', name: 'Introduction', school_id: 'school-2', subject_id: 'sub-9', drive_folder_id: null, description: 'Getting started', sort_order: 1, created_at: NOW },
+  { id: 'sec-15', name: 'Fundamentals', school_id: 'school-2', subject_id: 'sub-10', drive_folder_id: null, description: 'Core leadership skills', sort_order: 1, created_at: NOW },
+  { id: 'sec-16', name: 'Savings Basics', school_id: 'school-2', subject_id: 'sub-11', drive_folder_id: null, description: 'Introduction to saving money', sort_order: 1, created_at: NOW },
 ];
 
 // ------------------------------------------------------------------
@@ -409,16 +409,20 @@ const STUDENTS = [
 // ------------------------------------------------------------------
 // 8. COURSES
 // ------------------------------------------------------------------
+function makeCourse(id, name, desc, schoolId, categoryId, subjectId, difficulty, duration) {
+  return { id, name, description: desc, school_id: schoolId, category_id: categoryId, subject_id: subjectId, difficulty, estimated_duration: duration, publish_status: 'published', version: 1, created_by: 'Rajesh Gupta', thumbnail: null, status: 'active', created_at: NOW };
+}
+
 const COURSES = [
-  { id: 'course-1', name: 'Soft Skills', description: 'Develop essential interpersonal and professional skills.', school_id: 'school-1', status: 'active', created_at: NOW },
-  { id: 'course-2', name: 'Leadership', description: 'Learn the principles of effective leadership and team management.', school_id: 'school-1', status: 'active', created_at: NOW },
-  { id: 'course-3', name: 'Communication', description: 'Master verbal, written, and non-verbal communication.', school_id: 'school-1', status: 'active', created_at: NOW },
-  { id: 'course-4', name: 'Financial Literacy', description: 'Understand saving, budgeting, and investing fundamentals.', school_id: 'school-1', status: 'active', created_at: NOW },
-  { id: 'course-5', name: 'Career Planning', description: 'Explore career paths and build a roadmap for your future.', school_id: 'school-1', status: 'active', created_at: NOW },
-  { id: 'course-6', name: 'Entrepreneurship', description: 'Learn how to start, run, and grow your own business.', school_id: 'school-1', status: 'active', created_at: NOW },
-  { id: 'course-7', name: 'Soft Skills', description: 'Develop essential interpersonal and professional skills.', school_id: 'school-2', status: 'active', created_at: NOW },
-  { id: 'course-8', name: 'Leadership', description: 'Learn the principles of effective leadership and team management.', school_id: 'school-2', status: 'active', created_at: NOW },
-  { id: 'course-9', name: 'Financial Literacy', description: 'Understand saving, budgeting, and investing fundamentals.', school_id: 'school-2', status: 'active', created_at: NOW },
+  makeCourse('course-1', 'Soft Skills', 'Develop essential interpersonal and professional skills.', 'school-1', 'cat-2', 'sub-1', 'beginner', '4 weeks'),
+  makeCourse('course-2', 'Leadership', 'Learn the principles of effective leadership and team management.', 'school-1', 'cat-2b', 'sub-2', 'intermediate', '6 weeks'),
+  makeCourse('course-3', 'Communication', 'Master verbal, written, and non-verbal communication.', 'school-1', 'cat-2a', 'sub-3', 'beginner', '4 weeks'),
+  makeCourse('course-4', 'Financial Literacy', 'Understand saving, budgeting, and investing fundamentals.', 'school-1', 'cat-3a', 'sub-4', 'beginner', '3 weeks'),
+  makeCourse('course-5', 'Career Planning', 'Explore career paths and build a roadmap for your future.', 'school-1', 'cat-3b', 'sub-5', 'intermediate', '4 weeks'),
+  makeCourse('course-6', 'Entrepreneurship', 'Learn how to start, run, and grow your own business.', 'school-1', 'cat-3c', 'sub-6', 'advanced', '8 weeks'),
+  makeCourse('course-7', 'Soft Skills', 'Develop essential interpersonal and professional skills.', 'school-2', 'cat-6', 'sub-9', 'beginner', '4 weeks'),
+  makeCourse('course-8', 'Leadership', 'Learn the principles of effective leadership and team management.', 'school-2', 'cat-6', 'sub-10', 'intermediate', '6 weeks'),
+  makeCourse('course-9', 'Financial Literacy', 'Understand saving, budgeting, and investing fundamentals.', 'school-2', 'cat-7', 'sub-11', 'beginner', '3 weeks'),
 ];
 
 // ------------------------------------------------------------------

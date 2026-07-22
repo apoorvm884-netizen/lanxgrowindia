@@ -8,7 +8,7 @@ export const CourseService = {
       .from('courses')
       .select('*')
       .eq('school_id', schoolId)
-      .order('name');
+      .order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
   },
@@ -23,13 +23,56 @@ export const CourseService = {
     return data;
   },
 
+  async getByCategory(categoryId) {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('category_id', categoryId)
+      .order('name');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getBySubject(subjectId) {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('subject_id', subjectId)
+      .order('name');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getByStatus(schoolId, status) {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('publish_status', status)
+      .order('name');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getPublished(schoolId) {
+    return this.getByStatus(schoolId, 'published');
+  },
+
   async create(item) {
     const { data, error } = await supabase
       .from('courses')
       .insert({
         name: item.name,
         description: item.description || null,
-        school_id: item.schoolId
+        school_id: item.schoolId,
+        category_id: item.categoryId || null,
+        subject_id: item.subjectId || null,
+        thumbnail: item.thumbnail || null,
+        difficulty: item.difficulty || 'intermediate',
+        estimated_duration: item.estimatedDuration || null,
+        publish_status: item.publishStatus || 'draft',
+        version: item.version || 1,
+        created_by: item.createdBy || null
       })
       .select()
       .single();
@@ -43,6 +86,13 @@ export const CourseService = {
     const payload = {};
     if (updates.name !== undefined) payload.name = updates.name;
     if (updates.description !== undefined) payload.description = updates.description;
+    if (updates.categoryId !== undefined) payload.category_id = updates.categoryId;
+    if (updates.subjectId !== undefined) payload.subject_id = updates.subjectId;
+    if (updates.thumbnail !== undefined) payload.thumbnail = updates.thumbnail;
+    if (updates.difficulty !== undefined) payload.difficulty = updates.difficulty;
+    if (updates.estimatedDuration !== undefined) payload.estimated_duration = updates.estimatedDuration;
+    if (updates.publishStatus !== undefined) payload.publish_status = updates.publishStatus;
+    if (updates.version !== undefined) payload.version = updates.version;
 
     const { data, error } = await supabase
       .from('courses')
@@ -54,6 +104,10 @@ export const CourseService = {
 
     await AuditLogService.log('edited', 'Course', data.name, `Course "${data.name}" updated`);
     return data;
+  },
+
+  async archive(id) {
+    return this.update(id, { publishStatus: 'archived' });
   },
 
   async delete(id) {
@@ -100,6 +154,17 @@ export const CourseService = {
       .eq('course_id', courseId)
       .eq('section_id', sectionId);
     if (error) throw error;
+  },
+
+  async search(query) {
+    const q = query.toLowerCase();
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .ilike('name', `%${q}%`)
+      .order('name');
+    if (error) throw error;
+    return data || [];
   },
 
   // Enrollments

@@ -33,13 +33,25 @@ export const SubjectService = {
     return data;
   },
 
+  async search(query) {
+    const q = query.toLowerCase();
+    const { data, error } = await supabase
+      .from('subjects')
+      .select('*')
+      .ilike('name', `%${q}%`)
+      .order('name');
+    if (error) throw error;
+    return data || [];
+  },
+
   async create(subject) {
     const { data, error } = await supabase
       .from('subjects')
       .insert({
         name: subject.name,
         school_id: subject.schoolId,
-        category_id: subject.categoryId
+        category_id: subject.categoryId,
+        status: subject.status || 'active'
       })
       .select()
       .single();
@@ -50,12 +62,14 @@ export const SubjectService = {
   },
 
   async update(id, updates) {
+    const payload = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.categoryId !== undefined) payload.category_id = updates.categoryId;
+    if (updates.status !== undefined) payload.status = updates.status;
+
     const { data, error } = await supabase
       .from('subjects')
-      .update({
-        name: updates.name,
-        category_id: updates.categoryId
-      })
+      .update(payload)
       .eq('id', id)
       .select()
       .single();

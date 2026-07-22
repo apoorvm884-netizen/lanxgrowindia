@@ -558,13 +558,14 @@ window.SchoolCourses = {
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
         ${courses.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">school</span><h3>No courses match your search</h3><p>Create your first course or try a different search.</p></div>`
-        : `<div class="table-container"><table><thead><tr><th>Name</th><th>Description</th><th>Sections</th><th>Students</th><th>Created</th><th style="width:140px;"></th></tr></thead><tbody>
+        : `<div class="table-container"><table><thead><tr><th>Name</th><th>Difficulty</th><th>Status</th><th>Sections</th><th>Students</th><th>Created</th><th style="width:140px;"></th></tr></thead><tbody>
           ${pageItems.map(c => {
             const sections = data.courseSections?.filter(cs => cs.course_id === c.id) || [];
             const enrollments = data.enrollments?.filter(e => e.course_id === c.id) || [];
             return `<tr>
               <td><span class="font-semibold">${eh(c.name)}</span></td>
-              <td style="font-size:13px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${eh(c.description || '—')}</td>
+              <td><span style="font-size:11px;padding:2px 6px;border-radius:4px;background:${c.difficulty === 'beginner' ? '#f0fdf4' : c.difficulty === 'advanced' ? '#fef2f2' : '#fffbeb'};color:${c.difficulty === 'beginner' ? '#16a34a' : c.difficulty === 'advanced' ? '#dc2626' : '#d97706'};">${eh(c.difficulty || 'intermediate')}</span></td>
+              <td><span class="status-badge ${c.publish_status === 'published' ? 'status-active' : c.publish_status === 'archived' ? 'status-suspended' : 'status-pending'}">${eh(c.publish_status || 'draft')}</span></td>
               <td style="font-size:13px;">${sections.length}</td>
               <td style="font-size:13px;">${enrollments.length}</td>
               <td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.created_at)}</td>
@@ -690,14 +691,34 @@ window.SchoolCourses = {
   },
 
   async openAdd(schoolId) {
+    const data = await AppStorage.load();
+    const cats = data.categories.filter(c => c.school_id === schoolId);
+    const subjects = data.subjects.filter(s => s.school_id === schoolId);
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'modal-course';
-    overlay.innerHTML = `<div class="modal">
+    overlay.innerHTML = `<div class="modal" style="max-width:560px;">
       <div class="modal-header"><h3 class="modal-title">Add Course</h3><button class="modal-close" data-close-modal="modal-course"><span class="material-symbols-outlined">close</span></button></div>
       <div class="modal-body">
         <div class="form-group"><label class="form-label">Course Name</label><input type="text" class="form-input" id="sp-input-course-name" placeholder="e.g. Mathematics 101"></div>
-        <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" id="sp-input-course-desc" placeholder="Course description..." style="height:80px;resize:vertical;"></textarea></div>
+        <div class="form-group" style="margin-top:12px;"><label class="form-label">Description</label><textarea class="form-input" id="sp-input-course-desc" placeholder="Course description..." style="height:60px;resize:vertical;"></textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+          <div class="form-group"><label class="form-label">Category</label>
+            <select class="form-select" id="sp-input-course-category"><option value="">Choose...</option>${cats.map(c => `<option value="${c.id}">${eh(c.name)}</option>`).join('')}</select>
+          </div>
+          <div class="form-group"><label class="form-label">Subject</label>
+            <select class="form-select" id="sp-input-course-subject"><option value="">Choose...</option>${subjects.map(s => `<option value="${s.id}">${eh(s.name)}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px;">
+          <div class="form-group"><label class="form-label">Difficulty</label>
+            <select class="form-select" id="sp-input-course-difficulty"><option value="beginner">Beginner</option><option value="intermediate" selected>Intermediate</option><option value="advanced">Advanced</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">Duration</label><input type="text" class="form-input" id="sp-input-course-duration" placeholder="e.g. 4 weeks"></div>
+          <div class="form-group"><label class="form-label">Status</label>
+            <select class="form-select" id="sp-input-course-publish"><option value="draft">Draft</option><option value="published" selected>Published</option></select>
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" data-close-modal="modal-course">Cancel</button>
@@ -713,16 +734,37 @@ window.SchoolCourses = {
     try {
       const course = await window.CourseService?.getById(courseId);
       if (!course) return;
+      const data = await AppStorage.load();
+      const schoolId = course.school_id;
+      const cats = data.categories.filter(c => c.school_id === schoolId);
+      const subjects = data.subjects.filter(s => s.school_id === schoolId);
       const existing = document.getElementById('modal-course');
       if (existing) existing.remove();
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
       overlay.id = 'modal-course';
-      overlay.innerHTML = `<div class="modal">
+      overlay.innerHTML = `<div class="modal" style="max-width:560px;">
         <div class="modal-header"><h3 class="modal-title">Edit Course</h3><button class="modal-close" data-close-modal="modal-course"><span class="material-symbols-outlined">close</span></button></div>
         <div class="modal-body">
           <div class="form-group"><label class="form-label">Course Name</label><input type="text" class="form-input" id="sp-input-course-name" value="${eh(course.name)}"></div>
-          <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" id="sp-input-course-desc" style="height:80px;resize:vertical;">${eh(course.description || '')}</textarea></div>
+          <div class="form-group" style="margin-top:12px;"><label class="form-label">Description</label><textarea class="form-input" id="sp-input-course-desc" style="height:60px;resize:vertical;">${eh(course.description || '')}</textarea></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div class="form-group"><label class="form-label">Category</label>
+              <select class="form-select" id="sp-input-course-category"><option value="">Choose...</option>${cats.map(c => `<option value="${c.id}" ${c.id === course.category_id ? 'selected' : ''}>${eh(c.name)}</option>`).join('')}</select>
+            </div>
+            <div class="form-group"><label class="form-label">Subject</label>
+              <select class="form-select" id="sp-input-course-subject"><option value="">Choose...</option>${subjects.map(s => `<option value="${s.id}" ${s.id === course.subject_id ? 'selected' : ''}>${eh(s.name)}</option>`).join('')}</select>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px;">
+            <div class="form-group"><label class="form-label">Difficulty</label>
+              <select class="form-select" id="sp-input-course-difficulty"><option value="beginner" ${course.difficulty === 'beginner' ? 'selected' : ''}>Beginner</option><option value="intermediate" ${course.difficulty === 'intermediate' ? 'selected' : ''}>Intermediate</option><option value="advanced" ${course.difficulty === 'advanced' ? 'selected' : ''}>Advanced</option></select>
+            </div>
+            <div class="form-group"><label class="form-label">Duration</label><input type="text" class="form-input" id="sp-input-course-duration" value="${eh(course.estimated_duration || '')}" placeholder="e.g. 4 weeks"></div>
+            <div class="form-group"><label class="form-label">Status</label>
+              <select class="form-select" id="sp-input-course-publish"><option value="draft" ${course.publish_status === 'draft' ? 'selected' : ''}>Draft</option><option value="published" ${course.publish_status === 'published' ? 'selected' : ''}>Published</option><option value="archived" ${course.publish_status === 'archived' ? 'selected' : ''}>Archived</option></select>
+            </div>
+          </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-close-modal="modal-course">Cancel</button>
@@ -739,14 +781,19 @@ window.SchoolCourses = {
     const name = document.getElementById('sp-input-course-name')?.value?.trim();
     if (!name) { AppToast.show('Course name is required.', 'error'); return; }
     const description = document.getElementById('sp-input-course-desc')?.value?.trim() || null;
+    const categoryId = document.getElementById('sp-input-course-category')?.value || null;
+    const subjectId = document.getElementById('sp-input-course-subject')?.value || null;
+    const difficulty = document.getElementById('sp-input-course-difficulty')?.value || 'intermediate';
+    const estimatedDuration = document.getElementById('sp-input-course-duration')?.value?.trim() || null;
+    const publishStatus = document.getElementById('sp-input-course-publish')?.value || 'draft';
     const btn = document.getElementById('sp-btn-save-course');
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...'; }
     try {
       if (isUpdate) {
-        await window.CourseService?.update(courseId, { name, description });
+        await window.CourseService?.update(courseId, { name, description, categoryId, subjectId, difficulty, estimatedDuration, publishStatus });
         AppToast.show('Course updated.', 'success');
       } else {
-        await window.CourseService?.create({ name, description, schoolId: AppRouter.currentSchoolId });
+        await window.CourseService?.create({ name, description, schoolId: AppRouter.currentSchoolId, categoryId, subjectId, difficulty, estimatedDuration, publishStatus });
         AppToast.show('Course created.', 'success');
       }
       AppModal.close('modal-course');

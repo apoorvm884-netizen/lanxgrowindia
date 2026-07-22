@@ -8,6 +8,7 @@ export const SectionService = {
       .from('sections')
       .select('*')
       .eq('school_id', schoolId)
+      .order('sort_order', { ascending: true, nullsFirst: false })
       .order('name');
     if (error) throw error;
     return data || [];
@@ -18,6 +19,7 @@ export const SectionService = {
       .from('sections')
       .select('*')
       .eq('subject_id', subjectId)
+      .order('sort_order', { ascending: true, nullsFirst: false })
       .order('name');
     if (error) throw error;
     return data || [];
@@ -39,7 +41,9 @@ export const SectionService = {
       .insert({
         name: section.name,
         school_id: section.schoolId,
-        subject_id: section.subjectId
+        subject_id: section.subjectId,
+        description: section.description || null,
+        sort_order: section.sortOrder || null
       })
       .select()
       .single();
@@ -50,9 +54,14 @@ export const SectionService = {
   },
 
   async update(id, updates) {
+    const payload = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.description !== undefined) payload.description = updates.description;
+    if (updates.sortOrder !== undefined) payload.sort_order = updates.sortOrder;
+
     const { data, error } = await supabase
       .from('sections')
-      .update({ name: updates.name })
+      .update(payload)
       .eq('id', id)
       .select()
       .single();
