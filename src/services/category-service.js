@@ -23,12 +23,28 @@ export const CategoryService = {
     return data;
   },
 
+  async getChildren(parentId) {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('parent_id', parentId)
+      .order('name');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getTree(schoolId) {
+    const all = await this.getBySchool(schoolId);
+    return all.filter(c => !c.parent_id);
+  },
+
   async create(category) {
     const { data, error } = await supabase
       .from('categories')
       .insert({
         name: category.name,
-        school_id: category.schoolId
+        school_id: category.schoolId,
+        parent_id: category.parentId || null
       })
       .select()
       .single();
@@ -39,9 +55,11 @@ export const CategoryService = {
   },
 
   async update(id, updates) {
+    const payload = { name: updates.name };
+    if (updates.parentId !== undefined) payload.parent_id = updates.parentId;
     const { data, error } = await supabase
       .from('categories')
-      .update({ name: updates.name })
+      .update(payload)
       .eq('id', id)
       .select()
       .single();

@@ -19,8 +19,29 @@ const SCHOOLS = [
     code: 'GVPS',
     status: 'active',
     created_at: '2025-06-01T00:00:00Z',
+    updated_at: '2025-06-01T00:00:00Z',
     drive_folder_id: null,
     principal_name: 'Dr. Anil Verma',
+    school_type: 'Private',
+    contact_person: 'Dr. Anil Verma',
+    phone: '+91-98765-43210',
+    email: 'contact@gvps.edu',
+    website: 'https://gvps.edu',
+    address_line1: '123 Green Avenue',
+    address_line2: 'Sector 15',
+    city: 'New Delhi',
+    state: 'Delhi',
+    country: 'India',
+    postal_code: '110001',
+    academic_year: '2025-2026',
+    board: 'CBSE',
+    medium: 'English',
+    timezone: 'Asia/Kolkata',
+    plan: 'premium',
+    student_limit: 500,
+    teacher_limit: 30,
+    counselor_limit: 10,
+    storage_limit: '100GB',
   },
   {
     id: 'school-2',
@@ -28,8 +49,29 @@ const SCHOOLS = [
     code: 'DPS',
     status: 'active',
     created_at: '2025-06-15T00:00:00Z',
+    updated_at: '2025-06-15T00:00:00Z',
     drive_folder_id: null,
     principal_name: 'Mrs. Meera Sharma',
+    school_type: 'Public',
+    contact_person: 'Mrs. Meera Sharma',
+    phone: '+91-87654-32109',
+    email: 'info@dps.edu',
+    website: 'https://dps.edu',
+    address_line1: '456 Knowledge Park',
+    address_line2: 'Sector 22',
+    city: 'New Delhi',
+    state: 'Delhi',
+    country: 'India',
+    postal_code: '110022',
+    academic_year: '2025-2026',
+    board: 'CBSE',
+    medium: 'English',
+    timezone: 'Asia/Kolkata',
+    plan: 'standard',
+    student_limit: 300,
+    teacher_limit: 20,
+    counselor_limit: 5,
+    storage_limit: '50GB',
   },
 ];
 
@@ -37,28 +79,41 @@ const SCHOOLS = [
 // 2. CATEGORIES
 // ------------------------------------------------------------------
 const CATEGORIES = [
-  { id: 'cat-1', name: 'Life Skills', school_id: 'school-1', drive_folder_id: null, created_at: NOW },
-  { id: 'cat-2', name: 'Career Development', school_id: 'school-1', drive_folder_id: null, created_at: NOW },
-  { id: 'cat-3', name: 'Academic Support', school_id: 'school-1', drive_folder_id: null, created_at: NOW },
-  { id: 'cat-4', name: 'Life Skills', school_id: 'school-2', drive_folder_id: null, created_at: NOW },
-  { id: 'cat-5', name: 'Career Development', school_id: 'school-2', drive_folder_id: null, created_at: NOW },
+  { id: 'cat-1', name: 'Art', school_id: 'school-1', parent_id: null, drive_folder_id: null, created_at: NOW },
+  { id: 'cat-1a', name: 'Digital Art', school_id: 'school-1', parent_id: 'cat-1', drive_folder_id: null, created_at: NOW },
+  { id: 'cat-1b', name: 'Sketching', school_id: 'school-1', parent_id: 'cat-1a', drive_folder_id: null, created_at: NOW },
+  { id: 'cat-1c', name: 'Watercolor', school_id: 'school-1', parent_id: 'cat-1b', drive_folder_id: null, created_at: NOW },
+  { id: 'cat-2', name: 'Life Skills', school_id: 'school-1', parent_id: null, drive_folder_id: null, created_at: NOW },
+  { id: 'cat-2a', name: 'Communication', school_id: 'school-1', parent_id: 'cat-2', drive_folder_id: null, created_at: NOW },
+  { id: 'cat-2b', name: 'Leadership', school_id: 'school-1', parent_id: 'cat-2', drive_folder_id: null, created_at: NOW },
+  { id: 'cat-3', name: 'Career Development', school_id: 'school-1', parent_id: null, drive_folder_id: null, created_at: NOW },
+  { id: 'cat-3a', name: 'Financial Literacy', school_id: 'school-1', parent_id: 'cat-3', drive_folder_id: null, created_at: NOW },
+  { id: 'cat-3b', name: 'Career Planning', school_id: 'school-1', parent_id: 'cat-3', drive_folder_id: null, created_at: NOW },
+  { id: 'cat-3c', name: 'Entrepreneurship', school_id: 'school-1', parent_id: 'cat-3', drive_folder_id: null, created_at: NOW },
+  { id: 'cat-4', name: 'Academic Support', school_id: 'school-1', parent_id: null, drive_folder_id: null, created_at: NOW },
+  { id: 'cat-4a', name: 'Mathematics', school_id: 'school-1', parent_id: 'cat-4', drive_folder_id: null, created_at: NOW },
+  { id: 'cat-4b', name: 'Science', school_id: 'school-1', parent_id: 'cat-4', drive_folder_id: null, created_at: NOW },
+  { id: 'cat-5', name: 'Art', school_id: 'school-2', parent_id: null, drive_folder_id: null, created_at: NOW },
+  { id: 'cat-5a', name: 'Digital Art', school_id: 'school-2', parent_id: 'cat-5', drive_folder_id: null, created_at: NOW },
+  { id: 'cat-6', name: 'Life Skills', school_id: 'school-2', parent_id: null, drive_folder_id: null, created_at: NOW },
+  { id: 'cat-7', name: 'Career Development', school_id: 'school-2', parent_id: null, drive_folder_id: null, created_at: NOW },
 ];
 
 // ------------------------------------------------------------------
 // 3. SUBJECTS
 // ------------------------------------------------------------------
 const SUBJECTS = [
-  { id: 'sub-1', name: 'Soft Skills', school_id: 'school-1', category_id: 'cat-1', drive_folder_id: null, created_at: NOW },
-  { id: 'sub-2', name: 'Leadership', school_id: 'school-1', category_id: 'cat-1', drive_folder_id: null, created_at: NOW },
-  { id: 'sub-3', name: 'Communication', school_id: 'school-1', category_id: 'cat-1', drive_folder_id: null, created_at: NOW },
-  { id: 'sub-4', name: 'Financial Literacy', school_id: 'school-1', category_id: 'cat-2', drive_folder_id: null, created_at: NOW },
-  { id: 'sub-5', name: 'Career Planning', school_id: 'school-1', category_id: 'cat-2', drive_folder_id: null, created_at: NOW },
-  { id: 'sub-6', name: 'Entrepreneurship', school_id: 'school-1', category_id: 'cat-2', drive_folder_id: null, created_at: NOW },
-  { id: 'sub-7', name: 'Mathematics', school_id: 'school-1', category_id: 'cat-3', drive_folder_id: null, created_at: NOW },
-  { id: 'sub-8', name: 'Science', school_id: 'school-1', category_id: 'cat-3', drive_folder_id: null, created_at: NOW },
-  { id: 'sub-9', name: 'Soft Skills', school_id: 'school-2', category_id: 'cat-4', drive_folder_id: null, created_at: NOW },
-  { id: 'sub-10', name: 'Leadership', school_id: 'school-2', category_id: 'cat-4', drive_folder_id: null, created_at: NOW },
-  { id: 'sub-11', name: 'Financial Literacy', school_id: 'school-2', category_id: 'cat-5', drive_folder_id: null, created_at: NOW },
+  { id: 'sub-1', name: 'Soft Skills', school_id: 'school-1', category_id: 'cat-2', drive_folder_id: null, created_at: NOW },
+  { id: 'sub-2', name: 'Leadership Fundamentals', school_id: 'school-1', category_id: 'cat-2b', drive_folder_id: null, created_at: NOW },
+  { id: 'sub-3', name: 'Communication Basics', school_id: 'school-1', category_id: 'cat-2a', drive_folder_id: null, created_at: NOW },
+  { id: 'sub-4', name: 'Financial Literacy', school_id: 'school-1', category_id: 'cat-3a', drive_folder_id: null, created_at: NOW },
+  { id: 'sub-5', name: 'Career Planning', school_id: 'school-1', category_id: 'cat-3b', drive_folder_id: null, created_at: NOW },
+  { id: 'sub-6', name: 'Entrepreneurship', school_id: 'school-1', category_id: 'cat-3c', drive_folder_id: null, created_at: NOW },
+  { id: 'sub-7', name: 'Mathematics', school_id: 'school-1', category_id: 'cat-4a', drive_folder_id: null, created_at: NOW },
+  { id: 'sub-8', name: 'Science', school_id: 'school-1', category_id: 'cat-4b', drive_folder_id: null, created_at: NOW },
+  { id: 'sub-9', name: 'Soft Skills', school_id: 'school-2', category_id: 'cat-6', drive_folder_id: null, created_at: NOW },
+  { id: 'sub-10', name: 'Leadership', school_id: 'school-2', category_id: 'cat-6', drive_folder_id: null, created_at: NOW },
+  { id: 'sub-11', name: 'Financial Literacy', school_id: 'school-2', category_id: 'cat-7', drive_folder_id: null, created_at: NOW },
 ];
 
 // ------------------------------------------------------------------
@@ -108,30 +163,22 @@ function makeVideo(id, name, subjectId, sectionId, schoolId, duration, categoryI
 }
 
 const CONTENT = [
-  // School 1 - Soft Skills
-  makeVideo('vid-1', 'Introduction to Soft Skills', 'sub-1', 'sec-1', 'school-1', '10:30', 'cat-1'),
-  makeVideo('vid-2', 'Effective Communication Basics', 'sub-1', 'sec-2', 'school-1', '12:15', 'cat-1'),
-  makeVideo('vid-3', 'Advanced Interpersonal Skills', 'sub-1', 'sec-3', 'school-1', '15:45', 'cat-1'),
-  // School 1 - Leadership
-  makeVideo('vid-4', 'What Makes a Leader', 'sub-2', 'sec-4', 'school-1', '8:20', 'cat-1'),
-  makeVideo('vid-5', 'Building High-Performance Teams', 'sub-2', 'sec-5', 'school-1', '18:00', 'cat-1'),
-  // School 1 - Communication
-  makeVideo('vid-6', 'Public Speaking Mastery', 'sub-3', 'sec-7', 'school-1', '22:10', 'cat-1'),
-  makeVideo('vid-7', 'Active Listening Skills', 'sub-3', 'sec-6', 'school-1', '9:45', 'cat-1'),
-  // School 1 - Financial Literacy
-  makeVideo('vid-8', 'Smart Saving Habits', 'sub-4', 'sec-8', 'school-1', '11:30', 'cat-2'),
-  makeVideo('vid-9', 'Introduction to Investing', 'sub-4', 'sec-9', 'school-1', '14:50', 'cat-2'),
-  // School 1 - Career Planning
-  makeVideo('vid-10', 'Exploring Career Options', 'sub-5', 'sec-10', 'school-1', '16:20', 'cat-2'),
-  // School 1 - Entrepreneurship
-  makeVideo('vid-11', 'Starting Your Own Business', 'sub-6', 'sec-11', 'school-1', '20:00', 'cat-2'),
-  // School 1 - Academic
-  makeVideo('vid-12', 'Algebra Made Easy', 'sub-7', 'sec-12', 'school-1', '25:00', 'cat-3'),
-  makeVideo('vid-13', 'Physics: Motion & Forces', 'sub-8', 'sec-13', 'school-1', '19:30', 'cat-3'),
-  // School 2
-  makeVideo('vid-14', 'Soft Skills for Success', 'sub-9', 'sec-14', 'school-2', '11:00', 'cat-4'),
-  makeVideo('vid-15', 'Leadership Fundamentals', 'sub-10', 'sec-15', 'school-2', '13:20', 'cat-4'),
-  makeVideo('vid-16', 'Saving Money 101', 'sub-11', 'sec-16', 'school-2', '8:40', 'cat-5'),
+  makeVideo('vid-1', 'Introduction to Soft Skills', 'sub-1', 'sec-1', 'school-1', '10:30', 'cat-2'),
+  makeVideo('vid-2', 'Effective Communication Basics', 'sub-1', 'sec-2', 'school-1', '12:15', 'cat-2'),
+  makeVideo('vid-3', 'Advanced Interpersonal Skills', 'sub-1', 'sec-3', 'school-1', '15:45', 'cat-2'),
+  makeVideo('vid-4', 'What Makes a Leader', 'sub-2', 'sec-4', 'school-1', '8:20', 'cat-2b'),
+  makeVideo('vid-5', 'Building High-Performance Teams', 'sub-2', 'sec-5', 'school-1', '18:00', 'cat-2b'),
+  makeVideo('vid-6', 'Public Speaking Mastery', 'sub-3', 'sec-7', 'school-1', '22:10', 'cat-2a'),
+  makeVideo('vid-7', 'Active Listening Skills', 'sub-3', 'sec-6', 'school-1', '9:45', 'cat-2a'),
+  makeVideo('vid-8', 'Smart Saving Habits', 'sub-4', 'sec-8', 'school-1', '11:30', 'cat-3a'),
+  makeVideo('vid-9', 'Introduction to Investing', 'sub-4', 'sec-9', 'school-1', '14:50', 'cat-3a'),
+  makeVideo('vid-10', 'Exploring Career Options', 'sub-5', 'sec-10', 'school-1', '16:20', 'cat-3b'),
+  makeVideo('vid-11', 'Starting Your Own Business', 'sub-6', 'sec-11', 'school-1', '20:00', 'cat-3c'),
+  makeVideo('vid-12', 'Algebra Made Easy', 'sub-7', 'sec-12', 'school-1', '25:00', 'cat-4a'),
+  makeVideo('vid-13', 'Physics: Motion & Forces', 'sub-8', 'sec-13', 'school-1', '19:30', 'cat-4b'),
+  makeVideo('vid-14', 'Soft Skills for Success', 'sub-9', 'sec-14', 'school-2', '11:00', 'cat-6'),
+  makeVideo('vid-15', 'Leadership Fundamentals', 'sub-10', 'sec-15', 'school-2', '13:20', 'cat-6'),
+  makeVideo('vid-16', 'Saving Money 101', 'sub-11', 'sec-16', 'school-2', '8:40', 'cat-7'),
 ];
 
 // ------------------------------------------------------------------

@@ -481,6 +481,7 @@ tr:hover td { background: var(--surface-low); }
         </div>
 
         <div id="entity-fields-category" class="entity-fields" style="display:none;">
+          <input type="hidden" id="entity-parent-id" value="">
           <div class="form-group">
             <label class="form-label" for="input-name-cat">Category Name</label>
             <input class="form-input" type="text" id="input-name-cat" placeholder="e.g. Class 11">
@@ -578,6 +579,205 @@ tr:hover td { background: var(--surface-low); }
     <div class="modal-footer">
       <button class="btn btn-secondary" data-close-modal="modal-entity">Cancel</button>
       <button class="btn btn-primary" id="btn-save-entity">Save School</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== SCHOOL MODAL (multi-section form) ====== -->
+<div class="modal-overlay" id="modal-school" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modal-school-title">Add School</h3>
+      <button class="modal-close" data-close-modal="modal-school"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="modal-body" style="max-height:68vh;overflow-y:auto;">
+      <input type="hidden" id="school-entity-id" value="">
+      <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
+        <button class="school-tab-btn active" data-tab="general" style="flex:1;padding:10px 8px;background:none;border:none;border-bottom:2px solid var(--primary);font-size:12px;font-weight:600;color:var(--primary);cursor:pointer;">General</button>
+        <button class="school-tab-btn" data-tab="address" style="flex:1;padding:10px 8px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer;">Address</button>
+        <button class="school-tab-btn" data-tab="academic" style="flex:1;padding:10px 8px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer;">Academic</button>
+        <button class="school-tab-btn" data-tab="subscription" style="flex:1;padding:10px 8px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer;">Subscription</button>
+      </div>
+
+      <div id="school-tab-general" class="school-tab-panel">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">General Information</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-name">School Name <span style="color:var(--danger);">*</span></label>
+            <input class="form-input" type="text" id="school-input-name" placeholder="e.g. Green Valley Public School">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-code">School Code <span style="color:var(--danger);">*</span></label>
+            <input class="form-input" type="text" id="school-input-code" placeholder="e.g. GVPS">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-type">School Type</label>
+            <select class="form-select" id="school-input-type">
+              <option value="">Select...</option>
+              <option value="Private">Private</option>
+              <option value="Public">Public</option>
+              <option value="Government">Government</option>
+              <option value="International">International</option>
+              <option value="Trust">Trust</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-principal">Principal Name</label>
+            <input class="form-input" type="text" id="school-input-principal" placeholder="Full name of principal">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-contact">Contact Person</label>
+            <input class="form-input" type="text" id="school-input-contact" placeholder="Primary contact person">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-phone">Phone</label>
+            <input class="form-input" type="tel" id="school-input-phone" placeholder="+91-98765-43210">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-email">Email</label>
+            <input class="form-input" type="email" id="school-input-email" placeholder="contact@school.edu">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-website">Website</label>
+            <input class="form-input" type="url" id="school-input-website" placeholder="https://school.edu">
+          </div>
+        </div>
+      </div>
+
+      <div id="school-tab-address" class="school-tab-panel" style="display:none;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">Address</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <label class="form-label" for="school-input-addr1">Address Line 1</label>
+            <input class="form-input" type="text" id="school-input-addr1" placeholder="Street address, building, area">
+          </div>
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <label class="form-label" for="school-input-addr2">Address Line 2</label>
+            <input class="form-input" type="text" id="school-input-addr2" placeholder="Locality, landmark (optional)">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-city">City</label>
+            <input class="form-input" type="text" id="school-input-city" placeholder="e.g. New Delhi">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-state">State</label>
+            <input class="form-input" type="text" id="school-input-state" placeholder="e.g. Delhi">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-country">Country</label>
+            <input class="form-input" type="text" id="school-input-country" value="India">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-postal">Postal Code</label>
+            <input class="form-input" type="text" id="school-input-postal" placeholder="e.g. 110001">
+          </div>
+        </div>
+      </div>
+
+      <div id="school-tab-academic" class="school-tab-panel" style="display:none;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">Academic Information</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-academic-year">Academic Year</label>
+            <input class="form-input" type="text" id="school-input-academic-year" placeholder="e.g. 2025-2026">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-board">Board</label>
+            <select class="form-select" id="school-input-board">
+              <option value="">Select...</option>
+              <option value="CBSE">CBSE</option>
+              <option value="ICSE">ICSE</option>
+              <option value="IB">IB</option>
+              <option value="State Board">State Board</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-medium">Medium</label>
+            <select class="form-select" id="school-input-medium">
+              <option value="">Select...</option>
+              <option value="English">English</option>
+              <option value="Hindi">Hindi</option>
+              <option value="Regional">Regional</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-timezone">Time Zone</label>
+            <select class="form-select" id="school-input-timezone">
+              <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+              <option value="Asia/Dubai">Asia/Dubai</option>
+              <option value="America/New_York">America/New_York</option>
+              <option value="Europe/London">Europe/London</option>
+              <option value="Asia/Singapore">Asia/Singapore</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="school-tab-subscription" class="school-tab-panel" style="display:none;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">Subscription & Limits</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-plan">Plan</label>
+            <select class="form-select" id="school-input-plan">
+              <option value="basic">Basic</option>
+              <option value="standard">Standard</option>
+              <option value="premium">Premium</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-student-limit">Student Limit</label>
+            <input class="form-input" type="number" id="school-input-student-limit" placeholder="e.g. 500" min="0">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-teacher-limit">Teacher Limit</label>
+            <input class="form-input" type="number" id="school-input-teacher-limit" placeholder="e.g. 30" min="0">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-counselor-limit">Counselor Limit</label>
+            <input class="form-input" type="number" id="school-input-counselor-limit" placeholder="e.g. 5" min="0">
+          </div>
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <label class="form-label" for="school-input-storage-limit">Storage Limit</label>
+            <input class="form-input" type="text" id="school-input-storage-limit" placeholder="e.g. 100GB">
+          </div>
+        </div>
+        <div style="margin-top:16px;padding:12px;background:var(--surface-low);border-radius:var(--radius-md);display:flex;align-items:center;gap:10px;">
+          <span class="material-symbols-outlined" style="font-size:18px;color:var(--text-muted);">info</span>
+          <span style="font-size:12px;color:var(--text-secondary);">All limits can be adjusted later from School Settings.</span>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" for="school-input-status">Status</label>
+          <select class="form-select" id="school-input-status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="suspended">Suspended</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:4px;">
+          <div style="font-size:11px;color:var(--text-muted);">
+            <div style="font-size:10px;font-weight:600;text-transform:uppercase;">School ID</div>
+            <div id="school-display-id" style="font-size:13px;font-weight:600;color:var(--text-secondary);">Auto-generated</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:4px;">
+          <div style="font-size:11px;color:var(--text-muted);">
+            <div style="font-size:10px;font-weight:600;text-transform:uppercase;">Created</div>
+            <div id="school-display-created" style="font-size:13px;font-weight:600;color:var(--text-secondary);">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="modal-school">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-school">Save School</button>
     </div>
   </div>
 </div>

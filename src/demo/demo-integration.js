@@ -319,13 +319,14 @@ if (DEMO_MODE) {
       w.SchoolService.getAll = async () => [...SCHOOLS];
       w.SchoolService.getById = async (id) => SCHOOLS.find((s) => s.id === id);
       w.SchoolService.create = async (data) => {
-        const s = { id: newDemoId('school'), ...data, status: data.status || 'active', created_at: new Date().toISOString(), drive_folder_id: null };
+        const now = new Date().toISOString();
+        const s = { id: newDemoId('school'), ...data, status: data.status || 'active', created_at: now, updated_at: now, drive_folder_id: null };
         SCHOOLS.push(s);
         return s;
       };
       w.SchoolService.update = async (id, updates) => {
         const idx = SCHOOLS.findIndex((s) => s.id === id);
-        if (idx >= 0) { Object.assign(SCHOOLS[idx], updates); return SCHOOLS[idx]; }
+        if (idx >= 0) { Object.assign(SCHOOLS[idx], updates, { updated_at: new Date().toISOString() }); return SCHOOLS[idx]; }
         throw new Error('School not found');
       };
       w.SchoolService.delete = async (id) => {

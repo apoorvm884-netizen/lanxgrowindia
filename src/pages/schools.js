@@ -11,9 +11,19 @@ export async function render(main, data, router) {
     const pageSchools = schools.slice(start, start + perPage);
 
     const adminCountBySchool = {};
+    const studentCountBySchool = {};
+    const teacherCountBySchool = {};
     for (const p of data.users) {
       if (p.role === 'school_admin' && p.schoolId) {
         adminCountBySchool[p.schoolId] = (adminCountBySchool[p.schoolId] || 0) + 1;
+      }
+      if (p.role === 'teacher' && p.schoolId) {
+        teacherCountBySchool[p.schoolId] = (teacherCountBySchool[p.schoolId] || 0) + 1;
+      }
+    }
+    for (const s of (data.students || [])) {
+      if (s.school_id) {
+        studentCountBySchool[s.school_id] = (studentCountBySchool[s.school_id] || 0) + 1;
       }
     }
 
@@ -30,25 +40,27 @@ export async function render(main, data, router) {
       </div>
       ${schools.length === 0 ? `<div class="card"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">business</span><h3>No schools yet</h3><p>Create your first school to get started.</p></div></div>`
       : `<div class="schools-grid">${pageSchools.map(s => {
-        const stats = { categories: data.categories.filter(c => c.school_id === s.id).length, subjects: data.subjects.filter(sub => sub.school_id === s.id).length, sections: data.sections.filter(sec => sec.school_id === s.id).length };
+        const stats = { categories: data.categories.filter(c => c.school_id === s.id).length, subjects: data.subjects.filter(sub => sub.school_id === s.id).length, videos: data.content.filter(c => c.school_id === s.id).length };
         const logoClass = s.status === 'suspended' ? 'school-logo-suspended' : 'school-logo-default';
         const adminCount = adminCountBySchool[s.id] || 0;
+        const studentCount = studentCountBySchool[s.id] || 0;
+        const teacherCount = teacherCountBySchool[s.id] || 0;
         const eh = AppUtils.escapeHtml;
         return `<div class="school-card" style="cursor:pointer;" data-action="open-school" data-id="${s.id}">
           <div class="school-card-top">
             <div class="school-logo ${logoClass}">${AppUtils.getInitials(eh(s.name))}</div>
             <div class="school-info">
               <div class="school-name">${eh(s.name)}</div>
-              <div class="school-code">Code: ${eh(s.code)}</div>
+              <div class="school-code">Code: ${eh(s.code)} · ${eh(s.school_type || 'N/A')} · ${eh(s.board || 'N/A')}</div>
               <div class="school-admin"><span class="material-symbols-outlined" style="font-size:14px;">person</span> ${eh(s.principal_name || 'No principal')}</div>
             </div>
             <span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-suspended'}">${eh(s.status)}</span>
           </div>
           <div class="school-stats">
+            <div class="school-stat"><div class="school-stat-value">${studentCount}</div><div class="school-stat-label">Students</div></div>
             <div class="school-stat"><div class="school-stat-value">${stats.categories}</div><div class="school-stat-label">Categories</div></div>
             <div class="school-stat"><div class="school-stat-value">${stats.subjects}</div><div class="school-stat-label">Subjects</div></div>
-            <div class="school-stat"><div class="school-stat-value">${stats.sections}</div><div class="school-stat-label">Sections</div></div>
-            <div class="school-stat"><div class="school-stat-value">${adminCount}</div><div class="school-stat-label">Admins</div></div>
+            <div class="school-stat"><div class="school-stat-value">${stats.videos}</div><div class="school-stat-label">Videos</div></div>
           </div>
         </div>`;
       }).join('')}</div>

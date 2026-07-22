@@ -384,12 +384,13 @@ window.AppSidebar = {
     { id: 'sep-s1', separator: true },
     { id: 'school-students', label: 'Students', icon: 'groups', route: 'school-students' },
     { id: 'school-counselors', label: 'Counselors', icon: 'badge', route: 'school-counselors' },
+    { id: 'school-teachers', label: 'Teachers', icon: 'school', route: 'school-teachers' },
     { id: 'sep-s2', separator: true },
+    { id: 'school-courses', label: 'Courses', icon: 'book-open', route: 'school-courses' },
     { id: 'school-categories', label: 'Categories', icon: 'folder-tree', route: 'school-categories' },
-    { id: 'school-subjects', label: 'Subjects', icon: 'book-open', route: 'school-subjects' },
-    { id: 'school-sections', label: 'Sections', icon: 'folder-kanban', route: 'school-sections' },
+    { id: 'school-subjects', label: 'Subjects', icon: 'auto_stories', route: 'school-subjects' },
     { id: 'sep-s3', separator: true },
-    { id: 'school-courses', label: 'Courses', icon: 'school', route: 'school-courses' },
+    { id: 'school-drive', label: 'Drive', icon: 'cloud', route: 'school-drive' },
     { id: 'school-videos', label: 'Video Library', icon: 'video-library', route: 'school-videos' },
     { id: 'school-assignments', label: 'Assignments', icon: 'assignment', route: 'school-assignments' },
     { id: 'sep-s4', separator: true },
@@ -397,7 +398,6 @@ window.AppSidebar = {
     { id: 'school-notifications', label: 'Notifications', icon: 'notifications', route: 'school-notifications' },
     { id: 'sep-s5', separator: true },
     { id: 'school-settings', label: 'Settings', icon: 'settings', route: 'school-settings' },
-    { id: 'school-profile', label: 'Profile', icon: 'person', route: 'school-profile' },
   ],
 
   TEACHER_ITEMS: [
@@ -459,6 +459,14 @@ window.AppSidebar = {
     'assignment': '<span class="material-symbols-outlined" style="font-size:20px;">assignment</span>',
     'notifications': '<span class="material-symbols-outlined" style="font-size:20px;">notifications</span>',
     'person': '<span class="material-symbols-outlined" style="font-size:20px;">person</span>',
+    'auto_stories': '<span class="material-symbols-outlined" style="font-size:20px;">auto_stories</span>',
+    'cloud': '<span class="material-symbols-outlined" style="font-size:20px;">cloud</span>',
+    'people': '<span class="material-symbols-outlined" style="font-size:20px;">people</span>',
+    'trending_up': '<span class="material-symbols-outlined" style="font-size:20px;">trending_up</span>',
+    'download': '<span class="material-symbols-outlined" style="font-size:20px;">download</span>',
+    'support_agent': '<span class="material-symbols-outlined" style="font-size:20px;">support_agent</span>',
+    'storage': '<span class="material-symbols-outlined" style="font-size:20px;">storage</span>',
+    'celebration': '<span class="material-symbols-outlined" style="font-size:20px;">celebration</span>',
   },
 
   render(items, activeId, backLink) {
@@ -692,6 +700,11 @@ window.AppRouter = {
       const studentsStarted = schoolStudents.filter(s => (s.progress || 0) > 0 || (s.attendance || 0) > 0).length;
       const atRiskStudents = schoolStudents.filter(s => s.status === 'active' && ((s.attendance || 0) > 0 && s.attendance < 80 || (s.progress || 0) > 0 && s.progress < 50));
 
+      const teachersCount = (data.users || []).filter(u => u.schoolId === schoolId && u.role === 'teacher').length;
+      const schoolDrive = data.drive?.filter(d => d.school_id === schoolId) || [];
+      const storageUsed = schoolDrive.reduce((acc, d) => acc + (parseInt(d.size) || 0), 0);
+      const storageLabel = storageUsed > 1073741824 ? (storageUsed / 1073741824).toFixed(1) + 'GB' : storageUsed > 1048576 ? (storageUsed / 1048576).toFixed(1) + 'MB' : storageUsed > 1024 ? (storageUsed / 1024).toFixed(1) + 'KB' : storageUsed + 'B';
+
       main.innerHTML = `<div class="fade-in">
         ${isSuperAdmin ? `<div style="background:#111827;color:#d1d5db;padding:10px 16px;border-radius:var(--radius-md);margin-bottom:16px;display:flex;align-items:center;gap:12px;font-size:12px;">
           <span class="material-symbols-outlined" style="font-size:16px;">admin_panel_settings</span>
@@ -700,110 +713,96 @@ window.AppRouter = {
         </div>` : ''}
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;">
           <div>
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
-              <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1e3a8a,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;">${AppUtils.getInitials(schoolName)}</div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;">
+              <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#1e3a8a,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0;">${AppUtils.getInitials(schoolName)}</div>
               <div>
-                <h1 style="font-size:22px;font-weight:700;margin:0;">${greeting}, ${AppUtils.escapeHtml(profile?.name || 'Admin')}!</h1>
-                <p style="margin:2px 0 0;font-size:13px;color:var(--text-secondary);">${schoolName} · ${dateStr}</p>
+                <h1 style="font-size:24px;font-weight:700;margin:0;color:var(--on-surface);">${schoolName}</h1>
+                <p style="margin:2px 0 0;font-size:13px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
+                  <span>${AppUtils.escapeHtml(school?.code || '')}</span>
+                  <span style="color:var(--border);">·</span>
+                  <span class="status-badge ${school?.status === 'active' ? 'status-active' : 'status-suspended'}" style="font-size:10px;">${AppUtils.escapeHtml(school?.status || 'active')}</span>
+                  <span style="color:var(--border);">·</span>
+                  <span>${AppUtils.escapeHtml(school?.board || '')} ${AppUtils.escapeHtml(school?.medium || '')}</span>
+                </p>
               </div>
             </div>
           </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <span style="font-size:11px;padding:4px 12px;border-radius:20px;background:${avgAttendance >= 85 ? '#f0fdf4' : '#fffbeb'};color:${avgAttendance >= 85 ? '#10b981' : '#f59e0b'};font-weight:600;display:flex;align-items:center;gap:4px;">
-              <span style="width:6px;height:6px;border-radius:50%;background:${avgAttendance >= 85 ? '#10b981' : '#f59e0b'};"></span>${avgAttendance}% Attendance Today
-            </span>
+          <div style="display:flex;gap:6px;align-items:flex-start;">
+            <button class="btn btn-secondary btn-sm" style="height:32px;font-size:11px;" data-action="edit-school" data-id="${schoolId}"><span class="material-symbols-outlined" style="font-size:16px;">edit</span> Edit</button>
           </div>
         </div>
 
-        <div class="metrics-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px;">
-          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-green" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">groups</span></div><div class="metric-info"><h2 style="font-size:20px;">${schoolStudents.length}</h2><p>Students</p></div></div>
-          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-blue" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">trending_up</span></div><div class="metric-info"><h2 style="font-size:20px;">${studentsStarted}</h2><p>Active Learners</p></div></div>
-          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-red" style="width:36px;height:36px;background:#fef2f2;"><span class="material-symbols-outlined" style="font-size:18px;color:#ef4444;">warning</span></div><div class="metric-info"><h2 style="font-size:20px;color:#ef4444;">${atRiskStudents.length}</h2><p>Need Attention</p></div></div>
-          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-purple" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">badge</span></div><div class="metric-info"><h2 style="font-size:20px;">${schoolCounselors.length}</h2><p>Counselors</p></div></div>
-          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-orange" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">school</span></div><div class="metric-info"><h2 style="font-size:20px;">${schoolCourses.length}</h2><p>Courses</p></div></div>
-          <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-blue" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">video_library</span></div><div class="metric-info"><h2 style="font-size:20px;">${content.length}</h2><p>Content</p></div></div>
-          <div class="metric-card" style="padding:14px;"><div class="metric-icon" style="width:36px;height:36px;background:#f0fdf4;"><span class="material-symbols-outlined" style="font-size:18px;color:#10b981;">check_circle</span></div><div class="metric-info"><h2 style="font-size:20px;">${completionRate}%</h2><p>Completion</p></div></div>
-          <div class="metric-card" style="padding:14px;"><div class="metric-icon" style="width:36px;height:36px;background:#eff6ff;"><span class="material-symbols-outlined" style="font-size:18px;color:#3b82f6;">assignment</span></div><div class="metric-info"><h2 style="font-size:20px;">${schoolEnrollments.length}</h2><p>Enrollments</p></div></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
+          <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-blue" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">groups</span></div><div class="metric-info"><h2 style="font-size:22px;">${schoolStudents.length}</h2><p>Total Students</p></div></div>
+          <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-green" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">trending_up</span></div><div class="metric-info"><h2 style="font-size:22px;">${studentsStarted}</h2><p>Active Students</p></div></div>
+          <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-purple" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">people</span></div><div class="metric-info"><h2 style="font-size:22px;">${teachersCount || 0}</h2><p>Teachers</p></div></div>
+          <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#fef2f2;color:#ef4444;"><span class="material-symbols-outlined" style="font-size:20px;">badge</span></div><div class="metric-info"><h2 style="font-size:22px;">${schoolCounselors.length}</h2><p>Counselors</p></div></div>
+          <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-orange" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">school</span></div><div class="metric-info"><h2 style="font-size:22px;">${schoolCourses.length}</h2><p>Courses</p></div></div>
+          <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#f0fdf4;color:#10b981;"><span class="material-symbols-outlined" style="font-size:20px;">folder</span></div><div class="metric-info"><h2 style="font-size:22px;">${cats.length}</h2><p>Categories</p></div></div>
+          <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#f5f3ff;color:#8b5cf6;"><span class="material-symbols-outlined" style="font-size:20px;">auto_stories</span></div><div class="metric-info"><h2 style="font-size:22px;">${subjects.length}</h2><p>Subjects</p></div></div>
+          <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-blue" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">video_library</span></div><div class="metric-info"><h2 style="font-size:22px;">${content.length}</h2><p>Videos</p></div></div>
+          <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#fffbeb;color:#f59e0b;"><span class="material-symbols-outlined" style="font-size:20px;">storage</span></div><div class="metric-info"><h2 style="font-size:22px;">${storageLabel}</h2><p>Storage Used</p></div></div>
+          <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#fee2e2;color:#ef4444;"><span class="material-symbols-outlined" style="font-size:20px;">notifications</span></div><div class="metric-info"><h2 style="font-size:22px;">${schoolNotifications.filter(n => !n.is_read).length}</h2><p>Notifications</p></div></div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
-          <div class="card" style="padding:16px;">
+        <div class="card" style="padding:20px;margin-bottom:24px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h3 style="margin:0;font-size:15px;font-weight:600;">Quick Actions</h3>
+            <span style="font-size:12px;color:var(--text-muted);">${dateStr}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
+            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-students"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">person_add</span> Add Student</button>
+            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-counselors"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">support_agent</span> Add Counselor</button>
+            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="disabled-nav"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">school</span> Add Teacher</button>
+            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-courses"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">playlist_add</span> Create Course</button>
+            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-assignments"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">assignment</span> Assign Course</button>
+            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-categories"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">folder</span> Categories</button>
+            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-reports"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">bar_chart</span> Reports</button>
+            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="disabled-nav"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">cloud</span> Drive</button>
+            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-videos"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">video_library</span> Videos</button>
+            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-notifications"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">notifications</span> Notifications${schoolNotifications.filter(n => !n.is_read).length ? `<span style="background:var(--danger);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;">${schoolNotifications.filter(n => !n.is_read).length}</span>` : ''}</button>
+            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-settings"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">settings</span> Settings</button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div class="card" style="padding:20px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-              <h3 style="margin:0;font-size:14px;font-weight:600;">Quick Actions</h3>
-              <span style="font-size:11px;color:var(--text-muted);">What would you like to do?</span>
+              <h3 style="margin:0;font-size:14px;font-weight:600;">School Information</h3>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-students"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">person_add</span> Add Student</button>
-              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-courses"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">playlist_add</span> New Course</button>
-              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-assignments"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">assignment</span> Assign Course</button>
-              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-reports"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">bar_chart</span> View Reports</button>
-              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-categories"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">category</span> Categories</button>
-              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-videos"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">video_library</span> Videos</button>
-              <button class="btn btn-secondary" style="height:38px;font-size:11px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-notifications"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">notifications</span> Notifications${schoolNotifications.filter(n => !n.is_read).length ? `<span style="background:var(--danger);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;">${schoolNotifications.filter(n => !n.is_read).length}</span>` : ''}</button>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+              <div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Principal</span><br><span style="font-weight:500;">${AppUtils.escapeHtml(school?.principal_name || '—')}</span></div>
+              <div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Contact</span><br><span style="font-weight:500;">${AppUtils.escapeHtml(school?.contact_person || school?.principal_name || '—')}</span></div>
+              <div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Phone</span><br><span style="font-weight:500;">${AppUtils.escapeHtml(school?.phone || '—')}</span></div>
+              <div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Email</span><br><span style="font-weight:500;">${AppUtils.escapeHtml(school?.email || '—')}</span></div>
+              <div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Address</span><br><span style="font-weight:500;">${[school?.address_line1, school?.city, school?.state].filter(Boolean).join(', ') || '—'}</span></div>
+              <div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Plan</span><br><span class="status-badge status-active" style="font-size:10px;text-transform:capitalize;">${AppUtils.escapeHtml(school?.plan || 'basic')}</span></div>
             </div>
           </div>
 
-          <div class="card" style="padding:16px;">
+          <div class="card" style="padding:20px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
               <h3 style="margin:0;font-size:14px;font-weight:600;">Today's Summary</h3>
-              <span style="font-size:11px;color:var(--text-muted);">${schoolStudents.length} students</span>
+              <span style="font-size:11px;color:var(--text-muted);">${schoolStudents.length} active students</span>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
               <div style="padding:10px;background:#f0fdf4;border-radius:8px;text-align:center;">
-                <div style="font-size:18px;font-weight:700;color:#10b981;">${avgAttendance}%</div>
+                <div style="font-size:20px;font-weight:700;color:#10b981;">${avgAttendance}%</div>
                 <div style="font-size:11px;color:var(--text-secondary);">Attendance</div>
               </div>
               <div style="padding:10px;background:#eff6ff;border-radius:8px;text-align:center;">
-                <div style="font-size:18px;font-weight:700;color:#3b82f6;">${schoolEnrollments.filter(e => e.status === 'completed').length}</div>
-                <div style="font-size:11px;color:var(--text-secondary);">Completed</div>
+                <div style="font-size:20px;font-weight:700;color:#3b82f6;">${completionRate}%</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Completion Rate</div>
               </div>
               <div style="padding:10px;background:#f5f3ff;border-radius:8px;text-align:center;">
-                <div style="font-size:18px;font-weight:700;color:#8b5cf6;">${recentContent.length}</div>
-                <div style="font-size:11px;color:var(--text-secondary);">New Videos</div>
+                <div style="font-size:20px;font-weight:700;color:#8b5cf6;">${atRiskStudents.length}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Need Attention</div>
               </div>
               <div style="padding:10px;background:#fffbeb;border-radius:8px;text-align:center;">
-                <div style="font-size:18px;font-weight:700;color:#f59e0b;">${schoolNotifications.filter(n => !n.is_read).length}</div>
-                <div style="font-size:11px;color:var(--text-secondary);">Notifications</div>
+                <div style="font-size:20px;font-weight:700;color:#f59e0b;">${schoolEnrollments.filter(e => e.status === 'completed').length}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Completed</div>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
-          <div class="card" style="padding:16px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-              <h3 style="margin:0;font-size:14px;font-weight:600;">Latest Enrollments</h3>
-              <button class="btn btn-ghost btn-sm" style="font-size:11px;height:28px;" data-action="navigate" data-route="school-assignments">View All</button>
-            </div>
-            ${recentEnrollments.length === 0 ? `<div class="empty-state" style="padding:24px;"><span class="material-symbols-outlined" style="font-size:32px;">assignment</span><h3 style="font-size:14px;">No enrollments yet</h3></div>`
-            : `<div style="display:flex;flex-direction:column;">${recentEnrollments.map(e => {
-              const student = schoolStudents.find(s => s.id === e.student_id);
-              const course = schoolCourses.find(c => c.id === e.course_id);
-              return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);">
-                <div style="width:28px;height:28px;border-radius:50%;background:var(--primary)12;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--primary);flex-shrink:0;">${AppUtils.getInitials(student?.name || '')}</div>
-                <div style="flex:1;min-width:0;">
-                  <div style="font-size:13px;font-weight:500;">${AppUtils.escapeHtml(student?.name || 'Unknown')} → ${AppUtils.escapeHtml(course?.name || 'Unknown')}</div>
-                  <div style="font-size:11px;color:var(--text-secondary);">${AppUtils.escapeHtml(e.status)}</div>
-                </div>
-                <span class="status-badge ${e.status === 'active' ? 'status-active' : e.status === 'completed' ? 'status-active' : 'status-suspended'}" style="font-size:10px;">${AppUtils.escapeHtml(e.status)}</span>
-              </div>`;
-            }).join('')}</div>`}
-          </div>
-
-          <div class="card" style="padding:16px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-              <h3 style="margin:0;font-size:14px;font-weight:600;">Recent Notifications</h3>
-              <button class="btn btn-ghost btn-sm" style="font-size:11px;height:28px;" data-action="navigate" data-route="school-notifications">View All</button>
-            </div>
-            ${schoolNotifications.length === 0 ? `<div class="empty-state" style="padding:24px;"><span class="material-symbols-outlined" style="font-size:32px;">notifications</span><h3 style="font-size:14px;">No notifications</h3></div>`
-            : `<div style="display:flex;flex-direction:column;">${schoolNotifications.slice(0, 5).map(n => `
-              <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border-light);${!n.is_read ? '' : 'opacity:0.6;'}">
-                <span class="material-symbols-outlined" style="font-size:16px;color:${!n.is_read ? 'var(--primary)' : 'var(--text-muted)'};">${!n.is_read ? 'notifications_active' : 'notifications'}</span>
-                <div style="flex:1;min-width:0;">
-                  <div style="font-size:12px;font-weight:${!n.is_read ? '600' : '400'};">${AppUtils.escapeHtml(n.title)}</div>
-                  <div style="font-size:11px;color:var(--text-secondary);">${AppUtils.escapeHtml(n.message || '')}</div>
-                </div>
-              </div>`).join('')}</div>`}
           </div>
         </div>
       </div>`;
@@ -812,36 +811,81 @@ window.AppRouter = {
     }
 
     if (this.currentRoute === 'school-categories') {
-      const cats = data.categories.filter(c => c.school_id === schoolId);
+      const allCats = data.categories.filter(c => c.school_id === schoolId);
+      const parentId = this._selectedCategoryId || null;
+      const cats = parentId ? allCats.filter(c => c.parent_id === parentId) : allCats.filter(c => !c.parent_id);
+      const parentCat = parentId ? allCats.find(c => c.id === parentId) : null;
+
+      function renderCategoryTree(catId, depth) {
+        const children = allCats.filter(c => c.parent_id === catId);
+        if (children.length === 0) return '';
+        return children.map(child => {
+          const subCount = data.subjects.filter(s => s.category_id === child.id).length;
+          const grandChildren = allCats.filter(c => c.parent_id === child.id);
+          const hasChildren = grandChildren.length > 0;
+          return `<div style="padding-left:${depth * 20}px;">
+            <div style="display:flex;align-items:center;padding:8px 12px;border-left:2px solid var(--border);margin-bottom:2px;border-radius:0 var(--radius-sm) var(--radius-sm) 0;transition:background var(--transition);" class="tree-item">
+              <span class="material-symbols-outlined" style="font-size:16px;color:${hasChildren ? 'var(--warning)' : 'var(--text-muted)'};margin-right:8px;">${hasChildren ? 'folder' : 'description'}</span>
+              <span style="flex:1;font-size:13px;font-weight:500;">${AppUtils.escapeHtml(child.name)}</span>
+              <span style="font-size:11px;color:var(--text-muted);margin-right:12px;">${subCount} subjects</span>
+              ${hasChildren ? `<button class="btn btn-ghost btn-sm" data-action="open-category" data-id="${child.id}" title="Open" style="height:26px;width:26px;padding:0;"><span class="material-symbols-outlined" style="font-size:14px;">open_in_new</span></button>` : ''}
+              <button class="btn btn-ghost btn-sm" data-action="edit-category" data-id="${child.id}" title="Edit" style="height:26px;width:26px;padding:0;"><span class="material-symbols-outlined" style="font-size:14px;">edit</span></button>
+              <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-category" data-id="${child.id}" title="Delete" style="height:26px;width:26px;padding:0;"><span class="material-symbols-outlined" style="font-size:14px;">delete</span></button>
+            </div>
+            ${renderCategoryTree(child.id, depth + 1)}
+          </div>`;
+        }).join('');
+      }
+
       main.innerHTML = `<div class="fade-in">
         <div class="page-header">
           <div class="page-header-left">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-              <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-              <span style="font-size:12px;color:var(--text-secondary);">${schoolName}</span>
+              ${parentId ? `<button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-categories" data-id="">` : `<button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard">`}<span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
+              <span style="font-size:12px;color:var(--text-secondary);">${schoolName}${parentCat ? ' / ' + AppUtils.escapeHtml(parentCat.name) : ''}</span>
             </div>
-            <h1 class="page-title">Categories</h1>
-            <p class="page-subtitle">Manage grade levels and classes for ${schoolName}.</p>
+            <h1 class="page-title">${parentCat ? AppUtils.escapeHtml(parentCat.name) : 'Categories'}</h1>
+            <p class="page-subtitle">${parentCat ? 'Sub-categories under ' + AppUtils.escapeHtml(parentCat.name) : 'Manage the category hierarchy for ' + schoolName}.</p>
           </div>
-          <button class="btn btn-primary" data-action="add-category"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add Category</button>
-        </div>
-        <div class="management-bar" style="margin-bottom:16px;">
-          <div class="search-bar" style="max-width:280px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="cat-search" placeholder="Search categories..." data-action="cat-search-input"></div>
+          <button class="btn btn-primary" data-action="add-category"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add ${parentCat ? 'Sub-category' : 'Category'}</button>
         </div>
         <div class="card" style="padding:0;overflow:hidden;">
-          <div class="table-container"><table><thead><tr><th>Name</th><th>Subjects</th><th>Created</th><th style="width:120px;"></th></tr></thead><tbody>
-            ${cats.length === 0 ? `<tr><td colspan="4"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">folder</span><h3>No categories yet</h3><p>Create your first category.</p></div></td></tr>`
-            : cats.map(c => {
-              const count = data.subjects.filter(s => s.category_id === c.id).length;
-              return `<tr><td><div class="font-semibold">${AppUtils.escapeHtml(c.name)}</div></td><td>${count}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(c.created_at)}</td>
-                <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
-                  <button class="btn btn-ghost btn-sm" data-action="open-category" data-id="${c.id}" title="Open"><span class="material-symbols-outlined" style="font-size:16px;">open_in_new</span></button>
-                  <button class="btn btn-ghost btn-sm" data-action="edit-category" data-id="${c.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
-                  <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-category" data-id="${c.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
-                </td></tr>`;
-            }).join('')}
-          </tbody></table></div>
+          ${cats.length === 0 ? `<div class="empty-state" style="padding:40px;"><span class="material-symbols-outlined" style="font-size:40px;">folder</span><h3>No ${parentCat ? 'sub-categories' : 'categories'} yet</h3><p>${parentCat ? 'Add sub-categories to organize content under ' + AppUtils.escapeHtml(parentCat.name) + '.' : 'Create your first category to organize your curriculum.'}</p></div>`
+          : `<div style="padding:8px 0;">${cats.map(c => {
+            const subCount = data.subjects.filter(s => s.category_id === c.id).length;
+            const childCount = allCats.filter(ch => ch.parent_id === c.id).length;
+            return `<div style="display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);transition:background var(--transition);" class="tree-root-item">
+              <span class="material-symbols-outlined" style="font-size:18px;color:var(--primary);margin-right:10px;">${childCount > 0 ? 'folder' : 'folder_open'}</span>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:14px;font-weight:600;">${AppUtils.escapeHtml(c.name)}</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">${subCount} subjects · ${childCount} sub-categories</div>
+              </div>
+              <div style="display:flex;gap:4px;">
+                ${childCount > 0 || subCount > 0 ? `<button class="btn btn-ghost btn-sm" data-action="open-category" data-id="${c.id}" title="Open" style="height:30px;font-size:11px;"><span class="material-symbols-outlined" style="font-size:14px;">open_in_new</span> Open</button>` : ''}
+                <button class="btn btn-ghost btn-sm" data-action="edit-category" data-id="${c.id}" title="Edit" style="height:30px;width:30px;padding:0;"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
+                <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-category" data-id="${c.id}" title="Delete" style="height:30px;width:30px;padding:0;"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
+              </div>
+            </div>`;
+          }).join('')}</div>`}
         </div>
+        ${parentId ? `<div style="margin-top:16px;">
+          <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">Subjects under ${AppUtils.escapeHtml(parentCat?.name || '')}</div>
+          <div class="card" style="padding:0;overflow:hidden;">
+            <div class="table-container"><table><thead><tr><th>Name</th><th>Sub-category</th><th>Sections</th><th style="width:80px;"></th></tr></thead><tbody>
+              ${(() => {
+                const parentSubjectIds = allCats.filter(c => c.parent_id === parentId || c.id === parentId).map(c => c.id);
+                const subs = data.subjects.filter(s => parentSubjectIds.includes(s.category_id));
+                return subs.length === 0 ? `<tr><td colspan="4"><div class="empty-state" style="padding:20px;"><span class="material-symbols-outlined" style="font-size:24px;">auto_stories</span><h3 style="font-size:13px;">No subjects in this category</h3></div></td></tr>`
+                : subs.map(sub => {
+                  const secCount = data.sections.filter(sec => sec.subject_id === sub.id).length;
+                  const subCat = allCats.find(c => c.id === sub.category_id);
+                  return `<tr><td><span class="font-semibold">${AppUtils.escapeHtml(sub.name)}</span></td><td style="font-size:13px;color:var(--text-secondary);">${subCat ? AppUtils.escapeHtml(subCat.name) : '—'}</td><td>${secCount}</td>
+                    <td class="td-actions"><button class="btn btn-ghost btn-sm" data-action="open-subject" data-id="${sub.id}" title="Open"><span class="material-symbols-outlined" style="font-size:16px;">open_in_new</span></button></td></tr>`;
+                }).join('');
+              })()}
+            </tbody></table></div>
+          </div>
+        </div>` : ''}
       </div>`;
       initIcons();
       return;
@@ -1429,16 +1473,7 @@ window.AppSchools = {
   async edit(id) {
     const school = await SchoolService.getById(id);
     if (!school) { AppToast.show('School not found.', 'error'); return; }
-    document.getElementById('entity-type').value = 'school';
-    document.getElementById('entity-id').value = id;
-    document.querySelectorAll('.entity-fields').forEach(el => el.style.display = 'none');
-    document.getElementById('entity-fields-school').style.display = 'block';
-    document.getElementById('input-name').value = school.name;
-    document.getElementById('input-code').value = school.code;
-    document.getElementById('input-principal-name').value = school.principal_name || '';
-    document.getElementById('input-status').value = school.status;
-    document.getElementById('modal-title').textContent = 'Edit School';
-    AppModal.open('modal-entity');
+    openSchoolForm(school);
   },
   async confirmDelete(id) {
     const data = await AppStorage.load();
@@ -1655,13 +1690,14 @@ window.AppUserManagement = {
 // CATEGORIES CRUD MODULE
 // ==============================================================
 window.AppCategories = {
-  async openCreate() {
+  async openCreate(parentCategoryId) {
     document.getElementById('entity-type').value = 'category';
     document.getElementById('entity-id').value = '';
+    document.getElementById('entity-parent-id').value = parentCategoryId || '';
     document.querySelectorAll('.entity-fields').forEach(el => el.style.display = 'none');
     document.getElementById('entity-fields-category').style.display = 'block';
     document.getElementById('input-name-cat').value = '';
-    document.getElementById('modal-title').textContent = 'Add Category';
+    document.getElementById('modal-title').textContent = parentCategoryId ? 'Add Sub-category' : 'Add Category';
     AppModal.open('modal-entity');
   },
   async edit(id) {
@@ -2209,17 +2245,130 @@ window.AppAuditLog = {
 // ==============================================================
 // ENTITY FORM HANDLER
 // ==============================================================
-function openSchoolModal(schoolId) {
-  document.getElementById('entity-type').value = 'school';
-  document.getElementById('entity-id').value = '';
-  document.querySelectorAll('.entity-fields').forEach(el => el.style.display = 'none');
-  document.getElementById('entity-fields-school').style.display = 'block';
-  document.getElementById('input-name').value = '';
-  document.getElementById('input-code').value = '';
-  document.getElementById('input-principal-name').value = '';
-  document.getElementById('input-status').value = 'active';
-  document.getElementById('modal-title').textContent = 'Add School';
-  AppModal.open('modal-entity');
+function openSchoolForm(schoolData) {
+  const isEdit = !!schoolData;
+  document.getElementById('school-entity-id').value = schoolData?.id || '';
+  document.getElementById('modal-school-title').textContent = isEdit ? 'Edit School' : 'Add School';
+
+  document.getElementById('school-input-name').value = schoolData?.name || '';
+  document.getElementById('school-input-code').value = schoolData?.code || '';
+  document.getElementById('school-input-type').value = schoolData?.school_type || '';
+  document.getElementById('school-input-principal').value = schoolData?.principal_name || '';
+  document.getElementById('school-input-contact').value = schoolData?.contact_person || '';
+  document.getElementById('school-input-phone').value = schoolData?.phone || '';
+  document.getElementById('school-input-email').value = schoolData?.email || '';
+  document.getElementById('school-input-website').value = schoolData?.website || '';
+
+  document.getElementById('school-input-addr1').value = schoolData?.address_line1 || '';
+  document.getElementById('school-input-addr2').value = schoolData?.address_line2 || '';
+  document.getElementById('school-input-city').value = schoolData?.city || '';
+  document.getElementById('school-input-state').value = schoolData?.state || '';
+  document.getElementById('school-input-country').value = schoolData?.country || 'India';
+  document.getElementById('school-input-postal').value = schoolData?.postal_code || '';
+
+  document.getElementById('school-input-academic-year').value = schoolData?.academic_year || '';
+  document.getElementById('school-input-board').value = schoolData?.board || '';
+  document.getElementById('school-input-medium').value = schoolData?.medium || '';
+  document.getElementById('school-input-timezone').value = schoolData?.timezone || 'Asia/Kolkata';
+
+  document.getElementById('school-input-plan').value = schoolData?.plan || 'basic';
+  document.getElementById('school-input-student-limit').value = schoolData?.student_limit || '';
+  document.getElementById('school-input-teacher-limit').value = schoolData?.teacher_limit || '';
+  document.getElementById('school-input-counselor-limit').value = schoolData?.counselor_limit || '';
+  document.getElementById('school-input-storage-limit').value = schoolData?.storage_limit || '';
+
+  document.getElementById('school-input-status').value = schoolData?.status || 'active';
+  document.getElementById('school-display-id').textContent = schoolData?.id || 'Auto-generated';
+  document.getElementById('school-display-created').textContent = schoolData?.created_at ? AppUtils.formatDate(schoolData.created_at) : '—';
+
+  document.querySelectorAll('.school-tab-btn').forEach(b => {
+    b.classList.remove('active');
+    b.style.color = 'var(--text-muted)';
+    b.style.borderBottomColor = 'transparent';
+  });
+  document.querySelectorAll('.school-tab-panel').forEach(p => p.style.display = 'none');
+  document.querySelector('.school-tab-btn[data-tab="general"]').classList.add('active');
+  document.querySelector('.school-tab-btn[data-tab="general"]').style.color = 'var(--primary)';
+  document.querySelector('.school-tab-btn[data-tab="general"]').style.borderBottomColor = 'var(--primary)';
+  document.getElementById('school-tab-general').style.display = 'block';
+
+  document.getElementById('btn-save-school').textContent = isEdit ? 'Save Changes' : 'Save School';
+  AppModal.open('modal-school');
+}
+
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.school-tab-btn');
+  if (btn) {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.school-tab-btn').forEach(b => {
+      b.style.color = 'var(--text-muted)';
+      b.style.borderBottomColor = 'transparent';
+    });
+    btn.style.color = 'var(--primary)';
+    btn.style.borderBottomColor = 'var(--primary)';
+    document.querySelectorAll('.school-tab-panel').forEach(p => p.style.display = 'none');
+    document.getElementById('school-tab-' + tab).style.display = 'block';
+  }
+});
+
+async function handleSchoolSubmit() {
+  const btn = document.getElementById('btn-save-school');
+  const id = document.getElementById('school-entity-id').value;
+  const isEdit = !!id;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  try {
+    const name = document.getElementById('school-input-name').value.trim();
+    const code = document.getElementById('school-input-code').value.trim();
+    if (!name || !code) { AppToast.show('School name and code are required.', 'error'); btn.disabled = false; btn.textContent = isEdit ? 'Save Changes' : 'Save School'; return; }
+
+    if (!isEdit) {
+      const existing = await SchoolService.getByCode(code);
+      if (existing) { AppToast.show(`School with code "${code}" already exists.`, 'error'); btn.disabled = false; btn.textContent = 'Save School'; return; }
+    }
+
+    const payload = {
+      name,
+      code,
+      school_type: document.getElementById('school-input-type').value || null,
+      principal_name: document.getElementById('school-input-principal').value.trim() || null,
+      contact_person: document.getElementById('school-input-contact').value.trim() || null,
+      phone: document.getElementById('school-input-phone').value.trim() || null,
+      email: document.getElementById('school-input-email').value.trim() || null,
+      website: document.getElementById('school-input-website').value.trim() || null,
+      address_line1: document.getElementById('school-input-addr1').value.trim() || null,
+      address_line2: document.getElementById('school-input-addr2').value.trim() || null,
+      city: document.getElementById('school-input-city').value.trim() || null,
+      state: document.getElementById('school-input-state').value.trim() || null,
+      country: document.getElementById('school-input-country').value.trim() || 'India',
+      postal_code: document.getElementById('school-input-postal').value.trim() || null,
+      academic_year: document.getElementById('school-input-academic-year').value.trim() || null,
+      board: document.getElementById('school-input-board').value || null,
+      medium: document.getElementById('school-input-medium').value || null,
+      timezone: document.getElementById('school-input-timezone').value || 'Asia/Kolkata',
+      plan: document.getElementById('school-input-plan').value || 'basic',
+      student_limit: parseInt(document.getElementById('school-input-student-limit').value) || null,
+      teacher_limit: parseInt(document.getElementById('school-input-teacher-limit').value) || null,
+      counselor_limit: parseInt(document.getElementById('school-input-counselor-limit').value) || null,
+      storage_limit: document.getElementById('school-input-storage-limit').value.trim() || null,
+      status: document.getElementById('school-input-status').value || 'active'
+    };
+
+    if (isEdit) {
+      await SchoolService.update(id, payload);
+      AppToast.show('School updated.', 'success');
+    } else {
+      await SchoolService.create(payload);
+      AppToast.show('School created.', 'success');
+    }
+    AppModal.close('modal-school');
+    AppStorage.invalidate();
+    AppRouter.render();
+  } catch (err) {
+    AppToast.show(err.message || 'Failed to save school.', 'error');
+  }
+  btn.disabled = false;
+  btn.textContent = isEdit ? 'Save Changes' : 'Save School';
 }
 
 async function handleEntitySubmit() {
@@ -2250,11 +2399,12 @@ async function handleEntitySubmit() {
     } else if (type === 'category') {
       const name = document.getElementById('input-name-cat').value.trim();
       if (!name) { AppToast.show('Name is required.', 'error'); return; }
+      const parentId = document.getElementById('entity-parent-id')?.value || null;
       if (isEdit) {
-        await CategoryService.update(id, { name });
+        await CategoryService.update(id, { name, parentId });
         AppToast.show('Category updated.', 'success');
       } else {
-        await CategoryService.create({ name, schoolId: AppRouter.currentSchoolId });
+        await CategoryService.create({ name, schoolId: AppRouter.currentSchoolId, parentId });
         AppToast.show('Category created.', 'success');
       }
     } else if (type === 'subject') {
@@ -2348,7 +2498,9 @@ document.addEventListener('click', async function (e) {
   if (action === 'navigate') {
     const companyRoutes = ['content-manager','drive-manager','media-library','school-admins','roles-permissions','company-settings','audit-log'];
     if (AppRouter.SCHOOL_ROUTES.includes(route)) {
-      AppRouter.navigate(route, { schoolId: AppRouter.currentSchoolId });
+      const params = { schoolId: AppRouter.currentSchoolId };
+      if (el.dataset.id) params.categoryId = el.dataset.id || null;
+      AppRouter.navigate(route, params);
     } else if (companyRoutes.includes(route)) {
       AppRouter.currentSchoolId = null;
       AppRouter.navigate(route);
@@ -2360,7 +2512,7 @@ document.addEventListener('click', async function (e) {
   if (action === 'disabled-nav') { AppToast.show('Coming in a future update.', 'success'); return; }
 
   // Schools
-  if (action === 'add-school') { openSchoolModal(); return; }
+  if (action === 'add-school') { openSchoolForm(); return; }
   if (action === 'edit-school') { AppSchools.edit(id); return; }
   if (action === 'delete-school') { AppSchools.confirmDelete(id); return; }
   if (action === 'open-school') { AppRouter.navigate('school-dashboard', { schoolId: id }); return; }
@@ -2369,10 +2521,19 @@ document.addEventListener('click', async function (e) {
   if (action === 'school-search-input') { return; }
 
   // Categories
-  if (action === 'add-category') { AppCategories.openCreate(); return; }
+  if (action === 'add-category') { AppCategories.openCreate(AppRouter._selectedCategoryId); return; }
   if (action === 'edit-category') { AppCategories.edit(id); return; }
   if (action === 'delete-category') { AppCategories.confirmDelete(id); return; }
-  if (action === 'open-category') { AppRouter.navigate('school-subjects', { schoolId: AppRouter.currentSchoolId, categoryId: id }); return; }
+  if (action === 'open-category') {
+    const data = await AppStorage.load();
+    const cat = data.categories.find(c => c.id === id);
+    if (cat && data.categories.some(c => c.parent_id === id)) {
+      AppRouter.navigate('school-categories', { schoolId: AppRouter.currentSchoolId, categoryId: id });
+    } else {
+      AppRouter.navigate('school-subjects', { schoolId: AppRouter.currentSchoolId, categoryId: id });
+    }
+    return;
+  }
 
   // Subjects
   if (action === 'add-subject') { AppSubjects.openCreate(AppRouter._selectedCategoryId); return; }
@@ -3859,6 +4020,9 @@ async function initApp() {
   // Entity form save
   document.getElementById('btn-save-entity').addEventListener('click', handleEntitySubmit);
   document.getElementById('form-entity').addEventListener('submit', (e) => { e.preventDefault(); handleEntitySubmit(); });
+
+  // School form save
+  document.getElementById('btn-save-school').addEventListener('click', handleSchoolSubmit);
 
   // Sidebar
   document.getElementById('sidebar-toggle').addEventListener('click', () => {
