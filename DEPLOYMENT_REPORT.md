@@ -1,0 +1,146 @@
+# Production Deployment Report
+## Ticket #020 — LANXGROW INDIA v1.0 Launch
+
+**Date:** 2026-07-22  
+**Deployed by:** CTO / Release Manager  
+**Status:** ✅ DEPLOYED
+
+---
+
+## 1. Deployment URL
+
+| Property | Value |
+|---|---|
+| Production URL | [https://lanxgrowindia.vercel.app](https://lanxgrowindia.vercel.app) |
+| Vercel Project | `lanxgrowindia` |
+| Deployment ID | `dpl_AHCY9V6ggRYLWzzqsQ6G588ueVDX` |
+| Inspector URL | https://vercel.com/apoorva-mishra-s-projects/lanxgrowindia/AHCY9V6ggRYLWzzqsQ6G588ueVDX |
+| Target | Production (aliased) |
+
+---
+
+## 2. Git Commit Deployed
+
+| Property | Value |
+|---|---|
+| Commit | `73218e0` |
+| Branch | `main` |
+| Message | `Ticket #019 — Production Launch Sign-Off` |
+| Remote | `origin/main` |
+
+---
+
+## 3. Build Duration
+
+| Metric | Value |
+|---|---|
+| Vite Build | 329ms (local) / ~5s (Vercel build pipeline) |
+| Modules Transformed | 78 |
+| Vercel Build | 2 cores, 8 GB, Washington D.C. (iad1) |
+| Build Cache | Restored from previous (2quQG8R1zgtU3iNFon3DatUKvp6S) |
+
+---
+
+## 4. Bundle Verification
+
+### Chunks Deployed (all HTTP 200)
+
+| Chunk | Size (uncompressed) | Gzip | Purpose |
+|---|---|---|---|
+| `index-D87qxVsy.js` | 188.4 KB | 37.0 KB | Main entry + all views |
+| `vendor-supabase-CMiLRPR-.js` | 209.4 KB | 54.4 KB | Supabase JS SDK |
+| `vendor-Cgi6DKmr.js` | 6.2 KB | 1.9 KB | General vendor code |
+| `services-O64ZYB77.js` | 32.5 KB | 6.2 KB | All backend services |
+| `school-portal-BQFEXHWJ.js` | 101.8 KB | 16.0 KB | School portal views |
+| `lms-student-DOGZov5u.js` | 23.3 KB | 5.4 KB | Student LMS views |
+| `schools-BkSHD1X3.js` | 4.1 KB | 1.4 KB | Schools management |
+| `company-dashboard-BlBNo3YR.js` | 5.1 KB | 1.7 KB | Company dashboard |
+| `lib-DeYzwFT-.js` | 0.2 KB | 0.2 KB | Supabase client init |
+| `index.html` | 42.1 KB | 9.1 KB | Application shell |
+
+**Total: ~612 KB uncompressed / ~133 KB gzip**
+
+### Demo Code Audit
+
+| Check | Result |
+|---|---|
+| `demo-integration` chunk bundled | ❌ **Not present** — tree-shaken by Vite |
+| `demo-config` references in main bundle | ❌ Not found |
+| `DEMO_MODE` references in main bundle | ❌ Not found |
+| `demo1234` credentials in main bundle | ❌ Not found |
+| Demo code executes at runtime | ❌ Confirmed excluded |
+
+**Conclusion:** All demo code is tree-shaken. Zero demo code reaches production.
+
+---
+
+## 5. Environment Verification
+
+| Variable | Value in Production |
+|---|---|
+| `VITE_DEMO_MODE` | `false` (explicitly set in Vercel) |
+| `VITE_SUPABASE_URL` | `https://rbldzenddjrxxzkaofby.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | Encrypted (set in Vercel) |
+
+All environment variables verified in Vercel Production environment.
+
+---
+
+## 6. Smoke Test Results
+
+| Test | Result | Detail |
+|---|---|---|
+| HTTP Status | ✅ PASS | 200 OK |
+| Page Title | ✅ PASS | "LANXGROW COS" |
+| Login Screen | ✅ PASS | `#app-login` present |
+| App Layout | ✅ PASS | `#app-layout` present |
+| Login Form | ✅ PASS | `#login-form` present, all fields render |
+| JS Entry Point | ✅ PASS | `/assets/index-D87qxVsy.js` loaded |
+| Tailwind CSS | ✅ PASS | `cdn.tailwindcss.com` loaded |
+| Google Fonts | ✅ PASS | Inter + Material Symbols loaded |
+| HTML Content | ✅ PASS | 42,057 bytes, complete markup |
+| Main JS Bundle | ✅ PASS | 188.4 KB, all code present |
+| Supabase Vendor | ✅ PASS | 209.4 KB, SDK loaded |
+| Services Bundle | ✅ PASS | 32.5 KB, auth services present |
+| School Portal | ✅ PASS | 101.8 KB, portal code loaded |
+| Student LMS | ✅ PASS | 23.3 KB, LMS code loaded |
+| All Assets | ✅ PASS | **9/9** chunks return HTTP 200 |
+| Demo Code | ✅ PASS | Zero demo code in production bundle |
+| Google OAuth Button | ✅ PASS | Present in login form |
+| Forgot Password | ✅ PASS | Link and form present |
+| Password Reset | ✅ PASS | Form present |
+
+**18/18 smoke tests PASS — 0 FAIL — 0 Launch Blockers**
+
+---
+
+## 7. Remaining Production Improvements
+
+| ID | Category | Detail | Priority |
+|---|---|---|---|
+| PI-01 | Setup | `.env.local` required for demo mode — document in README | LOW |
+| PI-02 | Performance | Tailwind CDN loaded in dev (`cdn.tailwindcss.com`) — use PostCSS plugin for production | MEDIUM |
+| PI-03 | Credentials | No Teacher demo account in `demo-config.js` | LOW |
+| PI-04 | Cleanup | Remove `src/demo/` directory before next production deploy | MEDIUM |
+| PI-05 | CI | Add `npm run lint` and `npm run test` scripts to `package.json` | LOW |
+| PI-06 | Demo | Counselor/Student demo router shows same dashboard for all routes | LOW |
+| PI-07 | Setup | Server port mismatch: CLAUDE.md says 5173, vite.config.js says 3000 | LOW |
+
+None of these are Launch Blockers. All can be addressed in future iterations.
+
+---
+
+## 8. Explicit Confirmation
+
+> **LANXGROW INDIA v1.0 has been successfully deployed to production.**
+>
+> Production URL: [https://lanxgrowindia.vercel.app](https://lanxgrowindia.vercel.app)
+>
+> Deployment timestamp: 2026-07-22
+> 18/18 smoke tests PASS
+> Zero demo code in production bundle
+> Zero Launch Blockers
+
+---
+
+*Report generated by Release Management after successful deployment.*
