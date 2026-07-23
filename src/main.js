@@ -380,7 +380,6 @@ window.AppSidebar = {
     { id: 'sep-s1', separator: true },
     { id: 'school-students', label: 'Students', icon: 'groups', route: 'school-students' },
     { id: 'school-counselors', label: 'Counselors', icon: 'badge', route: 'school-counselors' },
-    { id: 'school-teachers', label: 'Teachers', icon: 'school', route: 'school-teachers' },
     { id: 'sep-s2', separator: true },
     { id: 'school-courses', label: 'Courses', icon: 'book-open', route: 'school-courses' },
     { id: 'school-categories', label: 'Categories', icon: 'folder-tree', route: 'school-categories' },
@@ -644,30 +643,34 @@ window.AppRouter = {
         break;
       }
       case 'content-manager':
-        await this.renderContentManager(main);
+        try { await this.renderContentManager(main); } catch (err) { this._renderError(main, err); }
         break;
       case 'drive-manager':
-        await this.renderDriveManager(main);
+        try { await this.renderDriveManager(main); } catch (err) { this._renderError(main, err); }
         break;
       case 'media-library':
-        await this.renderMediaLibrary(main);
+        try { await this.renderMediaLibrary(main); } catch (err) { this._renderError(main, err); }
         break;
       case 'school-admins':
-        await this.renderSchoolAdmins(main);
+        try { await this.renderSchoolAdmins(main); } catch (err) { this._renderError(main, err); }
         break;
       case 'roles-permissions':
-        await this.renderRolesPermissions(main);
+        try { await this.renderRolesPermissions(main); } catch (err) { this._renderError(main, err); }
         break;
       case 'company-settings':
-        await this.renderCompanySettings(main);
+        try { await this.renderCompanySettings(main); } catch (err) { this._renderError(main, err); }
         break;
       case 'audit-log':
-        await AppAuditLog.render(main);
+        try { await AppAuditLog.render(main); } catch (err) { this._renderError(main, err); }
         break;
       default:
-        await this.renderCompanyDashboard(main);
+        try { await this.renderCompanyDashboard(main); } catch (err) { this._renderError(main, err); }
         break;
     }
+  },
+
+  _renderError(main, err) {
+    main.innerHTML = `<div class="empty-state" style="padding:60px;"><span class="material-symbols-outlined" style="font-size:48px;color:#ef4444;">error</span><h3>Something went wrong</h3><p>${AppUtils.escapeHtml(err.message)}</p><button class="btn btn-primary" onclick="AppRouter.render()">Retry</button></div>`;
   },
 
   // --- SCHOOL WORKSPACE (dispatcher) ---
@@ -750,12 +753,10 @@ window.AppRouter = {
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-students"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">person_add</span> Add Student</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-counselors"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">support_agent</span> Add Counselor</button>
-            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="disabled-nav"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">school</span> Add Teacher</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-courses"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">playlist_add</span> Create Course</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-assignments"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">assignment</span> Assign Course</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-categories"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">folder</span> Categories</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-reports"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">bar_chart</span> Reports</button>
-            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="disabled-nav"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">cloud</span> Drive</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-videos"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">video_library</span> Videos</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-notifications"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">notifications</span> Notifications${schoolNotifications.filter(n => !n.is_read).length ? `<span style="background:var(--danger);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;">${schoolNotifications.filter(n => !n.is_read).length}</span>` : ''}</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-settings"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">settings</span> Settings</button>
@@ -1024,21 +1025,7 @@ window.AppRouter = {
       return;
     }
     if (this.currentRoute === 'school-teachers') {
-      main.innerHTML = `<div class="fade-in">
-        <div class="page-header">
-          <div class="page-header-left">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-              <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-              <span style="font-size:12px;color:var(--text-secondary);">${schoolName}</span>
-            </div>
-            <h1 class="page-title">Teachers</h1><p class="page-subtitle">Manage teachers for ${schoolName}.</p>
-          </div>
-        </div>
-        <div class="card">
-          <div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">school</span><h3>Teacher Management</h3><p>Teacher management will be available in a future update.</p></div>
-        </div>
-      </div>`;
-      initIcons();
+      this.navigate('school-dashboard');
       return;
     }
     if (this.currentRoute === 'school-courses') {
@@ -2616,7 +2603,7 @@ document.addEventListener('click', async function (e) {
   if (action === 'edit-school') { AppSchools.edit(id); return; }
   if (action === 'open-school') { AppRouter.navigate('school-dashboard', { schoolId: id }); return; }
   if (action === 'refresh-schools') { AppRouter._schoolSearchQuery = ''; AppRouter._schoolsPage = 1; AppRouter.render(); return; }
-  if (action === 'schools-page') { AppRouter._schoolsPage = parseInt(el.dataset.page); AppRouter.render(); return; }
+  if (action === 'schools-page') { AppRouter._schoolsPage = parseInt(el.dataset.page) || 1; AppRouter.render(); return; }
   if (action === 'school-search-input') { return; }
 
   // Categories
@@ -2660,7 +2647,7 @@ document.addEventListener('click', async function (e) {
   if (action === 'activate-user') { AppUserManagement.confirmActivate(id); return; }
   if (action === 'delete-user') { AppUserManagement.confirmDelete(id); return; }
   if (action === 'um-tab') { AppUserManagement.switchTab(el.dataset.tab); return; }
-  if (action === 'um-page') { AppUserManagement.currentPage = parseInt(el.dataset.page); AppUserManagement.render(document.getElementById('main-content')); return; }
+  if (action === 'um-page') { AppUserManagement.currentPage = parseInt(el.dataset.page) || 1; AppUserManagement.render(document.getElementById('main-content')); return; }
   // Confirm delete
   if (action === 'confirm-delete-entity') {
     const etype = el.getAttribute('data-entity-type');
@@ -2898,7 +2885,7 @@ document.addEventListener('click', async function (e) {
     catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
     return;
   }
-  if (action === 'sp-student-page') { window.SchoolStudents.currentPage = parseInt(el.dataset.page); AppRouter.render(); return; }
+  if (action === 'sp-student-page') { window.SchoolStudents.currentPage = parseInt(el.dataset.page) || 1; AppRouter.render(); return; }
   if (action === 'sp-view-student') { window.SchoolStudents.viewStudent(id); return; }
   if (action === 'sp-download-profile') {
     try {
@@ -2940,7 +2927,7 @@ document.addEventListener('click', async function (e) {
     catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
     return;
   }
-  if (action === 'sp-counselor-page') { window.SchoolCounselors.currentPage = parseInt(el.dataset.page); AppRouter.render(); return; }
+  if (action === 'sp-counselor-page') { window.SchoolCounselors.currentPage = parseInt(el.dataset.page) || 1; AppRouter.render(); return; }
 
   // Courses
   if (action === 'sp-add-course') { window.SchoolCourses.openAdd(AppRouter.currentSchoolId); return; }
@@ -2956,7 +2943,7 @@ document.addEventListener('click', async function (e) {
     catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
     return;
   }
-  if (action === 'sp-course-page') { window.SchoolCourses.currentPage = parseInt(el.dataset.page); AppRouter.render(); return; }
+  if (action === 'sp-course-page') { window.SchoolCourses.currentPage = parseInt(el.dataset.page) || 1; AppRouter.render(); return; }
   if (action === 'sp-toggle-section') {
     const courseId = el.dataset.courseId;
     const sectionId = el.dataset.sectionId;
@@ -4134,8 +4121,12 @@ async function initApp() {
 
   // Top nav
   document.getElementById('btn-topnav-search').addEventListener('click', () => { AppGlobalSearch.open(); });
-  document.getElementById('btn-notifications').addEventListener('click', () => { AppToast.show('No new notifications.'); });
-  document.getElementById('btn-theme-toggle').addEventListener('click', () => { AppToast.show('Dark mode coming soon.'); });
+  document.getElementById('btn-notifications').addEventListener('click', () => { AppRouter.navigate('school-notifications'); });
+  document.getElementById('btn-theme-toggle').addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+    const isDark = document.documentElement.classList.contains('dark');
+    AppToast.show(isDark ? 'Dark mode enabled.' : 'Light mode enabled.');
+  });
 
   // Logout
   document.getElementById('btn-logout').addEventListener('click', async () => {

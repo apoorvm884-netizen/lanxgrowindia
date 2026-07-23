@@ -68,7 +68,7 @@ window.SchoolStudents = {
         <span style="font-size:11px;color:var(--text-muted);margin-left:auto;">Showing ${pageItems.length} of ${students.length} students</span>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
-        ${students.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">groups</span><h3>No students match your search</h3><p>Try adjusting your filters or add a new student.</p></div>`
+        ${students.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">groups</span><h3>${q ? 'No students match your search' : 'No students enrolled yet'}</h3><p>${q ? 'Try adjusting your filters.' : 'Enroll students to get started with your school.'}</p>${q ? '' : `<button class="btn btn-primary" data-action="sp-add-student" style="margin-top:12px;"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span> Add Student</button>`}</div>`
         : `<div class="table-container"><table><thead><tr><th>Name</th><th>Email</th><th>Class</th><th>Counselor</th><th>Status</th><th>Courses</th><th style="width:140px;"></th></tr></thead><tbody>
           ${pageItems.map(s => {
             const counselor = counselors.find(c => c.id === s.counselor_id);
@@ -325,7 +325,7 @@ window.SchoolStudents = {
   async confirmDelete(studentId) {
     try {
       const student = await window.StudentService?.getById(studentId);
-      const existing = document.getElementById('modal-confirm');
+      const existing = document.getElementById('modal-confirm-student');
       if (existing) existing.remove();
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
@@ -563,7 +563,7 @@ window.SchoolCounselors = {
         <span style="font-size:11px;color:var(--text-muted);margin-left:auto;">Showing ${pageItems.length} of ${counselors.length} counselors</span>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
-        ${counselors.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">badge</span><h3>No counselors match your search</h3><p>Try adjusting your filters or add a new counselor.</p></div>`
+        ${counselors.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">badge</span><h3>${q ? 'No counselors match your search' : 'No counselors yet'}</h3><p>${q ? 'Try adjusting your filters.' : 'Add counselors to support your students.'}</p>${q ? '' : `<button class="btn btn-primary" data-action="sp-add-counselor" style="margin-top:12px;"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span> Add Counselor</button>`}</div>`
         : `<div class="table-container"><table><thead><tr><th>Name</th><th>Employee ID</th><th>Department</th><th>Students</th><th>Qualification</th><th>Experience</th><th>Status</th><th style="width:140px;"></th></tr></thead><tbody>
           ${pageItems.map(c => {
             const studentCount = students.filter(s => s.counselor_id === c.id).length;
@@ -760,7 +760,7 @@ window.SchoolCounselors = {
     try {
       const data = await AppStorage.load();
       const counselor = (data.counselors || []).find(c => c.id === counselorId);
-      const existing = document.getElementById('modal-confirm');
+      const existing = document.getElementById('modal-confirm-counselor');
       if (existing) existing.remove();
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
@@ -926,7 +926,7 @@ window.SchoolCourses = {
         <span style="font-size:11px;color:var(--text-muted);margin-left:auto;">Showing ${pageItems.length} of ${courses.length} courses</span>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
-        ${courses.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">school</span><h3>No courses match your search</h3><p>Create your first course or try a different search.</p></div>`
+        ${courses.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">school</span><h3>${q ? 'No courses match your search' : 'No courses yet'}</h3><p>${q ? 'Try adjusting your filters.' : 'Create your first course to get started.'}</p>${q ? '' : `<button class="btn btn-primary" data-action="sp-add-course" style="margin-top:12px;"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add Course</button>`}</div>`
         : `<div class="table-container"><table><thead><tr><th>Name</th><th>Difficulty</th><th>Status</th><th>Sections</th><th>Students</th><th>Created</th><th style="width:140px;"></th></tr></thead><tbody>
           ${pageItems.map(c => {
             const sections = data.courseSections?.filter(cs => cs.course_id === c.id) || [];
@@ -1211,18 +1211,20 @@ window.SchoolCourses = {
     initIcons();
   },
 
-  confirmDelete(courseId) {
-    const existing = document.getElementById('modal-confirm');
+  async confirmDelete(courseId) {
+    const course = await window.CourseService?.getById(courseId).catch(() => null);
+    const existing = document.getElementById('modal-confirm-course');
     if (existing) existing.remove();
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'modal-confirm-course';
+    const name = course?.name || 'this course';
     overlay.innerHTML = `<div class="modal" style="max-width:400px;">
       <div class="modal-header"><h3 class="modal-title">Confirm Delete</h3><button class="modal-close" data-close-modal="modal-confirm-course"><span class="material-symbols-outlined">close</span></button></div>
       <div class="modal-body">
         <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fef2f2;border-radius:8px;">
           <span class="material-symbols-outlined" style="font-size:24px;color:#ef4444;">warning</span>
-          <span style="font-size:13px;">Delete this course? Students enrolled will be unlinked.</span>
+          <span style="font-size:13px;">Delete "${AppUtils.escapeHtml(name)}"? Students enrolled will be unlinked.</span>
         </div>
       </div>
       <div class="modal-footer">
@@ -1440,7 +1442,7 @@ window.SchoolAssignments = {
         <span style="font-size:11px;color:var(--text-muted);">${enrollments.length} total enrollments</span>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
-        ${enrollments.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">assignment</span><h3>No assignments yet</h3><p>Enroll students in courses to see them here.</p></div>`
+        ${enrollments.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">assignment</span><h3>No assignments yet</h3><p>Enroll students in courses to see them here.</p><button class="btn btn-primary" data-action="navigate" data-route="school-courses" style="margin-top:12px;"><span class="material-symbols-outlined" style="font-size:18px;">school</span> Browse Courses</button></div>`
         : `<div class="table-container"><table><thead><tr><th>Student</th><th>Course</th><th>Status</th><th>Assigned</th><th style="width:80px;"></th></tr></thead><tbody>
           ${enrollments.map(e => {
             const student = students.find(s => s.id === e.student_id);
@@ -1459,8 +1461,20 @@ window.SchoolAssignments = {
     initIcons();
   },
 
-  confirmRemoveEnrollment(enrollmentId) {
-    const existing = document.getElementById('modal-confirm');
+  async confirmRemoveEnrollment(enrollmentId) {
+    let studentName = 'this student', courseName = 'this course';
+    try {
+      const enrollment = await window.EnrollmentService?.getById(enrollmentId);
+      if (enrollment) {
+        const [student, course] = await Promise.all([
+          window.StudentService?.getById(enrollment.student_id),
+          window.CourseService?.getById(enrollment.course_id)
+        ]);
+        if (student) studentName = student.name;
+        if (course) courseName = course.name;
+      }
+    } catch (e) { /* best-effort name resolution */ }
+    const existing = document.getElementById('modal-confirm-enrollment');
     if (existing) existing.remove();
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -1470,7 +1484,7 @@ window.SchoolAssignments = {
       <div class="modal-body">
         <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fef2f2;border-radius:8px;">
           <span class="material-symbols-outlined" style="font-size:24px;color:#ef4444;">warning</span>
-          <span style="font-size:13px;">Remove this enrollment? The student will be unlinked from this course.</span>
+          <span style="font-size:13px;">Remove "${AppUtils.escapeHtml(studentName)}" from "${AppUtils.escapeHtml(courseName)}"?</span>
         </div>
       </div>
       <div class="modal-footer">
@@ -1649,7 +1663,7 @@ window.SchoolNotifications = {
         <span style="font-size:11px;color:var(--text-muted);margin-left:auto;">${notifications.length} notification${notifications.length !== 1 ? 's' : ''}</span>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
-        ${notifications.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">notifications_off</span><h3>All caught up!</h3><p>${filter === 'unread' ? 'No unread notifications.' : 'No notifications yet.'}</p></div>`
+        ${notifications.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">notifications_off</span><h3>All caught up!</h3><p>${filter === 'unread' ? 'No unread notifications.' : 'No notifications yet.'}</p><button class="btn btn-primary" data-action="sp-send-notification" style="margin-top:12px;"><span class="material-symbols-outlined" style="font-size:18px;">send</span> Send Notification</button></div>`
         : `<div style="display:flex;flex-direction:column;">${notifications.map(n => `
           <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border);${!n.is_read ? 'background:var(--primary-subtle);' : ''}">
             <div style="width:8px;height:8px;border-radius:50%;background:${n.is_read ? 'var(--border)' : 'var(--primary)'};margin-top:6px;flex-shrink:0;cursor:pointer;" data-action="sp-mark-notification-read" data-id="${n.id}" title="${n.is_read ? 'Read' : 'Mark as read'}"></div>
@@ -1707,7 +1721,7 @@ window.SchoolNotifications = {
     const message = document.getElementById('sp-notif-message')?.value?.trim() || null;
     const recipientId = document.getElementById('sp-notif-recipient')?.value || null;
     const btn = document.getElementById('sp-btn-send-notification');
-    if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Sending...'; }
     try {
       if (recipientId) {
         await window.NotificationService?.create(title, message, recipientId);
@@ -1775,12 +1789,15 @@ window.SchoolSettings = {
     const principal = document.getElementById('sp-setting-principal')?.value?.trim();
     const status = document.getElementById('sp-setting-status')?.value;
     if (!name) { AppToast.show('School name is required.', 'error'); return; }
+    const btn = document.querySelector('[data-action="sp-save-settings"]');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...'; }
     try {
       await SchoolService.update(schoolId, { name, code, principal_name: principal, status });
       AppToast.show('School settings updated.', 'success');
       AppStorage.invalidate();
       AppRouter.render();
     } catch (err) { AppToast.show(err.message || 'Failed to save settings.', 'error'); }
+    if (btn) { btn.disabled = false; btn.innerHTML = 'Save Changes'; }
   }
 };
 
@@ -1862,7 +1879,7 @@ window.SchoolVideos = {
           <option value="Video">Video</option><option value="PDF">PDF</option><option value="Image">Image</option><option value="Document">Document</option><option value="Other">Other</option>
         </select>
       </div>
-      ${items.length === 0 ? `<div class="card"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">video_library</span><h3>No media available</h3><p>${content.length === 0 ? 'Upload videos and documents to your courses.' : 'No media matches your search criteria.'}</p></div></div>`
+      ${items.length === 0 ? `<div class="card"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">video_library</span><h3>No media available</h3><p>${content.length === 0 ? 'Upload videos and documents to your courses.' : 'No media matches your search criteria.'}</p>${content.length === 0 ? `<button class="btn btn-primary" data-action="add-content" style="margin-top:12px;"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add Content</button>` : ''}</div></div>`
       : `<div class="subjects-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));">${items.map(m => {
         const isVideo = m.type === 'Video';
         const stats = window.VIDEO_VIEWS?.[m.id] || {};
@@ -1981,7 +1998,10 @@ window.SchoolVideos = {
   },
 
   confirmDelete(videoId) {
-    const existing = document.getElementById('modal-confirm');
+    const data = window.AppStorage._cache || {};
+    const video = data.content?.find(c => c.id === videoId);
+    const name = video?.name || 'this item';
+    const existing = document.getElementById('modal-confirm-video');
     if (existing) existing.remove();
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -1991,7 +2011,7 @@ window.SchoolVideos = {
       <div class="modal-body">
         <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fef2f2;border-radius:8px;">
           <span class="material-symbols-outlined" style="font-size:24px;color:#ef4444;">warning</span>
-          <span style="font-size:13px;">Delete this video permanently? This action cannot be undone.</span>
+          <span style="font-size:13px;">Delete "${AppUtils.escapeHtml(name)}" permanently? This action cannot be undone.</span>
         </div>
       </div>
       <div class="modal-footer">
