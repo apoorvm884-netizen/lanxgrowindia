@@ -271,45 +271,6 @@ window.SchoolStudents = {
     }
   },
 
-  async openEdit(studentId) {
-    try {
-      const student = await window.StudentService?.getById(studentId);
-      if (!student) return;
-      const data = await AppStorage.load();
-      const school = data.schools.find(s => s.id === student.school_id);
-      const counselors = data.users.filter(u => u.schoolId === student.school_id && u.role === 'counselor');
-      const existing = document.getElementById('modal-student');
-      if (existing) existing.remove();
-      const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-      overlay.id = 'modal-student';
-      overlay.innerHTML = `<div class="modal">
-        <div class="modal-header"><h3 class="modal-title">Edit Student</h3><button class="modal-close" data-close-modal="modal-student"><span class="material-symbols-outlined">close</span></button></div>
-        <div class="modal-body">
-          <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="sp-input-student-name" value="${eh(student.name)}"></div>
-          <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="sp-input-student-email" value="${eh(student.email || '')}"></div>
-          <div class="form-group"><label class="form-label">Class</label><input type="text" class="form-input" id="sp-input-student-class" value="${eh(student.class || '')}"></div>
-          <div class="form-group"><label class="form-label">Section</label><input type="text" class="form-input" id="sp-input-student-section" value="${eh(student.section || '')}"></div>
-          <div class="form-group"><label class="form-label">Assign Counselor</label>
-            <select class="form-select" id="sp-input-student-counselor"><option value="">None</option>${counselors.map(c => `<option value="${c.id}" ${c.id === student.counselor_id ? 'selected' : ''}>${eh(c.name)}</option>`).join('')}</select>
-          </div>
-          <div class="form-group"><label class="form-label">Status</label>
-            <select class="form-select" id="sp-input-student-status"><option value="active" ${student.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${student.status === 'inactive' ? 'selected' : ''}>Inactive</option><option value="suspended" ${student.status === 'suspended' ? 'selected' : ''}>Suspended</option></select>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-close-modal="modal-student">Cancel</button>
-          <button class="btn btn-primary" data-action="sp-update-student" data-id="${student.id}" id="sp-btn-save-student">Save Changes</button>
-        </div>
-      </div>`;
-      document.body.appendChild(overlay);
-      AppModal.open(overlay.id);
-      setTimeout(() => document.getElementById('sp-input-student-name')?.focus(), 100);
-    } catch (err) {
-      AppToast.show(err.message || 'Failed to load student.', 'error');
-    }
-  },
-
   async save(isUpdate, studentId) {
     const name = document.getElementById('sp-input-student-name')?.value?.trim();
     if (!name) { AppToast.show('Name is required.', 'error'); return; }
@@ -340,12 +301,12 @@ window.SchoolStudents = {
         const student = await window.StudentService?.create({ ...updates, schoolId });
         if (student) {
           if (counselorId) {
-            try { await window.NotificationService?.create('Student Created', `New student "${name}" has been assigned to you.`, counselorId); } catch (e) { /* best-effort */ }
+            try { await window.NotificationService?.create('Student Created', `New student "${name}" has been assigned to you.`, counselorId); } catch (e) { console.warn('Failed to send notification:', e); }
           }
           if (assignedCourses.length > 0) {
             const profile = await AuthService.getProfile();
             for (const courseId of assignedCourses) {
-              try { await window.EnrollmentService?.create(student.id, courseId, profile?.id || null); } catch (e) { console.error('Failed to enroll:', e); }
+              try { await window.EnrollmentService?.create(student.id, courseId, profile?.id || null); } catch (e) { console.warn('Failed to enroll student in course:', e); AppToast.show(`Failed to enroll in "${courseId}"`, 'warn'); }
             }
             AppToast.show(`${assignedCourses.length} course(s) assigned.`, 'success');
           }

@@ -2614,7 +2614,6 @@ document.addEventListener('click', async function (e) {
   // Schools
   if (action === 'add-school') { openSchoolForm(); return; }
   if (action === 'edit-school') { AppSchools.edit(id); return; }
-  if (action === 'delete-school') { AppSchools.confirmDelete(id); return; }
   if (action === 'open-school') { AppRouter.navigate('school-dashboard', { schoolId: id }); return; }
   if (action === 'refresh-schools') { AppRouter._schoolSearchQuery = ''; AppRouter._schoolsPage = 1; AppRouter.render(); return; }
   if (action === 'schools-page') { AppRouter._schoolsPage = parseInt(el.dataset.page); AppRouter.render(); return; }
@@ -2652,12 +2651,6 @@ document.addEventListener('click', async function (e) {
   if (action === 'delete-content') { AppContent.confirmDelete(id); return; }
   if (action === 'play-video' || action === 'view-content') { AppContent.play(id); return; }
   if (action === 'view-content-file') { AppContent.play(id); return; }
-  if (action === 'content-upload-file') {
-    const fileInput = document.getElementById('input-content-file');
-    if (fileInput) fileInput.click();
-    return;
-  }
-
   // Admin
   // User Management
   if (action === 'add-user') { AppToast.show('User invitation — coming in a future update.', 'info'); return; }
@@ -2668,22 +2661,6 @@ document.addEventListener('click', async function (e) {
   if (action === 'delete-user') { AppUserManagement.confirmDelete(id); return; }
   if (action === 'um-tab') { AppUserManagement.switchTab(el.dataset.tab); return; }
   if (action === 'um-page') { AppUserManagement.currentPage = parseInt(el.dataset.page); AppUserManagement.render(document.getElementById('main-content')); return; }
-  // Legacy admin handlers (kept for backward compat)
-  if (action === 'delete-admin') {
-    const schoolId = el.dataset.schoolId;
-    document.getElementById('confirm-text').textContent = 'Remove this school admin? The school itself will not be deleted.';
-    AppModal.open('modal-confirm');
-    document.getElementById('btn-confirm-action').setAttribute('data-action', 'confirm-delete-entity');
-    document.getElementById('btn-confirm-action').setAttribute('data-entity-type', 'admin');
-    document.getElementById('btn-confirm-action').setAttribute('data-entity-id', id);
-    document.getElementById('btn-confirm-action').setAttribute('data-school-id', schoolId);
-    return;
-  }
-  if (action === 'edit-admin') {
-    AppUserManagement.openEditModal(id);
-    return;
-  }
-
   // Confirm delete
   if (action === 'confirm-delete-entity') {
     const etype = el.getAttribute('data-entity-type');
@@ -2841,56 +2818,6 @@ document.addEventListener('click', async function (e) {
       AppModal.open(overlay.id);
     } else {
       AppToast.show('No image URL available.', 'warn');
-    }
-    return;
-  }
-
-  // Review
-  if (action === 'add-timestamp') {
-    const list = document.getElementById('timestamp-list');
-    const notes = document.getElementById('review-notes');
-    if (list) {
-      const time = new Date().toLocaleTimeString([], { minute: '2-digit', second: '2-digit' });
-      const note = notes ? notes.value.trim() : '';
-      const item = document.createElement('div');
-      item.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:13px;';
-      item.innerHTML = `<span style="color:var(--primary);font-weight:600;cursor:pointer;">${AppUtils.escapeHtml(time)}</span><span style="color:var(--text-secondary);">${AppUtils.escapeHtml(note || 'Review note')}</span>`;
-      list.appendChild(item);
-      if (notes) notes.value = '';
-    }
-    AppToast.show('Timestamp marker added.', 'success');
-    return;
-  }
-  if (action === 'review-approve') {
-    const contentId = document.getElementById('video-content-id')?.textContent;
-    if (contentId) {
-      try {
-        await window.ContentService?.update(contentId, { status: 'published' });
-        await AppStorage.load(true);
-        AppToast.show('Content approved and published.', 'success');
-      } catch (err) { AppToast.show(err.message || 'Failed to approve content.', 'error'); }
-    }
-    return;
-  }
-  if (action === 'review-request') {
-    const contentId = document.getElementById('video-content-id')?.textContent;
-    if (contentId) {
-      try {
-        await window.ContentService?.update(contentId, { status: 'review' });
-        await AppStorage.load(true);
-        AppToast.show('Revision requested.', 'info');
-      } catch (err) { AppToast.show(err.message || 'Failed to update content.', 'error'); }
-    }
-    return;
-  }
-  if (action === 'review-reject') {
-    const contentId = document.getElementById('video-content-id')?.textContent;
-    if (contentId) {
-      try {
-        await window.ContentService?.update(contentId, { status: 'draft' });
-        await AppStorage.load(true);
-        AppToast.show('Content rejected.', 'error');
-      } catch (err) { AppToast.show(err.message || 'Failed to reject content.', 'error'); }
     }
     return;
   }
@@ -3211,12 +3138,6 @@ document.addEventListener('click', async function (e) {
   // LMS — Student Portal (lazy-load lms-student.js)
   async function _ensureStudentPortal() {
     if (!window.StudentPortal) await import('./lms-student.js');
-  }
-  if (action === 'sp-open-student-portal') {
-    const studentId = el.dataset.studentId || id;
-    await _ensureStudentPortal();
-    window.StudentPortal.dashboard(studentId);
-    return;
   }
   if (action === 'sp-open-course-player') {
     const studentId = el.dataset.studentId;
@@ -3820,8 +3741,6 @@ document.addEventListener('click', async function (e) {
     catch (err) { AppToast.show(err.message, 'error'); }
     return;
   }
-  // Notification filter change
-  if (action === 'sp-notif-filter') { AppRouter.render(); return; }
   // Video actions
   if (action === 'sp-view-video') { window.SchoolVideos.viewVideo(id); return; }
   if (action === 'sp-delete-content') { window.SchoolVideos.confirmDelete(id); return; }
@@ -3905,11 +3824,6 @@ document.addEventListener('click', async function (e) {
     return;
   }
 
-  // Close modal
-  if (action === 'close-modal') {
-    AppModal.close(el.dataset.closeModal || el.closest('.modal-overlay')?.id);
-    return;
-  }
 });
 
 // ==============================================================
@@ -4066,22 +3980,6 @@ document.addEventListener('keydown', function (e) {
     const searchModal = document.getElementById('modal-global-search');
     if (searchModal && searchModal.classList.contains('active')) { AppModal.close('modal-global-search'); }
     else { AppGlobalSearch.open(); }
-  }
-});
-
-// ==============================================================
-// SCHOOL SEARCH — debounced keyup handler
-// ==============================================================
-let schoolSearchTimer;
-document.addEventListener('keyup', function (e) {
-  const input = e.target.closest('#school-search');
-  if (input) {
-    clearTimeout(schoolSearchTimer);
-    schoolSearchTimer = setTimeout(() => {
-      AppRouter._schoolSearchQuery = input.value;
-      AppRouter._schoolsPage = 1;
-      AppRouter.render();
-    }, 300);
   }
 });
 
