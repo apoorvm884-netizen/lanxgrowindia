@@ -104,23 +104,84 @@ window.SchoolStudents = {
   },
 
   async openAdd(data, school) {
-    const counselors = data.users.filter(u => u.schoolId === school.id && u.role === 'counselor');
+    const counselors = (data.counselors || data.users || []).filter(u => u.schoolId === school.id && u.role === 'counselor');
+    const cats = (data.categories || []).filter(c => c.school_id === school.id);
+    const subjects = (data.subjects || []).filter(s => s.school_id === school.id);
+    const courses = (data.courses || []).filter(c => c.school_id === school.id);
+    const classes = [...new Set((data.students || []).filter(s => s.school_id === school.id).map(s => s.class).filter(Boolean))];
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'modal-student';
-    overlay.innerHTML = `<div class="modal">
+    overlay.innerHTML = `<div class="modal" style="max-width:640px;">
       <div class="modal-header"><h3 class="modal-title">Add Student</h3><button class="modal-close" data-close-modal="modal-student"><span class="material-symbols-outlined">close</span></button></div>
-      <div class="modal-body">
-        <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="sp-input-student-name" placeholder="Enter student name"></div>
-        <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="sp-input-student-email" placeholder="student@example.com"></div>
-        <div class="form-group"><label class="form-label">Class</label><input type="text" class="form-input" id="sp-input-student-class" placeholder="e.g. Class 9"></div>
-        <div class="form-group"><label class="form-label">Section</label><input type="text" class="form-input" id="sp-input-student-section" placeholder="e.g. A"></div>
-        <div class="form-group"><label class="form-label">Assign Counselor</label>
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Basic Information</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="sp-input-student-name" placeholder="Enter student name"></div>
+          <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="sp-input-student-email" placeholder="student@example.com"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:8px;">
+          <div class="form-group"><label class="form-label">Date of Birth</label><input type="date" class="form-input" id="sp-input-student-dob"></div>
+          <div class="form-group"><label class="form-label">Gender</label>
+            <select class="form-select" id="sp-input-student-gender"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">Admission No.</label><input type="text" class="form-input" id="sp-input-student-admission" placeholder="e.g. ADM-001"></div>
+        </div>
+
+        <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Guardian Information</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group"><label class="form-label">Parent/Guardian Name</label><input type="text" class="form-input" id="sp-input-student-parent" placeholder="Parent's full name"></div>
+          <div class="form-group"><label class="form-label">Parent Contact</label><input type="text" class="form-input" id="sp-input-student-parent-contact" placeholder="+91-98765-43210"></div>
+        </div>
+
+        <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">School Details</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div class="form-group"><label class="form-label">Class</label>
+            <select class="form-select" id="sp-input-student-class"><option value="">Select...</option>${classes.map(c => `<option value="${c}">${eh(c)}</option>`).join('')}<option value="Class 11">Class 11</option><option value="Class 12">Class 12</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">Section</label><input type="text" class="form-input" id="sp-input-student-section" placeholder="e.g. A"></div>
+          <div class="form-group"><label class="form-label">Academic Year</label>
+            <select class="form-select" id="sp-input-student-academic-year"><option value="2025-2026">2025-2026</option><option value="2026-2027">2026-2027</option></select>
+          </div>
+        </div>
+
+        <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Assignments</div>
+        <div class="form-group"><label class="form-label">Assigned Counselor</label>
           <select class="form-select" id="sp-input-student-counselor"><option value="">None</option>${counselors.map(c => `<option value="${c.id}">${eh(c.name)}</option>`).join('')}</select>
         </div>
-        <div class="form-group"><label class="form-label">Status</label>
-          <select class="form-select" id="sp-input-student-status"><option value="active">Active</option><option value="inactive">Inactive</option></select>
+        <div style="margin-top:8px;">
+          <div style="display:flex;gap:20px;">
+            <div style="flex:1;">
+              <label class="form-label">Assigned Categories</label>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;max-height:100px;overflow-y:auto;">${cats.map(c => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-student-cat" value="${c.id}"> ${eh(c.name)}</label>`).join('')}</div>
+            </div>
+            <div style="flex:1;">
+              <label class="form-label">Assigned Subjects</label>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;max-height:100px;overflow-y:auto;">${subjects.map(s => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-student-sub" value="${s.id}"> ${eh(s.name)}</label>`).join('')}</div>
+            </div>
+          </div>
         </div>
+        <div style="margin-top:8px;">
+          <label class="form-label">Assigned Courses (enroll on create)</label>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;max-height:100px;overflow-y:auto;">${courses.map(c => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-student-course" value="${c.id}"> ${eh(c.name)}</label>`).join('')}</div>
+        </div>
+
+        <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Status & Credentials</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group"><label class="form-label">Enrollment Status</label>
+            <select class="form-select" id="sp-input-student-status"><option value="active">Active</option><option value="inactive">Inactive</option></select>
+          </div>
+          <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;">
+            <div style="flex:1;">
+              <label class="form-label">Login Credentials</label>
+              <div style="display:flex;gap:4px;align-items:center;">
+                <input type="text" class="form-input" id="sp-input-student-username" placeholder="Auto-generated" readonly style="flex:1;font-size:12px;background:var(--border-light);">
+                <button class="btn btn-secondary btn-sm" data-action="sp-generate-creds" style="white-space:nowrap;font-size:11px;"><span class="material-symbols-outlined" style="font-size:14px;">autorenew</span> Generate</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:4px;"><label class="form-label">Notes</label><textarea class="form-input" id="sp-input-student-notes" placeholder="Optional notes..." style="height:50px;resize:vertical;"></textarea></div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" data-close-modal="modal-student">Cancel</button>
@@ -130,6 +191,84 @@ window.SchoolStudents = {
     document.body.appendChild(overlay);
     AppModal.open(overlay.id);
     setTimeout(() => document.getElementById('sp-input-student-name')?.focus(), 100);
+  },
+
+  async openEdit(studentId) {
+    try {
+      const student = await window.StudentService?.getById(studentId);
+      if (!student) return;
+      const data = await AppStorage.load();
+      const school = data.schools.find(s => s.id === student.school_id);
+      const counselors = (data.counselors || data.users || []).filter(u => u.schoolId === student.school_id && u.role === 'counselor');
+      const cats = (data.categories || []).filter(c => c.school_id === student.school_id);
+      const subjects = (data.subjects || []).filter(s => s.school_id === student.school_id);
+      const existing = document.getElementById('modal-student');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.id = 'modal-student';
+      overlay.innerHTML = `<div class="modal" style="max-width:640px;">
+        <div class="modal-header"><h3 class="modal-title">Edit Student</h3><button class="modal-close" data-close-modal="modal-student"><span class="material-symbols-outlined">close</span></button></div>
+        <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+          <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Basic Information</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="sp-input-student-name" value="${eh(student.name)}"></div>
+            <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="sp-input-student-email" value="${eh(student.email || '')}"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:8px;">
+            <div class="form-group"><label class="form-label">Date of Birth</label><input type="date" class="form-input" id="sp-input-student-dob" value="${eh(student.dob || '')}"></div>
+            <div class="form-group"><label class="form-label">Gender</label>
+              <select class="form-select" id="sp-input-student-gender"><option value="">Select...</option><option value="Male" ${student.gender === 'Male' ? 'selected' : ''}>Male</option><option value="Female" ${student.gender === 'Female' ? 'selected' : ''}>Female</option><option value="Other" ${student.gender === 'Other' ? 'selected' : ''}>Other</option></select>
+            </div>
+            <div class="form-group"><label class="form-label">Admission No.</label><input type="text" class="form-input" id="sp-input-student-admission" value="${eh(student.admission_no || '')}"></div>
+          </div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Guardian Information</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group"><label class="form-label">Parent/Guardian Name</label><input type="text" class="form-input" id="sp-input-student-parent" value="${eh(student.parent_name || '')}"></div>
+            <div class="form-group"><label class="form-label">Parent Contact</label><input type="text" class="form-input" id="sp-input-student-parent-contact" value="${eh(student.parent_contact || '')}"></div>
+          </div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">School Details</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div class="form-group"><label class="form-label">Class</label>
+              <select class="form-select" id="sp-input-student-class"><option value="">Select...</option>${[...new Set((data.students || []).filter(s => s.school_id === student.school_id).map(s => s.class).filter(Boolean)), 'Class 11', 'Class 12'].map(c => `<option value="${c}" ${student.class === c ? 'selected' : ''}>${eh(c)}</option>`).join('')}</select>
+            </div>
+            <div class="form-group"><label class="form-label">Section</label><input type="text" class="form-input" id="sp-input-student-section" value="${eh(student.section || '')}"></div>
+            <div class="form-group"><label class="form-label">Academic Year</label>
+              <select class="form-select" id="sp-input-student-academic-year"><option value="2025-2026" ${student.academic_year === '2025-2026' ? 'selected' : ''}>2025-2026</option><option value="2026-2027" ${student.academic_year === '2026-2027' ? 'selected' : ''}>2026-2027</option></select>
+            </div>
+          </div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Assignment</div>
+          <div class="form-group"><label class="form-label">Assigned Counselor</label>
+            <select class="form-select" id="sp-input-student-counselor"><option value="">None</option>${counselors.map(c => `<option value="${c.id}" ${c.id === student.counselor_id ? 'selected' : ''}>${eh(c.name)}</option>`).join('')}</select>
+          </div>
+          <div style="margin-top:8px;">
+            <div style="display:flex;gap:20px;">
+              <div style="flex:1;">
+                <label class="form-label">Assigned Categories</label>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;max-height:100px;overflow-y:auto;">${cats.map(c => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-student-cat" value="${c.id}" ${(student.assigned_categories || []).includes(c.id) ? 'checked' : ''}> ${eh(c.name)}</label>`).join('')}</div>
+              </div>
+              <div style="flex:1;">
+                <label class="form-label">Assigned Subjects</label>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;max-height:100px;overflow-y:auto;">${subjects.map(s => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-student-sub" value="${s.id}" ${(student.assigned_subjects || []).includes(s.id) ? 'checked' : ''}> ${eh(s.name)}</label>`).join('')}</div>
+              </div>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:12px;"><label class="form-label">Status</label>
+            <select class="form-select" id="sp-input-student-status"><option value="active" ${student.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${student.status === 'inactive' ? 'selected' : ''}>Inactive</option><option value="suspended" ${student.status === 'suspended' ? 'selected' : ''}>Suspended</option></select>
+          </div>
+          <div class="form-group" style="margin-top:8px;"><label class="form-label">Notes</label><textarea class="form-input" id="sp-input-student-notes" style="height:50px;resize:vertical;">${eh(student.notes || '')}</textarea></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close-modal="modal-student">Cancel</button>
+          <button class="btn btn-primary" data-action="sp-update-student" data-id="${student.id}" id="sp-btn-save-student">Save Changes</button>
+        </div>
+      </div>`;
+      document.body.appendChild(overlay);
+      AppModal.open(overlay.id);
+      setTimeout(() => document.getElementById('sp-input-student-name')?.focus(), 100);
+    } catch (err) {
+      AppToast.show(err.message || 'Failed to load student.', 'error');
+    }
   },
 
   async openEdit(studentId) {
@@ -175,21 +314,43 @@ window.SchoolStudents = {
     const name = document.getElementById('sp-input-student-name')?.value?.trim();
     if (!name) { AppToast.show('Name is required.', 'error'); return; }
     const email = document.getElementById('sp-input-student-email')?.value?.trim() || null;
-    const studentClass = document.getElementById('sp-input-student-class')?.value?.trim() || null;
+    const dob = document.getElementById('sp-input-student-dob')?.value || null;
+    const gender = document.getElementById('sp-input-student-gender')?.value || null;
+    const admissionNo = document.getElementById('sp-input-student-admission')?.value?.trim() || null;
+    const parentName = document.getElementById('sp-input-student-parent')?.value?.trim() || null;
+    const parentContact = document.getElementById('sp-input-student-parent-contact')?.value?.trim() || null;
+    const studentClass = document.getElementById('sp-input-student-class')?.value || null;
     const section = document.getElementById('sp-input-student-section')?.value?.trim() || null;
+    const academicYear = document.getElementById('sp-input-student-academic-year')?.value || null;
     const counselorId = document.getElementById('sp-input-student-counselor')?.value || null;
+    const notes = document.getElementById('sp-input-student-notes')?.value?.trim() || null;
     const status = document.getElementById('sp-input-student-status')?.value || 'active';
+    const assignedCategories = [...document.querySelectorAll('.sp-student-cat:checked')].map(el => el.value);
+    const assignedSubjects = [...document.querySelectorAll('.sp-student-sub:checked')].map(el => el.value);
+    const assignedCourses = [...document.querySelectorAll('.sp-student-course:checked')].map(el => el.value);
     const btn = document.getElementById('sp-btn-save-student');
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...'; }
     try {
       const schoolId = AppRouter.currentSchoolId;
-      const updates = { name, email, class: studentClass, section, counselorId, status };
+      const updates = { name, email, dob, gender, admissionNo, parentName, parentContact, class: studentClass, section, academicYear, counselorId, notes, status, assignedCategories, assignedSubjects };
       if (isUpdate) {
         await window.StudentService?.update(studentId, updates);
         AppToast.show('Student updated.', 'success');
       } else {
-        await window.StudentService?.create({ ...updates, schoolId });
-        AppToast.show('Student created.', 'success');
+        const student = await window.StudentService?.create({ ...updates, schoolId });
+        if (student) {
+          if (counselorId) {
+            try { await window.NotificationService?.create('Student Created', `New student "${name}" has been assigned to you.`, counselorId); } catch (e) { /* best-effort */ }
+          }
+          if (assignedCourses.length > 0) {
+            const profile = await AuthService.getProfile();
+            for (const courseId of assignedCourses) {
+              try { await window.EnrollmentService?.create(student.id, courseId, profile?.id || null); } catch (e) { console.error('Failed to enroll:', e); }
+            }
+            AppToast.show(`${assignedCourses.length} course(s) assigned.`, 'success');
+          }
+        }
+        AppToast.show(`Student "${name}" created.`, 'success');
       }
       AppModal.close('modal-student');
       AppStorage.invalidate();
@@ -392,15 +553,27 @@ window.SchoolStudents = {
 // COUNSELORS MANAGEMENT
 // ==============================================================
 window.SchoolCounselors = {
+  currentPage: 1,
+  perPage: 20,
+
   async render(main, data, school) {
     const schoolId = school.id;
     const q = (document.getElementById('sp-counselor-search')?.value || '').toLowerCase();
-    let counselors = data.users.filter(u => u.schoolId === schoolId && u.role === 'counselor');
+    const statusFilter = document.getElementById('sp-counselor-status')?.value || '';
+    const deptFilter = document.getElementById('sp-counselor-dept')?.value || '';
 
-    if (q) counselors = counselors.filter(c => c.name.toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q));
+    let counselors = (data.counselors || []).filter(c => c.school_id === schoolId);
+    if (q) counselors = counselors.filter(c => c.name.toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q) || (c.employee_id || '').toLowerCase().includes(q));
+    if (statusFilter) counselors = counselors.filter(c => c.status === statusFilter);
+    if (deptFilter) counselors = counselors.filter(c => c.department === deptFilter);
 
     let students = [];
     try { students = await window.StudentService?.getBySchool(schoolId) || []; } catch (e) { console.error('Failed in school-portal:', e); }
+
+    const startIdx = (this.currentPage - 1) * this.perPage;
+    const pageItems = counselors.slice(startIdx, startIdx + this.perPage);
+    const totalPages = Math.max(1, Math.ceil(counselors.length / this.perPage));
+    const departments = [...new Set((data.counselors || []).filter(c => c.school_id === schoolId).map(c => c.department).filter(Boolean))];
 
     main.innerHTML = `<div class="fade-in">
       <div class="page-header">
@@ -409,60 +582,277 @@ window.SchoolCounselors = {
             <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
             <span style="font-size:12px;color:var(--text-secondary);">${eh(school.name)}</span>
           </div>
-          <h1 class="page-title">Counselors</h1><p class="page-subtitle">Manage staff and counselors for ${eh(school.name)}.</p>
+          <h1 class="page-title">Counselors</h1><p class="page-subtitle">Manage counselors for ${eh(school.name)}.</p>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" data-action="sp-add-counselor"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span> Add Counselor</button>
         </div>
       </div>
       <div class="management-bar" style="margin-bottom:16px;">
-        <div class="search-bar" style="max-width:280px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="sp-counselor-search" placeholder="Search counselors..." value="${eh(q)}"></div>
-        <span style="font-size:11px;color:var(--text-muted);margin-left:auto;">Showing ${counselors.length} counselor${counselors.length !== 1 ? 's' : ''}</span>
+        <div class="search-bar" style="max-width:250px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="sp-counselor-search" placeholder="Search counselors..." value="${eh(q)}"></div>
+        <select class="form-select" id="sp-counselor-status" style="width:140px;height:40px;font-size:13px;">
+          <option value="">All Status</option>
+          <option value="active" ${statusFilter === 'active' ? 'selected' : ''}>Active</option>
+          <option value="inactive" ${statusFilter === 'inactive' ? 'selected' : ''}>Inactive</option>
+        </select>
+        <select class="form-select" id="sp-counselor-dept" style="width:180px;height:40px;font-size:13px;">
+          <option value="">All Departments</option>
+          ${departments.map(d => `<option value="${d}" ${deptFilter === d ? 'selected' : ''}>${eh(d)}</option>`).join('')}
+        </select>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:auto;">Showing ${pageItems.length} of ${counselors.length} counselors</span>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
-        ${counselors.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">badge</span><h3>No counselors match your search</h3><p>Try adjusting your search or filters.</p></div>`
-        : `<div class="table-container"><table><thead><tr><th>Name</th><th>Email</th><th>Students</th><th>Role</th><th>Status</th><th style="width:100px;"></th></tr></thead><tbody>
-          ${counselors.map(c => {
+        ${counselors.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">badge</span><h3>No counselors match your search</h3><p>Try adjusting your filters or add a new counselor.</p></div>`
+        : `<div class="table-container"><table><thead><tr><th>Name</th><th>Employee ID</th><th>Department</th><th>Students</th><th>Qualification</th><th>Experience</th><th>Status</th><th style="width:140px;"></th></tr></thead><tbody>
+          ${pageItems.map(c => {
             const studentCount = students.filter(s => s.counselor_id === c.id).length;
             return `<tr>
               <td><div style="display:flex;align-items:center;gap:8px;"><div class="user-avatar" style="width:28px;height:28px;font-size:10px;">${AppUtils.getInitials(c.name)}</div><span class="font-semibold">${eh(c.name)}</span></div></td>
-              <td style="font-size:13px;">${eh(c.email || '—')}</td>
+              <td style="font-size:13px;">${eh(c.employee_id || '—')}</td>
+              <td style="font-size:13px;">${eh(c.department || '—')}</td>
               <td style="font-size:13px;">${studentCount}</td>
-              <td><span class="status-badge" style="background:var(--warning-light);color:#92400e;">Counselor</span></td>
-              <td><span class="status-badge status-active">Active</span></td>
+              <td style="font-size:13px;">${eh(c.qualification || '—')}</td>
+              <td style="font-size:13px;">${c.experience != null ? c.experience + ' yrs' : '—'}</td>
+              <td><span class="status-badge ${c.status === 'active' ? 'status-active' : 'status-suspended'}">${eh(c.status)}</span></td>
               <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
                 <button class="btn btn-ghost btn-sm" data-action="sp-view-counselor" data-id="${c.id}" title="View Profile"><span class="material-symbols-outlined" style="font-size:16px;">person</span></button>
-                <button class="btn btn-ghost btn-sm" data-action="edit-admin" data-id="${c.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
+                <button class="btn btn-ghost btn-sm" data-action="sp-edit-counselor" data-id="${c.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
+                <button class="btn btn-ghost btn-sm" data-action="sp-toggle-counselor-status" data-id="${c.id}" title="${c.status === 'active' ? 'Deactivate' : 'Activate'}"><span class="material-symbols-outlined" style="font-size:16px;">${c.status === 'active' ? 'toggle_off' : 'toggle_on'}</span></button>
+                <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="sp-delete-counselor" data-id="${c.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
               </td>
             </tr>`;
           }).join('')}
         </tbody></table></div>`}
       </div>
+      ${totalPages > 1 ? pagination(totalPages, this.currentPage, 'sp-counselor-page') : ''}
     </div>`;
     initIcons();
+  },
+
+  async openAdd(schoolId) {
+    const data = await AppStorage.load();
+    const cats = (data.categories || []).filter(c => c.school_id === schoolId);
+    const subjects = (data.subjects || []).filter(s => s.school_id === schoolId);
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'modal-counselor';
+    overlay.innerHTML = `<div class="modal" style="max-width:600px;">
+      <div class="modal-header"><h3 class="modal-title">Add Counselor</h3><button class="modal-close" data-close-modal="modal-counselor"><span class="material-symbols-outlined">close</span></button></div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="sp-input-counselor-name" placeholder="Enter full name"></div>
+          <div class="form-group"><label class="form-label">Employee ID</label><input type="text" class="form-input" id="sp-input-counselor-empid" placeholder="e.g. EMP-004"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+          <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="sp-input-counselor-email" placeholder="counselor@school.com"></div>
+          <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-input" id="sp-input-counselor-phone" placeholder="+91-98765-43210"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+          <div class="form-group"><label class="form-label">Gender</label>
+            <select class="form-select" id="sp-input-counselor-gender"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">Date of Birth</label><input type="date" class="form-input" id="sp-input-counselor-dob"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+          <div class="form-group"><label class="form-label">Qualification</label><input type="text" class="form-input" id="sp-input-counselor-qual" placeholder="e.g. M.A. Psychology"></div>
+          <div class="form-group"><label class="form-label">Experience (years)</label><input type="number" class="form-input" id="sp-input-counselor-exp" placeholder="e.g. 5" min="0" style="width:100px;"></div>
+        </div>
+        <div class="form-group" style="margin-top:12px;"><label class="form-label">Department</label>
+          <select class="form-select" id="sp-input-counselor-dept"><option value="">Select...</option><option value="Career Counseling">Career Counseling</option><option value="Academic Guidance">Academic Guidance</option><option value="Student Wellness">Student Wellness</option><option value="College Prep">College Prep</option></select>
+        </div>
+        <div style="margin-top:12px;">
+          <label class="form-label">Assigned Categories</label>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">${cats.map(c => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-counselor-cat" value="${c.id}"> ${eh(c.name)}</label>`).join('')}</div>
+        </div>
+        <div style="margin-top:12px;">
+          <label class="form-label">Assigned Subjects</label>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">${subjects.map(s => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-counselor-sub" value="${s.id}"> ${eh(s.name)}</label>`).join('')}</div>
+        </div>
+        <div class="form-group" style="margin-top:12px;"><label class="form-label">Status</label>
+          <select class="form-select" id="sp-input-counselor-status"><option value="active" selected>Active</option><option value="inactive">Inactive</option></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close-modal="modal-counselor">Cancel</button>
+        <button class="btn btn-primary" data-action="sp-save-counselor" id="sp-btn-save-counselor">Add Counselor</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    AppModal.open(overlay.id);
+    setTimeout(() => document.getElementById('sp-input-counselor-name')?.focus(), 100);
+  },
+
+  async openEdit(counselorId) {
+    try {
+      const data = await AppStorage.load();
+      const counselor = (data.counselors || []).find(c => c.id === counselorId);
+      if (!counselor) { AppToast.show('Counselor not found.', 'error'); return; }
+      const schoolId = counselor.school_id;
+      const cats = (data.categories || []).filter(c => c.school_id === schoolId);
+      const subjects = (data.subjects || []).filter(s => s.school_id === schoolId);
+      const assignedCats = counselor.assigned_categories || [];
+      const assignedSubs = counselor.assigned_subjects || [];
+      const existing = document.getElementById('modal-counselor');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.id = 'modal-counselor';
+      overlay.innerHTML = `<div class="modal" style="max-width:600px;">
+        <div class="modal-header"><h3 class="modal-title">Edit Counselor</h3><button class="modal-close" data-close-modal="modal-counselor"><span class="material-symbols-outlined">close</span></button></div>
+        <div class="modal-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="sp-input-counselor-name" value="${eh(counselor.name)}"></div>
+            <div class="form-group"><label class="form-label">Employee ID</label><input type="text" class="form-input" id="sp-input-counselor-empid" value="${eh(counselor.employee_id || '')}"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="sp-input-counselor-email" value="${eh(counselor.email || '')}"></div>
+            <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-input" id="sp-input-counselor-phone" value="${eh(counselor.phone || '')}"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div class="form-group"><label class="form-label">Gender</label>
+              <select class="form-select" id="sp-input-counselor-gender"><option value="">Select...</option><option value="Male" ${counselor.gender === 'Male' ? 'selected' : ''}>Male</option><option value="Female" ${counselor.gender === 'Female' ? 'selected' : ''}>Female</option><option value="Other" ${counselor.gender === 'Other' ? 'selected' : ''}>Other</option></select>
+            </div>
+            <div class="form-group"><label class="form-label">Date of Birth</label><input type="date" class="form-input" id="sp-input-counselor-dob" value="${eh(counselor.date_of_birth || '')}"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+            <div class="form-group"><label class="form-label">Qualification</label><input type="text" class="form-input" id="sp-input-counselor-qual" value="${eh(counselor.qualification || '')}"></div>
+            <div class="form-group"><label class="form-label">Experience (years)</label><input type="number" class="form-input" id="sp-input-counselor-exp" value="${counselor.experience || 0}" min="0" style="width:100px;"></div>
+          </div>
+          <div class="form-group" style="margin-top:12px;"><label class="form-label">Department</label>
+            <select class="form-select" id="sp-input-counselor-dept"><option value="">Select...</option><option value="Career Counseling" ${counselor.department === 'Career Counseling' ? 'selected' : ''}>Career Counseling</option><option value="Academic Guidance" ${counselor.department === 'Academic Guidance' ? 'selected' : ''}>Academic Guidance</option><option value="Student Wellness" ${counselor.department === 'Student Wellness' ? 'selected' : ''}>Student Wellness</option><option value="College Prep" ${counselor.department === 'College Prep' ? 'selected' : ''}>College Prep</option></select>
+          </div>
+          <div style="margin-top:12px;">
+            <label class="form-label">Assigned Categories</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">${cats.map(c => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-counselor-cat" value="${c.id}" ${assignedCats.includes(c.id) ? 'checked' : ''}> ${eh(c.name)}</label>`).join('')}</div>
+          </div>
+          <div style="margin-top:12px;">
+            <label class="form-label">Assigned Subjects</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">${subjects.map(s => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-counselor-sub" value="${s.id}" ${assignedSubs.includes(s.id) ? 'checked' : ''}> ${eh(s.name)}</label>`).join('')}</div>
+          </div>
+          <div class="form-group" style="margin-top:12px;"><label class="form-label">Status</label>
+            <select class="form-select" id="sp-input-counselor-status"><option value="active" ${counselor.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${counselor.status === 'inactive' ? 'selected' : ''}>Inactive</option></select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close-modal="modal-counselor">Cancel</button>
+          <button class="btn btn-primary" data-action="sp-update-counselor" data-id="${counselor.id}" id="sp-btn-save-counselor">Save Changes</button>
+        </div>
+      </div>`;
+      document.body.appendChild(overlay);
+      AppModal.open(overlay.id);
+      setTimeout(() => document.getElementById('sp-input-counselor-name')?.focus(), 100);
+    } catch (err) {
+      AppToast.show(err.message || 'Failed to load counselor.', 'error');
+    }
+  },
+
+  async save(isUpdate, counselorId) {
+    const name = document.getElementById('sp-input-counselor-name')?.value?.trim();
+    if (!name) { AppToast.show('Name is required.', 'error'); return; }
+    const email = document.getElementById('sp-input-counselor-email')?.value?.trim() || null;
+    const employeeId = document.getElementById('sp-input-counselor-empid')?.value?.trim() || null;
+    const phone = document.getElementById('sp-input-counselor-phone')?.value?.trim() || null;
+    const gender = document.getElementById('sp-input-counselor-gender')?.value || null;
+    const dateOfBirth = document.getElementById('sp-input-counselor-dob')?.value || null;
+    const qualification = document.getElementById('sp-input-counselor-qual')?.value?.trim() || null;
+    const experience = parseInt(document.getElementById('sp-input-counselor-exp')?.value) || 0;
+    const department = document.getElementById('sp-input-counselor-dept')?.value || null;
+    const status = document.getElementById('sp-input-counselor-status')?.value || 'active';
+    const assignedCategories = [...document.querySelectorAll('.sp-counselor-cat:checked')].map(el => el.value);
+    const assignedSubjects = [...document.querySelectorAll('.sp-counselor-sub:checked')].map(el => el.value);
+    const btn = document.getElementById('sp-btn-save-counselor');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...'; }
+    try {
+      const schoolId = AppRouter.currentSchoolId;
+      const updates = { name, email, employeeId, phone, gender, dateOfBirth, qualification, experience, department, status, assignedCategories, assignedSubjects };
+      if (isUpdate) {
+        await window.CounselorService?.update(counselorId, updates);
+        AppToast.show('Counselor updated.', 'success');
+      } else {
+        await window.CounselorService?.create({ ...updates, schoolId });
+        AppToast.show('Counselor created.', 'success');
+      }
+      AppModal.close('modal-counselor');
+      AppStorage.invalidate();
+      AppRouter.render();
+    } catch (err) {
+      AppToast.show(err.message || 'Failed to save counselor.', 'error');
+    }
+    if (btn) { btn.disabled = false; btn.textContent = isUpdate ? 'Save Changes' : 'Add Counselor'; }
+  },
+
+  async toggleStatus(counselorId) {
+    try {
+      const counselor = (await AppStorage.load()).counselors?.find(c => c.id === counselorId);
+      if (!counselor) { AppToast.show('Counselor not found.', 'error'); return; }
+      const newStatus = counselor.status === 'active' ? 'inactive' : 'active';
+      await window.CounselorService?.update(counselorId, { status: newStatus });
+      AppToast.show(`Counselor ${newStatus === 'active' ? 'activated' : 'deactivated'}.`, 'success');
+      AppStorage.invalidate();
+      AppRouter.render();
+    } catch (err) {
+      AppToast.show(err.message || 'Failed to toggle status.', 'error');
+    }
+  },
+
+  async confirmDelete(counselorId) {
+    try {
+      const data = await AppStorage.load();
+      const counselor = (data.counselors || []).find(c => c.id === counselorId);
+      const existing = document.getElementById('modal-confirm');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.id = 'modal-confirm-counselor';
+      overlay.innerHTML = `<div class="modal" style="max-width:400px;">
+        <div class="modal-header"><h3 class="modal-title">Confirm Delete</h3><button class="modal-close" data-close-modal="modal-confirm-counselor"><span class="material-symbols-outlined">close</span></button></div>
+        <div class="modal-body">
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fef2f2;border-radius:8px;margin-bottom:12px;">
+            <span class="material-symbols-outlined" style="font-size:24px;color:#ef4444;">warning</span>
+            <span style="font-size:13px;">Delete <strong>"${eh(counselor?.name || 'this counselor')}"</strong>? Students assigned to them will become unassigned.</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close-modal="modal-confirm-counselor">Cancel</button>
+          <button class="btn btn-danger" data-action="sp-confirm-delete-counselor" data-id="${counselorId}" style="background:#ef4444;color:#fff;border:none;">Delete Counselor</button>
+        </div>
+      </div>`;
+      document.body.appendChild(overlay);
+      AppModal.open(overlay.id);
+      initIcons();
+    } catch { AppToast.show('Failed to load counselor.', 'error'); }
   },
 
   async viewCounselor(counselorId) {
     try {
       const data = await AppStorage.load();
-      const users = data.users || [];
-      const counselor = users.find(u => u.id === counselorId);
+      const counselor = (data.counselors || []).find(c => c.id === counselorId);
       if (!counselor) { AppToast.show('Counselor not found.', 'error'); return; }
+      const school = (data.schools || []).find(s => s.id === counselor.school_id);
       const students = (data.students || []).filter(s => s.counselor_id === counselorId);
       const enrollments = (data.enrollments || []).filter(e => students.some(s => s.id === e.student_id));
       const completedEnrollments = enrollments.filter(e => e.status === 'completed');
       const completionRate = enrollments.length ? Math.round(completedEnrollments.length / enrollments.length * 100) : 0;
+      const assignedCats = (counselor.assigned_categories || []).map(id => { const c = (data.categories || []).find(cat => cat.id === id); return c ? c.name : id; });
+      const assignedSubs = (counselor.assigned_subjects || []).map(id => { const s = (data.subjects || []).find(sub => sub.id === id); return s ? s.name : id; });
 
       const existing = document.getElementById('modal-counselor-profile');
       if (existing) existing.remove();
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
       overlay.id = 'modal-counselor-profile';
-      overlay.innerHTML = `<div class="modal" style="max-width:640px;">
+      overlay.innerHTML = `<div class="modal" style="max-width:680px;">
         <div class="modal-header"><h3 class="modal-title">Counselor Profile</h3><button class="modal-close" data-close-modal="modal-counselor-profile"><span class="material-symbols-outlined">close</span></button></div>
-        <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+        <div class="modal-body" style="max-height:75vh;overflow-y:auto;">
           <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border);">
             <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#8b5cf6,#a78bfa);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;flex-shrink:0;">${AppUtils.getInitials(counselor.name)}</div>
             <div style="flex:1;">
               <div style="font-size:18px;font-weight:700;">${eh(counselor.name)}</div>
-              <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${eh(counselor.email || '—')}</div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${eh(counselor.email || '—')} · ${eh(counselor.employee_id || '')} · ${eh(school?.name || '')}</div>
+              <div style="margin-top:4px;"><span class="status-badge ${counselor.status === 'active' ? 'status-active' : 'status-suspended'}">${eh(counselor.status)}</span></div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-secondary btn-sm" style="height:32px;font-size:12px;" data-action="sp-edit-counselor" data-id="${counselor.id}"><span class="material-symbols-outlined" style="font-size:16px;">edit</span> Edit</button>
             </div>
           </div>
 
@@ -483,14 +873,14 @@ window.SchoolCounselors = {
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
             <div>
-              <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Assigned Students</div>
-              <div style="display:flex;flex-direction:column;gap:4px;">
-                ${students.length > 0 ? students.slice(0, 5).map(s => `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border-light);">
-                  <div style="width:24px;height:24px;border-radius:50%;background:var(--primary)12;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--primary);">${AppUtils.getInitials(s.name)}</div>
-                  <span>${eh(s.name)}</span>
-                  <span style="margin-left:auto;font-size:10px;color:var(--text-muted);">${eh(s.class || '')}</span>
-                </div>`).join('') : '<span style="font-size:12px;color:var(--text-muted);">No students assigned</span>'}
-                ${students.length > 5 ? `<div style="font-size:11px;color:var(--primary);text-align:center;margin-top:4px;">+${students.length - 5} more</div>` : ''}
+              <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Personal Info</div>
+              <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Department</span><span style="font-weight:500;">${eh(counselor.department || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Qualification</span><span style="font-weight:500;">${eh(counselor.qualification || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Experience</span><span style="font-weight:500;">${counselor.experience != null ? counselor.experience + ' years' : '—'}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Gender</span><span style="font-weight:500;">${eh(counselor.gender || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>DOB</span><span style="font-weight:500;">${counselor.date_of_birth ? AppUtils.formatDate(counselor.date_of_birth) : '—'}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Phone</span><span style="font-weight:500;">${eh(counselor.phone || '—')}</span></div>
               </div>
             </div>
             <div>
@@ -500,7 +890,24 @@ window.SchoolCounselors = {
                 <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Completed</span><span style="font-weight:600;">${completedEnrollments.length}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Active</span><span style="font-weight:600;">${enrollments.filter(e => e.status === 'active').length}</span></div>
               </div>
+              ${assignedCats.length > 0 ? `<div style="margin-top:12px;"><div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px;">Categories</div><div style="display:flex;gap:4px;flex-wrap:wrap;">${assignedCats.map(n => `<span style="padding:2px 8px;background:var(--primary)12;color:var(--primary);border-radius:8px;font-size:11px;">${eh(n)}</span>`).join('')}</div></div>` : ''}
+              ${assignedSubs.length > 0 ? `<div style="margin-top:8px;"><div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px;">Subjects</div><div style="display:flex;gap:4px;flex-wrap:wrap;">${assignedSubs.map(n => `<span style="padding:2px 8px;background:#f0fdf4;color:#16a34a;border-radius:8px;font-size:11px;">${eh(n)}</span>`).join('')}</div></div>` : ''}
             </div>
+          </div>
+
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Assigned Students</div>
+            ${students.length === 0 ? '<div style="font-size:13px;color:var(--text-secondary);">No students assigned.</div>'
+            : `<div style="display:flex;flex-direction:column;gap:4px;">${students.slice(0, 8).map(s => {
+              const enr = enrollments.filter(e => e.student_id === s.id);
+              return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:13px;">
+                <div style="width:26px;height:26px;border-radius:50%;background:var(--primary)12;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--primary);">${AppUtils.getInitials(s.name)}</div>
+                <span>${eh(s.name)}</span>
+                <span style="font-size:11px;color:var(--text-muted);">${eh(s.class || '')}</span>
+                <span style="margin-left:auto;font-size:11px;">${enr.length} course${enr.length !== 1 ? 's' : ''}</span>
+              </div>`;
+            }).join('')}</div>`}
+            ${students.length > 8 ? `<div style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:6px;">+${students.length - 8} more students</div>` : ''}
           </div>
         </div>
         <div class="modal-footer">
@@ -516,6 +923,7 @@ window.SchoolCounselors = {
   },
 
   filter() {
+    this.currentPage = 1;
     AppRouter.render();
   }
 };
@@ -681,6 +1089,7 @@ window.SchoolCourses = {
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-close-modal="modal-course-detail">Close</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:11px;" data-action="sp-manage-structure" data-id="${courseId}"><span class="material-symbols-outlined" style="font-size:16px;">layers</span> Manage Structure</button>
           <button class="btn btn-ghost btn-sm" style="font-size:11px;" data-action="sp-export-csv" data-entity="course" data-id="${courseId}"><span class="material-symbols-outlined" style="font-size:16px;">download</span> Export</button>
         </div>
       </div>`;
@@ -1124,9 +1533,14 @@ window.SchoolReports = {
     try { students = await window.StudentService?.getBySchool(schoolId) || []; } catch (e) { console.error('Failed in school-portal:', e); }
     try { courses = await window.CourseService?.getBySchool(schoolId) || []; } catch (e) { console.error('Failed in school-portal:', e); }
     try { enrollments = await window.EnrollmentService?.getBySchool(schoolId) || []; } catch (e) { console.error('Failed in school-portal:', e); }
+    const categories = (data.categories || []).filter(c => c.school_id === schoolId);
+    const subjects = (data.subjects || []).filter(s => s.school_id === schoolId);
+    const counselors = (data.counselors || []).filter(c => c.school_id === schoolId);
     const content = data.content.filter(c => c.school_id === schoolId);
+    const activities = (data.activities || []).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 8);
     const activeStudents = students.filter(s => s.status === 'active');
     const activeEnrollments = enrollments.filter(e => e.status === 'active');
+    const recentEnrollments = [...enrollments].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 6);
 
     main.innerHTML = `<div class="fade-in">
       <div class="page-header">
@@ -1137,15 +1551,16 @@ window.SchoolReports = {
           </div>
           <h1 class="page-title">Reports</h1><p class="page-subtitle">Platform analytics and insights for ${eh(school.name)}.</p>
         </div>
-        <button class="btn btn-secondary btn-sm" style="height:34px;font-size:11px;" data-action="sp-export-csv" data-entity="reports"><span class="material-symbols-outlined" style="font-size:14px;">download</span> Export Report</button>
       </div>
+
       <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr);">
         <div class="metric-card"><div class="metric-icon metric-icon-green"><span class="material-symbols-outlined">groups</span></div><div class="metric-info"><h2>${activeStudents.length}/${students.length}</h2><p>Active Students</p></div></div>
         <div class="metric-card"><div class="metric-icon metric-icon-blue"><span class="material-symbols-outlined">school</span></div><div class="metric-info"><h2>${courses.length}</h2><p>Total Courses</p></div></div>
         <div class="metric-card"><div class="metric-icon metric-icon-purple"><span class="material-symbols-outlined">assignment</span></div><div class="metric-info"><h2>${activeEnrollments.length}</h2><p>Active Enrollments</p></div></div>
         <div class="metric-card"><div class="metric-icon metric-icon-orange"><span class="material-symbols-outlined">videocam</span></div><div class="metric-info"><h2>${content.length}</h2><p>Content Items</p></div></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
         <div class="card">
           <div class="card-header"><h3 class="card-title">Students by Status</h3></div>
           <div style="display:flex;gap:16px;padding:16px 0;">
@@ -1167,15 +1582,69 @@ window.SchoolReports = {
           </div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-header"><h3 class="card-title">Course Completion Rates</h3><button class="btn btn-ghost btn-sm" style="font-size:11px;" data-action="sp-export-csv" data-entity="course-completion"><span class="material-symbols-outlined" style="font-size:14px;">download</span> Export</button></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Counselor Performance</h3></div>
+          ${counselors.length === 0 ? '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">No counselors found.</div>'
+          : `<div class="table-container"><table><thead><tr><th>Counselor</th><th>Students</th><th>Enrollments</th><th>Completed</th><th>Rate</th></tr></thead><tbody>${counselors.map(co => {
+            const coStudents = students.filter(s => s.counselor_id === co.id);
+            const coEnrollments = enrollments.filter(e => coStudents.some(s => s.id === e.student_id));
+            const coCompleted = coEnrollments.filter(e => e.status === 'completed').length;
+            const coRate = coEnrollments.length > 0 ? Math.round((coCompleted / coEnrollments.length) * 100) : 0;
+            return `<tr><td><span class="font-semibold">${eh(co.name)}</span></td><td>${coStudents.length}</td><td>${coEnrollments.length}</td><td>${coCompleted}</td><td><div style="display:flex;align-items:center;gap:6px;"><div style="width:40px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${coRate}%;background:${coRate > 50 ? 'var(--success)' : 'var(--warning)'};border-radius:3px;"></div></div><span style="font-size:11px;">${coRate}%</span></div></td></tr>`;
+          }).join('')}</tbody></table></div>`}
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Category & Subject Stats</h3></div>
+          ${categories.length === 0 ? '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">No categories found.</div>'
+          : `<div class="table-container"><table><thead><tr><th>Category</th><th>Subjects</th><th>Courses</th></tr></thead><tbody>${categories.map(cat => {
+            const subCount = subjects.filter(s => s.category_id === cat.id).length;
+            const courseCount = courses.filter(co => co.category_id === cat.id).length;
+            return `<tr><td><span class="font-semibold">${eh(cat.name)}</span></td><td>${subCount}</td><td>${courseCount}</td></tr>`;
+          }).join('')}</tbody></table></div>`}
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><h3 class="card-title">Course Completion Rates</h3></div>
         ${courses.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">bar_chart</span><h3>No course data</h3><p>Enroll students in courses to see completion data.</p></div>`
-        : `<div class="table-container"><table><thead><tr><th>Course</th><th>Enrolled</th><th>Active</th><th>Completed</th><th>Rate</th></tr></thead><tbody>${courses.map(c => {
+        : `<div class="table-container"><table><thead><tr><th>Course</th><th>Category</th><th>Enrolled</th><th>Active</th><th>Completed</th><th>Rate</th></tr></thead><tbody>${courses.map(c => {
           const cEnrollments = enrollments.filter(e => e.course_id === c.id);
           const completed = cEnrollments.filter(e => e.status === 'completed').length;
           const rate = cEnrollments.length > 0 ? Math.round((completed / cEnrollments.length) * 100) : 0;
-          return `<tr><td><span class="font-semibold">${eh(c.name)}</span></td><td>${cEnrollments.length}</td><td>${cEnrollments.filter(e => e.status === 'active').length}</td><td>${completed}</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${rate}%;background:${rate > 50 ? 'var(--success)' : rate > 20 ? 'var(--warning)' : 'var(--danger)'};border-radius:3px;"></div></div><span style="font-size:12px;font-weight:600;">${rate}%</span></div></td></tr>`;
+          const cat = categories.find(ca => ca.id === c.category_id);
+          return `<tr><td><span class="font-semibold">${eh(c.name)}</span></td><td style="font-size:12px;color:var(--text-secondary);">${eh(cat?.name || '—')}</td><td>${cEnrollments.length}</td><td>${cEnrollments.filter(e => e.status === 'active').length}</td><td>${completed}</td><td><div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${rate}%;background:${rate > 50 ? 'var(--success)' : rate > 20 ? 'var(--warning)' : 'var(--danger)'};border-radius:3px;"></div></div><span style="font-size:12px;font-weight:600;">${rate}%</span></div></td></tr>`;
         }).join('')}</tbody></table></div>`}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Recent Enrollments</h3></div>
+          ${recentEnrollments.length === 0 ? '<div class="empty-state" style="padding:20px;"><span class="material-symbols-outlined" style="font-size:32px;">assignment</span><h3 style="font-size:13px;">No enrollments yet</h3></div>'
+          : `<div style="display:flex;flex-direction:column;">${recentEnrollments.map(e => {
+            const student = students.find(s => s.id === e.student_id);
+            const course = courses.find(c => c.id === e.course_id);
+            return `<div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border-light);font-size:12px;">
+              <div style="width:24px;height:24px;border-radius:50%;background:var(--primary)12;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--primary);">${AppUtils.getInitials(student?.name || '?')}</div>
+              <div style="flex:1;"><span class="font-semibold">${eh(student?.name || 'Unknown')}</span> → ${eh(course?.name || 'Unknown')}</div>
+              <span class="status-badge ${e.status === 'active' ? 'status-active' : e.status === 'completed' ? 'status-active' : 'status-suspended'}" style="font-size:9px;">${eh(e.status)}</span>
+            </div>`;
+          }).join('')}</div>`}
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Activity Timeline</h3></div>
+          ${activities.length === 0 ? '<div class="empty-state" style="padding:20px;"><span class="material-symbols-outlined" style="font-size:32px;">timeline</span><h3 style="font-size:13px;">No activity yet</h3></div>'
+          : `<div style="display:flex;flex-direction:column;">${activities.map(a => {
+            const icons = { course_completed: 'check_circle', video_watched: 'play_circle', attendance_marked: 'fact_check', assignment_submitted: 'assignment', course_assigned: 'playlist_add', certificate_earned: 'workspace_premium', counseling_session: 'support', progress_review: 'trending_up' };
+            const student = students.find(s => s.id === a.student_id);
+            return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 16px;border-bottom:1px solid var(--border-light);font-size:12px;">
+              <span class="material-symbols-outlined" style="font-size:14px;color:var(--primary);flex-shrink:0;margin-top:1px;">${icons[a.action] || 'circle'}</span>
+              <div style="flex:1;"><span>${eh(a.description)}</span>${student ? `<span style="color:var(--text-secondary);"> — ${eh(student.name)}</span>` : ''}</div>
+              <span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">${AppUtils.timeAgo(a.timestamp)}</span>
+            </div>`;
+          }).join('')}</div>`}
+        </div>
       </div>
     </div>`;
     initIcons();
@@ -1194,7 +1663,6 @@ window.SchoolNotifications = {
     } catch (e) { console.error('Failed in school-portal:', e); }
     const filter = document.getElementById('sp-notif-filter')?.value || '';
     if (filter === 'unread') notifications = notifications.filter(n => !n.is_read);
-
     const unreadCount = notifications.filter(n => !n.is_read).length;
 
     main.innerHTML = `<div class="fade-in">
@@ -1206,7 +1674,8 @@ window.SchoolNotifications = {
           </div>
           <h1 class="page-title">Notifications</h1><p class="page-subtitle">Stay updated with platform activity.</p>
         </div>
-        <div style="display:flex;gap:8px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" style="height:34px;font-size:11px;" data-action="sp-send-notification"><span class="material-symbols-outlined" style="font-size:14px;">send</span> Send Notification</button>
           ${unreadCount > 0 ? `<button class="btn btn-secondary btn-sm" style="height:34px;font-size:11px;" data-action="sp-mark-all-read"><span class="material-symbols-outlined" style="font-size:14px;">done_all</span> Mark All Read</button>` : ''}
           ${notifications.length > 0 ? `<button class="btn btn-ghost btn-sm btn-danger-ghost" style="height:34px;font-size:11px;" data-action="sp-delete-all-notifications"><span class="material-symbols-outlined" style="font-size:14px;">delete_sweep</span> Clear All</button>` : ''}
         </div>
@@ -1236,6 +1705,69 @@ window.SchoolNotifications = {
       </div>
     </div>`;
     initIcons();
+  },
+
+  async openSend(schoolId) {
+    const data = await AppStorage.load();
+    const recipients = [
+      ...(data.counselors || []).filter(c => c.school_id === schoolId).map(c => ({ id: c.id, name: c.name, role: 'counselor' })),
+      ...(data.users || []).filter(u => u.schoolId === schoolId && u.role === 'school_admin').map(u => ({ id: u.id, name: u.name, role: 'admin' })),
+    ];
+    const existing = document.getElementById('modal-send-notification');
+    if (existing) existing.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'modal-send-notification';
+    overlay.innerHTML = `<div class="modal" style="max-width:500px;">
+      <div class="modal-header"><h3 class="modal-title">Send Notification</h3><button class="modal-close" data-close-modal="modal-send-notification"><span class="material-symbols-outlined">close</span></button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Recipient</label>
+          <select class="form-select" id="sp-notif-recipient"><option value="">All School Admins & Counselors</option>${recipients.map(r => `<option value="${r.id}">${eh(r.name)} (${r.role})</option>`).join('')}</select>
+        </div>
+        <div class="form-group" style="margin-top:12px;"><label class="form-label">Title</label><input type="text" class="form-input" id="sp-notif-title" placeholder="Notification title"></div>
+        <div class="form-group" style="margin-top:12px;"><label class="form-label">Message</label><textarea class="form-input" id="sp-notif-message" placeholder="Write your message..." style="height:100px;resize:vertical;"></textarea></div>
+        <div class="form-group" style="margin-top:12px;"><label class="form-label">Type</label>
+          <select class="form-select" id="sp-notif-type"><option value="System Message">System Message</option><option value="Course Published">Course Published</option><option value="Assignment">Assignment</option></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close-modal="modal-send-notification">Cancel</button>
+        <button class="btn btn-primary" data-action="sp-send-notification-now" id="sp-btn-send-notification">Send</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    AppModal.open(overlay.id);
+    setTimeout(() => document.getElementById('sp-notif-title')?.focus(), 100);
+  },
+
+  async send(data) {
+    const title = document.getElementById('sp-notif-title')?.value?.trim();
+    if (!title) { AppToast.show('Title is required.', 'error'); return; }
+    const message = document.getElementById('sp-notif-message')?.value?.trim() || null;
+    const recipientId = document.getElementById('sp-notif-recipient')?.value || null;
+    const btn = document.getElementById('sp-btn-send-notification');
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+    try {
+      if (recipientId) {
+        await window.NotificationService?.create(title, message, recipientId);
+      } else {
+        const data = await AppStorage.load();
+        const schoolId = AppRouter.currentSchoolId;
+        const schoolUsers = (data.counselors || []).filter(c => c.school_id === schoolId).map(c => c.id);
+        const adminUsers = (data.users || []).filter(u => u.schoolId === schoolId && u.role === 'school_admin').map(u => u.id);
+        const allRecipients = [...new Set([...schoolUsers, ...adminUsers])];
+        for (const uid of allRecipients) {
+          await window.NotificationService?.create(title, `${message || ''} [System broadcast]`, uid);
+        }
+      }
+      AppToast.show('Notification sent.', 'success');
+      AppModal.close('modal-send-notification');
+      AppStorage.invalidate();
+      AppRouter.render();
+    } catch (err) {
+      AppToast.show(err.message || 'Failed to send notification.', 'error');
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
   }
 };
 

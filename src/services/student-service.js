@@ -43,7 +43,16 @@ export const StudentService = {
         counselor_id: item.counselorId || null,
         status: item.status || 'active',
         class: item.class || null,
-        section: item.section || null
+        section: item.section || null,
+        dob: item.dob || null,
+        gender: item.gender || null,
+        admission_no: item.admissionNo || null,
+        parent_name: item.parentName || null,
+        parent_contact: item.parentContact || null,
+        academic_year: item.academicYear || null,
+        notes: item.notes || null,
+        assigned_categories: item.assignedCategories || [],
+        assigned_subjects: item.assignedSubjects || []
       })
       .select()
       .single();
@@ -61,6 +70,15 @@ export const StudentService = {
     if (updates.status !== undefined) payload.status = updates.status;
     if (updates.class !== undefined) payload.class = updates.class;
     if (updates.section !== undefined) payload.section = updates.section;
+    if (updates.dob !== undefined) payload.dob = updates.dob;
+    if (updates.gender !== undefined) payload.gender = updates.gender;
+    if (updates.admissionNo !== undefined) payload.admission_no = updates.admissionNo;
+    if (updates.parentName !== undefined) payload.parent_name = updates.parentName;
+    if (updates.parentContact !== undefined) payload.parent_contact = updates.parentContact;
+    if (updates.academicYear !== undefined) payload.academic_year = updates.academicYear;
+    if (updates.notes !== undefined) payload.notes = updates.notes;
+    if (updates.assignedCategories !== undefined) payload.assigned_categories = updates.assignedCategories;
+    if (updates.assignedSubjects !== undefined) payload.assigned_subjects = updates.assignedSubjects;
 
     const { data, error } = await supabase
       .from('students')

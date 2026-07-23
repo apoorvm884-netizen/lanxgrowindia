@@ -18,6 +18,7 @@ import {
   SCHOOLS, CATEGORIES, SUBJECTS, SECTIONS, CONTENT,
   STUDENTS, COURSES, COURSE_SECTIONS, ENROLLMENTS,
   NOTIFICATIONS, COUNSELORS, USERS, AUDIT_LOG, newDemoId,
+  ACTIVITY_LOG,
 } from './demo-data.js';
 import { renderSchoolIntelligence } from './demo-analytics.js';
 
@@ -35,28 +36,35 @@ if (DEMO_MODE) {
     const counselorId = profile ? profile.id : 'demo-counselor-1';
     const schoolId = profile ? profile.school_id : 'school-1';
     const school = SCHOOLS.find((s) => s.id === schoolId);
+    const counselor = COUNSELORS.find((c) => c.id === counselorId);
 
     const myStudents = STUDENTS.filter((s) => s.counselor_id === counselorId);
     const myEnrollments = ENROLLMENTS.filter((e) =>
       myStudents.some((s) => s.id === e.student_id)
     );
     const completedCount = myEnrollments.filter((e) => e.status === 'completed').length;
-    const inProgressCount = myEnrollments.filter((e) => e.status === 'in_progress').length;
+    const inProgressCount = myEnrollments.filter((e) => e.status === 'in_progress' || e.status === 'active').length;
     const activeStudents = myStudents.filter((s) => s.status === 'active').length;
     const totalCourses = [...new Set(myEnrollments.map((e) => e.course_id))].length;
+    const assignedCatNames = (counselor?.assigned_categories || []).map(id => { const c = CATEGORIES.find(cat => cat.id === id); return c ? c.name : id; });
+    const assignedSubjNames = (counselor?.assigned_subjects || []).map(id => { const s = SUBJECTS.find(sub => sub.id === id); return s ? s.name : id; });
+    const myActivities = ACTIVITY_LOG.filter(a => a.counselor_id === counselorId).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5);
+    const myNotifs = NOTIFICATIONS.filter(n => n.user_id === counselorId).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 4);
+    const pendingAssignments = myEnrollments.filter(e => e.status === 'not_started').length;
+    const avgProgress = myStudents.length ? Math.round(myStudents.reduce((sum, s) => sum + (s.progress || 0), 0) / myStudents.length) : 0;
 
     container.innerHTML = `
       <div style="padding:24px;">
         <h1 style="font-size:24px;font-weight:700;margin:0 0 4px;">Counselor Dashboard</h1>
-        <p style="color:var(--text-secondary);margin:0 0 24px;">${eh(profile?.name || 'Counselor')} · ${eh(school?.name || 'School')}</p>
+        <p style="color:var(--text-secondary);margin:0 0 24px;">${eh(profile?.name || 'Counselor')} · ${eh(school?.name || 'School')} · ${eh(counselor?.department || '')}</p>
 
-        <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
+        <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px;">
           <div class="metric-card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
             <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Assigned Students</div>
             <div style="font-size:32px;font-weight:700;">${activeStudents}</div>
           </div>
           <div class="metric-card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
-            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Active Courses</div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Assigned Courses</div>
             <div style="font-size:32px;font-weight:700;">${totalCourses}</div>
           </div>
           <div class="metric-card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
@@ -67,7 +75,27 @@ if (DEMO_MODE) {
             <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">In Progress</div>
             <div style="font-size:32px;font-weight:700;color:var(--primary);">${inProgressCount}</div>
           </div>
+          <div class="metric-card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
+            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Pending</div>
+            <div style="font-size:32px;font-weight:700;color:var(--warning);">${pendingAssignments}</div>
+          </div>
+          <div class="metric-card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
+            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Avg Progress</div>
+            <div style="font-size:32px;font-weight:700;color:var(--info);">${avgProgress}%</div>
+          </div>
         </div>
+
+        ${assignedCatNames.length > 0 || assignedSubjNames.length > 0 ? `
+        <div style="display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+          <div class="card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px 20px;flex:1;min-width:200px;">
+            <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Assigned Categories</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">${assignedCatNames.map(n => `<span style="padding:3px 10px;background:var(--primary)12;color:var(--primary);border-radius:12px;font-size:12px;">${eh(n)}</span>`).join('')}</div>
+          </div>
+          <div class="card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:16px 20px;flex:1;min-width:200px;">
+            <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Assigned Subjects</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">${assignedSubjNames.map(n => `<span style="padding:3px 10px;background:#f0fdf4;color:#16a34a;border-radius:12px;font-size:12px;">${eh(n)}</span>`).join('')}</div>
+          </div>
+        </div>` : ''}
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
           <div class="card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
@@ -79,22 +107,24 @@ if (DEMO_MODE) {
                     <thead><tr style="border-bottom:1px solid var(--border);">
                       <th style="text-align:left;padding:8px 12px;font-weight:600;">Name</th>
                       <th style="text-align:left;padding:8px 12px;font-weight:600;">Class</th>
+                      <th style="text-align:left;padding:8px 12px;font-weight:600;">Section</th>
                       <th style="text-align:left;padding:8px 12px;font-weight:600;">Progress</th>
                       <th style="text-align:left;padding:8px 12px;font-weight:600;">Status</th>
                     </tr></thead>
                     <tbody>${myStudents.map((s) => `
                       <tr style="border-bottom:1px solid var(--border-light);">
-                        <td style="padding:8px 12px;">${eh(s.name)}</td>
+                        <td style="padding:8px 12px;"><div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:24px;border-radius:50%;background:var(--primary)12;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--primary);">${(s.name || '?').charAt(0).toUpperCase()}</div>${eh(s.name)}</div></td>
                         <td style="padding:8px 12px;color:var(--text-secondary);">${eh(s.class)}</td>
+                        <td style="padding:8px 12px;color:var(--text-secondary);">${eh(s.section || '—')}</td>
                         <td style="padding:8px 12px;">
                           <div style="display:flex;align-items:center;gap:8px;">
                             <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
-                              <div style="width:${s.progress}%;height:100%;background:var(--primary);border-radius:3px;"></div>
+                              <div style="width:${s.progress}%;height:100%;background:${s.progress > 70 ? 'var(--success)' : s.progress > 40 ? 'var(--warning)' : 'var(--danger)'};border-radius:3px;"></div>
                             </div>
                             <span style="font-size:12px;color:var(--text-secondary);">${s.progress}%</span>
                           </div>
                         </td>
-                        <td style="padding:8px 12px;"><span class="badge badge-${s.status === 'active' ? 'success' : 'warning'}" style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:${s.status === 'active' ? 'var(--success-bg, #e6f7e6)' : 'var(--warning-bg, #fff3e0)'};color:${s.status === 'active' ? 'var(--success, #2e7d32)' : 'var(--warning, #f57c00)'};">${eh(s.status)}</span></td>
+                        <td style="padding:8px 12px;"><span style="padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:${s.status === 'active' ? '#e6f7e6' : '#fff3e0'};color:${s.status === 'active' ? '#2e7d32' : '#f57c00'};">${eh(s.status)}</span></td>
                       </tr>`).join('')}</tbody>
                   </table>
                 </div>`}
@@ -102,34 +132,24 @@ if (DEMO_MODE) {
 
           <div style="display:flex;flex-direction:column;gap:16px;">
             <div class="card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
-              <h3 style="margin:0 0 12px;font-size:16px;font-weight:600;">Today's Tasks</h3>
-              <div style="display:flex;flex-direction:column;gap:8px;">
-                <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);">
-                  <input type="checkbox" style="accent-color:var(--primary);">
-                  <span style="font-size:13px;">Review Aarav Patel's progress</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);">
-                  <input type="checkbox" style="accent-color:var(--primary);">
-                  <span style="font-size:13px;">Prepare weekly counseling report</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);">
-                  <input type="checkbox" style="accent-color:var(--primary);">
-                  <span style="font-size:13px;">Schedule parent-teacher meeting</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;padding:8px 0;">
-                  <input type="checkbox" style="accent-color:var(--primary);">
-                  <span style="font-size:13px;">Review new course assignments</span>
-                </div>
-              </div>
+              <h3 style="margin:0 0 12px;font-size:16px;font-weight:600;">Notifications</h3>
+              ${myNotifs.length === 0 ? '<div style="font-size:13px;color:var(--text-secondary);">No notifications.</div>'
+              : `<div style="display:flex;flex-direction:column;gap:8px;">${myNotifs.map(n => `
+                <div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);${!n.is_read ? 'font-weight:500;' : ''}">
+                  <span class="material-symbols-outlined" style="font-size:16px;color:${!n.is_read ? 'var(--primary)' : 'var(--text-muted)'};">${!n.is_read ? 'notifications_active' : 'notifications'}</span>
+                  <div style="flex:1;font-size:12px;">${eh(n.title)}<br><span style="color:var(--text-muted);font-size:11px;">${eh(n.message || '')}</span></div>
+                </div>`).join('')}</div>`}
             </div>
 
             <div class="card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
               <h3 style="margin:0 0 12px;font-size:16px;font-weight:600;">Recent Activity</h3>
-              <div style="font-size:13px;color:var(--text-secondary);display:flex;flex-direction:column;gap:8px;">
-                <div style="padding:6px 0;border-bottom:1px solid var(--border-light);">Priya Singh completed "Communication" course</div>
-                <div style="padding:6px 0;border-bottom:1px solid var(--border-light);">New video "Public Speaking Mastery" available</div>
-                <div style="padding:6px 0;">Rohan Gupta reached 80% in Career Planning</div>
-              </div>
+              ${myActivities.length === 0 ? '<div style="font-size:13px;color:var(--text-secondary);">No recent activity.</div>'
+              : `<div style="display:flex;flex-direction:column;gap:6px;">${myActivities.map(a => `
+                <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:12px;">
+                  <span class="material-symbols-outlined" style="font-size:14px;color:var(--primary);">${a.action === 'counseling_session' ? 'support' : a.action === 'progress_review' ? 'trending_up' : a.action === 'course_recommendation' ? 'school' : 'circle'}</span>
+                  <span style="flex:1;color:var(--text-secondary);">${eh(a.description)}</span>
+                  <span style="font-size:10px;color:var(--text-muted);">${new Date(a.timestamp).toLocaleDateString()}</span>
+                </div>`).join('')}</div>`}
             </div>
           </div>
         </div>
@@ -425,7 +445,7 @@ if (DEMO_MODE) {
       w.StudentService.getByCounselor = async (counselorId) => STUDENTS.filter((s) => s.counselor_id === counselorId);
       w.StudentService.getById = async (id) => STUDENTS.find((s) => s.id === id);
       w.StudentService.create = async (data) => {
-        const s = { id: newDemoId('student'), ...data, status: data.status || 'active', attendance: 100, progress: 0, created_at: new Date().toISOString(), avatar_url: null };
+        const s = { id: newDemoId('student'), name: data.name, email: data.email || null, school_id: data.schoolId, counselor_id: data.counselorId || null, status: data.status || 'active', class: data.class || null, section: data.section || null, dob: data.dob || null, gender: data.gender || null, admission_no: data.admissionNo || null, parent_name: data.parentName || null, parent_contact: data.parentContact || null, academic_year: data.academicYear || null, notes: data.notes || null, assigned_categories: data.assignedCategories || [], assigned_subjects: data.assignedSubjects || [], attendance: 100, progress: 0, created_at: new Date().toISOString(), avatar_url: null };
         STUDENTS.push(s);
         return s;
       };
@@ -437,6 +457,26 @@ if (DEMO_MODE) {
       w.StudentService.delete = async (id) => {
         const idx = STUDENTS.findIndex((s) => s.id === id);
         if (idx >= 0) STUDENTS.splice(idx, 1);
+      };
+    }
+
+    // --- Patch CounselorService ---
+    if (w.CounselorService) {
+      w.CounselorService.getBySchool = async (schoolId) => COUNSELORS.filter((c) => c.school_id === schoolId);
+      w.CounselorService.getById = async (id) => COUNSELORS.find((c) => c.id === id);
+      w.CounselorService.create = async (data) => {
+        const c = { id: newDemoId('counselor'), ...data, status: data.status || 'active', created_at: new Date().toISOString() };
+        COUNSELORS.push(c);
+        return c;
+      };
+      w.CounselorService.update = async (id, updates) => {
+        const idx = COUNSELORS.findIndex((c) => c.id === id);
+        if (idx >= 0) { Object.assign(COUNSELORS[idx], updates); return COUNSELORS[idx]; }
+        throw new Error('Counselor not found');
+      };
+      w.CounselorService.delete = async (id) => {
+        const idx = COUNSELORS.findIndex((c) => c.id === id);
+        if (idx >= 0) COUNSELORS.splice(idx, 1);
       };
     }
 
@@ -649,6 +689,73 @@ if (DEMO_MODE) {
           }
         }
       }
+    }
+
+    // --- Patch ModuleService (for course structure) ---
+    if (w.ModuleService) {
+      w.ModuleService.getByCourse = async (courseId) => {
+        const courseSections = COURSE_SECTIONS.filter(cs => cs.course_id === courseId);
+        return courseSections.map((cs, i) => ({
+          id: `mod-${cs.id}`,
+          course_id: courseId,
+          title: `Module ${i + 1}`,
+          description: '',
+          sort_order: i,
+          created_at: NOW,
+          section_id: cs.section_id,
+        }));
+      };
+      w.ModuleService.getById = async (id) => null;
+      w.ModuleService.create = async (data) => ({ id: newDemoId('mod'), ...data, created_at: new Date().toISOString() });
+      w.ModuleService.update = async (id, updates) => null;
+      w.ModuleService.delete = async (id) => {};
+    }
+
+    // --- Patch LessonService (for course structure) ---
+    if (w.LessonService) {
+      w.LessonService.getByModules = async (moduleIds) => {
+        const result = {};
+        moduleIds.forEach(mid => { result[mid] = []; });
+        return result;
+      };
+      w.LessonService.getById = async (id) => null;
+      w.LessonService.create = async (data) => ({ id: newDemoId('les'), ...data, created_at: new Date().toISOString() });
+      w.LessonService.update = async (id, updates) => null;
+      w.LessonService.delete = async (id) => {};
+      w.LessonService.moveLesson = async (id, direction) => {};
+      w.LessonService.moveModule = async (id, direction) => {};
+    }
+
+    // --- Patch remaining unpatched LMS services with safe stubs ---
+    if (w.ProgressService) {
+      w.ProgressService.getByStudent = async (studentId) => [];
+      w.ProgressService.getByCourse = async (courseId) => [];
+      w.ProgressService.update = async (id, updates) => null;
+    }
+    if (w.AssignmentService) {
+      w.AssignmentService.getByCourse = async (courseId) => [];
+      w.AssignmentService.getById = async (id) => null;
+      w.AssignmentService.create = async (data) => ({ id: newDemoId('assign'), ...data, created_at: new Date().toISOString() });
+      w.AssignmentService.update = async (id, updates) => null;
+      w.AssignmentService.delete = async (id) => {};
+    }
+    if (w.QuizService) {
+      w.QuizService.getByCourse = async (courseId) => [];
+      w.QuizService.getById = async (id) => null;
+      w.QuizService.create = async (data) => ({ id: newDemoId('quiz'), ...data, created_at: new Date().toISOString() });
+      w.QuizService.submitAnswer = async (id, answer) => null;
+    }
+    if (w.CertificateService) {
+      w.CertificateService.getByStudent = async (studentId) => [];
+      w.CertificateService.generate = async (studentId, courseId) => ({ id: newDemoId('cert'), student_id: studentId, course_id: courseId, issued_at: new Date().toISOString() });
+    }
+    if (w.SettingsService) {
+      w.SettingsService.get = async (key) => null;
+      w.SettingsService.set = async (key, value) => {};
+    }
+    if (w.PermissionsService) {
+      w.PermissionsService.getUserRole = async (userId) => 'school_admin';
+      w.PermissionsService.hasPermission = async (userId, permission) => true;
     }
 
     // --- Add demo sidebar items for counselor and student ---

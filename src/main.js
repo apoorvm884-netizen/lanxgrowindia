@@ -27,7 +27,8 @@ import {
   ProgressService,
   AssignmentService,
   QuizService,
-  CertificateService
+  CertificateService,
+  CounselorService
 } from './services/index.js';
 
 // Conditional Demo Mode — only loads when VITE_DEMO_MODE=true
@@ -49,6 +50,7 @@ window.StudentService = StudentService;
 window.CourseService = CourseService;
 window.EnrollmentService = EnrollmentService;
 window.NotificationService = NotificationService;
+window.CounselorService = CounselorService;
 window.SettingsService = SettingsService;
 window.PermissionsService = PermissionsService;
 window.ModuleService = ModuleService;
@@ -1025,6 +1027,24 @@ window.AppRouter = {
     }
     if (this.currentRoute === 'school-counselors') {
       window.SchoolCounselors.render(main, data, school);
+      return;
+    }
+    if (this.currentRoute === 'school-teachers') {
+      main.innerHTML = `<div class="fade-in">
+        <div class="page-header">
+          <div class="page-header-left">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
+              <span style="font-size:12px;color:var(--text-secondary);">${schoolName}</span>
+            </div>
+            <h1 class="page-title">Teachers</h1><p class="page-subtitle">Manage teachers for ${schoolName}.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">school</span><h3>Teacher Management</h3><p>Teacher management will be available in a future update.</p></div>
+        </div>
+      </div>`;
+      initIcons();
       return;
     }
     if (this.currentRoute === 'school-courses') {
@@ -2959,15 +2979,47 @@ document.addEventListener('click', async function (e) {
   }
   if (action === 'sp-student-page') { window.SchoolStudents.currentPage = parseInt(el.dataset.page); AppRouter.render(); return; }
   if (action === 'sp-view-student') { window.SchoolStudents.viewStudent(id); return; }
-  if (action === 'sp-download-profile') { AppToast.show('Profile download — coming in a future update.', 'info'); return; }
-  if (action === 'sp-print-profile') { AppToast.show('Print — coming in a future update.', 'info'); return; }
+  if (action === 'sp-download-profile') {
+    try {
+      const data = await AppStorage.load();
+      const student = (data.students || []).find(s => s.id === id);
+      if (!student) { AppToast.show('Student not found.', 'error'); return; }
+      const profileText = JSON.stringify(student, null, 2);
+      const blob = new Blob([profileText], { type: 'application/json;charset=utf-8;' });
+      const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `profile-${student.name || id}.json`; link.click();
+      URL.revokeObjectURL(link.href);
+      AppToast.show('Profile downloaded.', 'success');
+    } catch (e) { AppToast.show('Download failed.', 'error'); }
+    return;
+  }
+  if (action === 'sp-print-profile') { window.print(); return; }
   if (action === 'sp-student-courses') {
     window.SchoolStudents.assignCourses(id);
+    return;
+  }
+  if (action === 'sp-generate-creds') {
+    const nameVal = document.getElementById('sp-input-student-name')?.value?.trim() || 'student';
+    const username = nameVal.toLowerCase().replace(/\s+/g, '.') + '.' + Math.random().toString(36).slice(2, 6);
+    const credsEl = document.getElementById('sp-input-student-username');
+    if (credsEl) credsEl.value = username + ' / pass@123';
+    AppToast.show('Login credentials generated.', 'success');
     return;
   }
 
   // Counselors
   if (action === 'sp-view-counselor') { window.SchoolCounselors.viewCounselor(id); return; }
+  if (action === 'sp-add-counselor') { window.SchoolCounselors.openAdd(AppRouter.currentSchoolId); return; }
+  if (action === 'sp-save-counselor') { window.SchoolCounselors.save(false, id); return; }
+  if (action === 'sp-update-counselor') { window.SchoolCounselors.save(true, id); return; }
+  if (action === 'sp-edit-counselor') { window.SchoolCounselors.openEdit(id); return; }
+  if (action === 'sp-toggle-counselor-status') { window.SchoolCounselors.toggleStatus(id); return; }
+  if (action === 'sp-delete-counselor') { window.SchoolCounselors.confirmDelete(id); return; }
+  if (action === 'sp-confirm-delete-counselor') {
+    try { await window.CounselorService?.delete(id); AppToast.show('Counselor deleted.', 'success'); AppStorage.invalidate(); AppModal.close('modal-confirm-counselor'); AppRouter.render(); }
+    catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
+    return;
+  }
+  if (action === 'sp-counselor-page') { window.SchoolCounselors.currentPage = parseInt(el.dataset.page); AppRouter.render(); return; }
 
   // Courses
   if (action === 'sp-add-course') { window.SchoolCourses.openAdd(AppRouter.currentSchoolId); return; }
@@ -2975,6 +3027,7 @@ document.addEventListener('click', async function (e) {
   if (action === 'sp-update-course') { window.SchoolCourses.save(true, id); return; }
   if (action === 'sp-edit-course') { window.SchoolCourses.openEdit(id); return; }
   if (action === 'sp-manage-course') { window.SchoolCourses.manage(id); return; }
+  if (action === 'sp-manage-structure') { window.SchoolCourses.manageStructure(id); return; }
   if (action === 'sp-view-course') { window.SchoolCourses.viewCourse(id); return; }
   if (action === 'sp-delete-course') { window.SchoolCourses.confirmDelete(id); return; }
   if (action === 'sp-confirm-delete-course') {
@@ -3715,6 +3768,18 @@ document.addEventListener('click', async function (e) {
       if (el.checked) {
         const p = await AuthService.getProfile();
         await window.EnrollmentService?.create(studentId, courseId, p?.id || null);
+        try {
+          const student = await window.StudentService?.getById(studentId);
+          const course = await window.CourseService?.getById(courseId);
+          const name = student?.name || 'Student';
+          const courseName = course?.name || 'Course';
+          if (student?.counselor_id) {
+            await window.NotificationService?.create('Course Assigned', `${name} has been assigned "${courseName}".`, student.counselor_id);
+          }
+          if (student?.user_id) {
+            await window.NotificationService?.create('Course Assigned', `You have been assigned "${courseName}".`, student.user_id);
+          }
+        } catch (e) { /* notification is best-effort */ }
         AppToast.show('Student enrolled.', 'success');
       } else {
         const enrollments = await window.EnrollmentService?.getByStudent(studentId) || [];
@@ -3734,6 +3799,13 @@ document.addEventListener('click', async function (e) {
     return;
   }
   // Notifications
+  if (action === 'sp-send-notification') {
+    const data = await AppStorage.load();
+    const school = data.schools.find(s => s.id === AppRouter.currentSchoolId);
+    if (school) window.SchoolNotifications.openSend(school.id);
+    return;
+  }
+  if (action === 'sp-send-notification-now') { window.SchoolNotifications.send(); return; }
   if (action === 'sp-mark-all-read') {
     try { const p = await AuthService.getProfile(); if (p) { await window.NotificationService?.markAllAsRead(p.id); AppToast.show('All marked as read.', 'success'); AppStorage.invalidate(); AppRouter.render(); } }
     catch (err) { AppToast.show(err.message, 'error'); }
@@ -3766,7 +3838,50 @@ document.addEventListener('click', async function (e) {
   }
 
   // Export (Demo)
-  if (action === 'sp-export-csv') { AppToast.show('Export CSV — coming in a future update.', 'info'); return; }
+  if (action === 'sp-export-csv') {
+    const entity = el.dataset.entity;
+    const exportId = el.dataset.id;
+    try {
+      const data = await AppStorage.load();
+      const schoolId = AppRouter.currentSchoolId;
+      const school = data.schools.find(s => s.id === schoolId);
+      let rows = [], headers = [];
+      if (entity === 'students') {
+        const schoolStudents = (data.students || []).filter(s => s.school_id === schoolId);
+        headers = ['Name', 'Email', 'Admission No', 'Class', 'Section', 'Status', 'Counselor'];
+        rows = schoolStudents.map(s => {
+          const counselor = (data.users || []).find(u => u.id === s.counselor_id);
+          return [s.name || '', s.email || '', s.admission_no || '', s.class || '', s.section || '', s.status || '', counselor?.name || ''];
+        });
+      } else if (entity === 'courses') {
+        const schoolCourses = (data.courses || []).filter(c => c.school_id === schoolId);
+        headers = ['Name', 'Code', 'Category', 'Subject', 'Difficulty', 'Status'];
+        rows = schoolCourses.map(c => [c.name || '', c.code || '', c.category_name || '', c.subject_name || '', c.difficulty || '', c.status || '']);
+      } else if (entity === 'course' && exportId) {
+        const enrollments = (data.enrollments || []).filter(e => e.course_id === exportId);
+        const course = (data.courses || []).find(c => c.id === exportId);
+        headers = ['Student Name', 'Status', 'Progress', 'Enrolled At'];
+        rows = enrollments.map(e => {
+          const student = (data.students || []).find(s => s.id === e.student_id);
+          return [student?.name || 'Unknown', e.status || '', e.progress ? `${e.progress}%` : '0%', e.created_at ? new Date(e.created_at).toLocaleDateString() : ''];
+        });
+      } else if (entity === 'student-profile' && exportId) {
+        const student = (data.students || []).find(s => s.id === exportId);
+        if (student) {
+          headers = ['Field', 'Value'];
+          rows = [['Name', student.name || ''], ['Email', student.email || ''], ['Admission No', student.admission_no || ''], ['Class', student.class || ''], ['Section', student.section || ''], ['Status', student.status || ''], ['DOB', student.date_of_birth || ''], ['Gender', student.gender || ''], ['Guardian', student.parent_name || ''], ['Guardian Contact', student.parent_contact || ''], ['Progress', student.progress ? `${student.progress}%` : '0%']];
+        }
+      }
+      if (headers.length && rows.length) {
+        const csvContent = [headers.join(','), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${entity}-${school?.name || 'export'}.csv`; link.click();
+        URL.revokeObjectURL(link.href);
+        AppToast.show('CSV exported.', 'success');
+      } else { AppToast.show('No data to export.', 'info'); }
+    } catch (e) { AppToast.show('Export failed.', 'error'); }
+    return;
+  }
   // Settings
   if (action === 'sp-save-settings') { window.SchoolSettings.save(AppRouter.currentSchoolId); return; }
 
@@ -3886,6 +4001,10 @@ document.addEventListener('change', function (e) {
   // School Portal filter changes
   if (['sp-student-counselor','sp-student-status','sp-student-class'].includes(e.target.id)) {
     window.SchoolStudents?.filter?.();
+    return;
+  }
+  if (['sp-counselor-status','sp-counselor-dept'].includes(e.target.id)) {
+    window.SchoolCounselors?.filter?.();
     return;
   }
   if (e.target.id === 'sp-video-type') { window.SchoolVideos?.filter?.(); return; }
