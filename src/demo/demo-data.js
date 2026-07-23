@@ -558,6 +558,138 @@ const ACTIVITY_LOG = [
 ];
 
 // ------------------------------------------------------------------
+// 15. COURSE MODULES (for LMS course player)
+// ------------------------------------------------------------------
+const COURSE_MODULES = [
+  { id: 'mod-1', course_id: 'course-1', title: 'Getting Started', description: 'Introduction to soft skills', sort_order: 1, created_at: NOW },
+  { id: 'mod-2', course_id: 'course-1', title: 'Core Skills', description: 'Building essential interpersonal skills', sort_order: 2, created_at: NOW },
+  { id: 'mod-3', course_id: 'course-1', title: 'Mastery', description: 'Advanced soft skills', sort_order: 3, created_at: NOW },
+  { id: 'mod-4', course_id: 'course-2', title: 'Leadership Foundations', description: 'Core leadership principles', sort_order: 1, created_at: NOW },
+  { id: 'mod-5', course_id: 'course-2', title: 'Team Building', description: 'Building effective teams', sort_order: 2, created_at: NOW },
+  { id: 'mod-6', course_id: 'course-3', title: 'Communication Basics', description: 'Fundamental communication', sort_order: 1, created_at: NOW },
+  { id: 'mod-7', course_id: 'course-3', title: 'Public Speaking', description: 'Presenting with confidence', sort_order: 2, created_at: NOW },
+  { id: 'mod-8', course_id: 'course-4', title: 'Saving Money', description: 'Smart saving habits', sort_order: 1, created_at: NOW },
+  { id: 'mod-9', course_id: 'course-4', title: 'Investing', description: 'Introduction to investments', sort_order: 2, created_at: NOW },
+  { id: 'mod-10', course_id: 'course-5', title: 'Career Exploration', description: 'Exploring career paths', sort_order: 1, created_at: NOW },
+  { id: 'mod-11', course_id: 'course-6', title: 'Business Basics', description: 'Starting your own business', sort_order: 1, created_at: NOW },
+];
+
+// ------------------------------------------------------------------
+// 16. LESSONS (tied to modules, with different content types)
+// ------------------------------------------------------------------
+function makeLesson(id, moduleId, title, contentType, contentUrl, sortOrder, duration) {
+  return { id, module_id: moduleId, course_id: COURSE_MODULES.find(m => m.id === moduleId)?.course_id || '', title, description: `${title} — learn and practice.`, content_type: contentType, content_url: contentUrl, content_id: null, sort_order: sortOrder, duration, created_at: NOW };
+}
+
+const LESSONS = [
+  makeLesson('les-1', 'mod-1', 'What are Soft Skills?', 'video', 'https://www.youtube.com/watch?v=demo-softskills-1', 1, 10),
+  makeLesson('les-2', 'mod-1', 'Soft Skills Self-Assessment', 'assignment', null, 2, null),
+  makeLesson('les-3', 'mod-1', 'Why Soft Skills Matter', 'video', 'https://www.youtube.com/watch?v=demo-softskills-2', 3, 8),
+  makeLesson('les-4', 'mod-2', 'Effective Communication', 'video', 'https://www.youtube.com/watch?v=demo-softskills-3', 1, 12),
+  makeLesson('les-5', 'mod-2', 'Communication Quiz', 'quiz', null, 2, null),
+  makeLesson('les-6', 'mod-2', 'Teamwork Basics', 'video', 'https://www.youtube.com/watch?v=demo-softskills-4', 3, 9),
+  makeLesson('les-7', 'mod-2', 'Teamwork Assignment', 'assignment', null, 4, null),
+  makeLesson('les-8', 'mod-3', 'Advanced Interpersonal Skills', 'video', 'https://www.youtube.com/watch?v=demo-softskills-5', 1, 15),
+  makeLesson('les-9', 'mod-3', 'Final Assessment', 'quiz', null, 2, null),
+  makeLesson('les-10', 'mod-4', 'What Makes a Leader', 'video', 'https://www.youtube.com/watch?v=demo-leader-1', 1, 8),
+  makeLesson('les-11', 'mod-4', 'Leadership Styles', 'pdf', 'https://drive.google.com/file/d/demo-leadership-styles', 2, null),
+  makeLesson('les-12', 'mod-4', 'Leadership Self-Reflection', 'assignment', null, 3, null),
+  makeLesson('les-13', 'mod-5', 'Building Trust', 'video', 'https://www.youtube.com/watch?v=demo-leader-2', 1, 11),
+  makeLesson('les-14', 'mod-5', 'Conflict Resolution', 'video', 'https://www.youtube.com/watch?v=demo-leader-3', 2, 14),
+  makeLesson('les-15', 'mod-5', 'Team Leadership Quiz', 'quiz', null, 3, null),
+  makeLesson('les-16', 'mod-6', 'Active Listening', 'video', 'https://www.youtube.com/watch?v=demo-comm-1', 1, 9),
+  makeLesson('les-17', 'mod-6', 'Non-Verbal Communication', 'pdf', 'https://drive.google.com/file/d/demo-nonverbal', 2, null),
+  makeLesson('les-18', 'mod-7', 'Public Speaking Mastery', 'video', 'https://www.youtube.com/watch?v=demo-comm-2', 1, 22),
+  makeLesson('les-19', 'mod-7', 'Speech Preparation', 'assignment', null, 2, null),
+  makeLesson('les-20', 'mod-8', 'Why Save Money?', 'video', 'https://www.youtube.com/watch?v=demo-finance-1', 1, 11),
+  makeLesson('les-21', 'mod-8', 'Budgeting Basics', 'pdf', 'https://drive.google.com/file/d/demo-budgeting', 2, null),
+  makeLesson('les-22', 'mod-8', 'Saving Challenge', 'assignment', null, 3, null),
+  makeLesson('les-23', 'mod-9', 'Introduction to Investing', 'video', 'https://www.youtube.com/watch?v=demo-finance-2', 1, 14),
+  makeLesson('les-24', 'mod-9', 'Investment Quiz', 'quiz', null, 2, null),
+  makeLesson('les-25', 'mod-10', 'Career Options Exploration', 'video', 'https://www.youtube.com/watch?v=demo-career-1', 1, 16),
+  makeLesson('les-26', 'mod-10', 'Career Roadmap', 'assignment', null, 2, null),
+  makeLesson('les-27', 'mod-11', 'Business Ideas', 'video', 'https://www.youtube.com/watch?v=demo-entre-1', 1, 20),
+  makeLesson('les-28', 'mod-11', 'Business Plan Template', 'assignment', null, 2, null),
+  makeLesson('les-29', 'mod-11', 'Entrepreneurship Quiz', 'quiz', null, 3, null),
+];
+
+// ------------------------------------------------------------------
+// 17. ASSIGNMENTS (tied to courses via lesson content_id)
+// ------------------------------------------------------------------
+const ASSIGNMENTS = [
+  { id: 'assign-1', course_id: 'course-1', title: 'Soft Skills Self-Assessment', description: 'Rate yourself on various soft skills and create a personal development plan.', due_date: new Date(Date.now() + 14 * 86400000).toISOString(), max_marks: 100, created_at: NOW },
+  { id: 'assign-2', course_id: 'course-1', title: 'Teamwork Reflection', description: 'Write a reflection on a recent team experience and what you learned.', due_date: new Date(Date.now() + 21 * 86400000).toISOString(), max_marks: 100, created_at: NOW },
+  { id: 'assign-3', course_id: 'course-2', title: 'Leadership Self-Reflection', description: 'Reflect on your leadership experiences and identify areas for growth.', due_date: new Date(Date.now() + 10 * 86400000).toISOString(), max_marks: 100, created_at: NOW },
+  { id: 'assign-4', course_id: 'course-3', title: 'Speech Preparation', description: 'Prepare and submit a 3-minute speech on a topic of your choice.', due_date: new Date(Date.now() + 7 * 86400000).toISOString(), max_marks: 100, created_at: NOW },
+  { id: 'assign-5', course_id: 'course-4', title: 'Saving Challenge', description: 'Create a monthly savings plan and track your expenses for one week.', due_date: new Date(Date.now() + 30 * 86400000).toISOString(), max_marks: 50, created_at: NOW },
+  { id: 'assign-6', course_id: 'course-5', title: 'Career Roadmap', description: 'Research a career path and create a 5-year roadmap.', due_date: new Date(Date.now() + 14 * 86400000).toISOString(), max_marks: 100, created_at: NOW },
+  { id: 'assign-7', course_id: 'course-6', title: 'Business Plan', description: 'Write a one-page business plan for your startup idea.', due_date: new Date(Date.now() + 21 * 86400000).toISOString(), max_marks: 100, created_at: NOW },
+];
+
+// ------------------------------------------------------------------
+// 18. QUIZZES + QUIZ QUESTIONS
+// ------------------------------------------------------------------
+const QUIZZES = [
+  { id: 'quiz-1', course_id: 'course-1', title: 'Communication Quiz', description: 'Test your understanding of communication concepts.', pass_percentage: 60, max_attempts: 3, time_limit: 10, created_at: NOW },
+  { id: 'quiz-2', course_id: 'course-1', title: 'Final Assessment', description: 'Final assessment for Soft Skills course.', pass_percentage: 70, max_attempts: 2, time_limit: 20, created_at: NOW },
+  { id: 'quiz-3', course_id: 'course-2', title: 'Team Leadership Quiz', description: 'Test your knowledge of team leadership.', pass_percentage: 60, max_attempts: 3, time_limit: 10, created_at: NOW },
+  { id: 'quiz-4', course_id: 'course-4', title: 'Investment Quiz', description: 'Test your understanding of investment basics.', pass_percentage: 60, max_attempts: 3, time_limit: 10, created_at: NOW },
+  { id: 'quiz-5', course_id: 'course-6', title: 'Entrepreneurship Quiz', description: 'Test your entrepreneurship knowledge.', pass_percentage: 60, max_attempts: 3, time_limit: 10, created_at: NOW },
+];
+
+const QUIZ_QUESTIONS = [
+  // Quiz 1 - Communication Quiz (MCQ + T/F)
+  { id: 'qq-1', quiz_id: 'quiz-1', question: 'What is the most important aspect of active listening?', question_type: 'multiple_choice', options: JSON.stringify(['Speaking clearly', 'Paying full attention', 'Taking notes', 'Asking questions']), correct_answer: 'Paying full attention', sort_order: 1 },
+  { id: 'qq-2', quiz_id: 'quiz-1', question: 'Non-verbal communication includes body language and facial expressions.', question_type: 'true_false', options: JSON.stringify(['True', 'False']), correct_answer: 'True', sort_order: 2 },
+  { id: 'qq-3', quiz_id: 'quiz-1', question: 'Which of these is a barrier to effective communication?', question_type: 'multiple_choice', options: JSON.stringify(['Clear message', 'Active listening', 'Noise', 'Feedback']), correct_answer: 'Noise', sort_order: 3 },
+  { id: 'qq-4', quiz_id: 'quiz-1', question: 'Briefly explain why empathy is important in communication.', question_type: 'short_answer', options: null, correct_answer: null, sort_order: 4 },
+  // Quiz 2 - Final Assessment
+  { id: 'qq-5', quiz_id: 'quiz-2', question: 'Which soft skill is most important for career success?', question_type: 'multiple_choice', options: JSON.stringify(['Technical skills', 'Communication', 'Speed', 'Luck']), correct_answer: 'Communication', sort_order: 1 },
+  { id: 'qq-6', quiz_id: 'quiz-2', question: 'Teamwork is only important in large organizations.', question_type: 'true_false', options: JSON.stringify(['True', 'False']), correct_answer: 'False', sort_order: 2 },
+  { id: 'qq-7', quiz_id: 'quiz-2', question: 'Describe a situation where you demonstrated leadership.', question_type: 'short_answer', options: null, correct_answer: null, sort_order: 3 },
+  // Quiz 3 - Team Leadership Quiz
+  { id: 'qq-8', quiz_id: 'quiz-3', question: 'What is the primary role of a team leader?', question_type: 'multiple_choice', options: JSON.stringify(['Give orders', 'Guide and support', 'Do all the work', 'Take credit']), correct_answer: 'Guide and support', sort_order: 1 },
+  { id: 'qq-9', quiz_id: 'quiz-3', question: 'Trust is the foundation of effective teamwork.', question_type: 'true_false', options: JSON.stringify(['True', 'False']), correct_answer: 'True', sort_order: 2 },
+  // Quiz 4 - Investment Quiz
+  { id: 'qq-10', quiz_id: 'quiz-4', question: 'What does diversification mean in investing?', question_type: 'multiple_choice', options: JSON.stringify(['Investing in one stock', 'Spreading investments across assets', 'Saving money', 'Taking loans']), correct_answer: 'Spreading investments across assets', sort_order: 1 },
+  { id: 'qq-11', quiz_id: 'quiz-4', question: 'What is compound interest?', question_type: 'short_answer', options: null, correct_answer: null, sort_order: 2 },
+  // Quiz 5 - Entrepreneurship Quiz
+  { id: 'qq-12', quiz_id: 'quiz-5', question: 'A business plan should include a financial projection.', question_type: 'true_false', options: JSON.stringify(['True', 'False']), correct_answer: 'True', sort_order: 1 },
+  { id: 'qq-13', quiz_id: 'quiz-5', question: 'What is a minimum viable product (MVP)?', question_type: 'multiple_choice', options: JSON.stringify(['A finished product', 'A simple version to test the market', 'An expensive product', 'A product with many features']), correct_answer: 'A simple version to test the market', sort_order: 2 },
+];
+
+// ------------------------------------------------------------------
+// 19. STUDENT PROGRESS (pre-existing for demo)
+// ------------------------------------------------------------------
+const PROGRESS = [
+  { id: 'prog-1', student_id: 'demo-student-1', lesson_id: 'les-1', completed: true, resume_position: 0, time_spent: 600, last_activity: new Date(Date.now() - 5 * 86400000).toISOString(), score: null, created_at: NOW },
+  { id: 'prog-2', student_id: 'demo-student-1', lesson_id: 'les-2', completed: true, resume_position: 0, time_spent: 900, last_activity: new Date(Date.now() - 4 * 86400000).toISOString(), score: 85, created_at: NOW },
+  { id: 'prog-3', student_id: 'demo-student-1', lesson_id: 'les-3', completed: true, resume_position: 0, time_spent: 480, last_activity: new Date(Date.now() - 4 * 86400000).toISOString(), score: null, created_at: NOW },
+  { id: 'prog-4', student_id: 'demo-student-1', lesson_id: 'les-4', completed: false, resume_position: 240, time_spent: 300, last_activity: new Date(Date.now() - 2 * 86400000).toISOString(), score: null, created_at: NOW },
+  { id: 'prog-5', student_id: 'demo-student-1', lesson_id: 'les-10', completed: true, resume_position: 0, time_spent: 480, last_activity: new Date(Date.now() - 8 * 86400000).toISOString(), score: null, created_at: NOW },
+  { id: 'prog-6', student_id: 'demo-student-2', lesson_id: 'les-1', completed: true, resume_position: 0, time_spent: 600, last_activity: new Date(Date.now() - 3 * 86400000).toISOString(), score: null, created_at: NOW },
+  { id: 'prog-7', student_id: 'demo-student-2', lesson_id: 'les-16', completed: true, resume_position: 0, time_spent: 540, last_activity: new Date(Date.now() - 2 * 86400000).toISOString(), score: null, created_at: NOW },
+  { id: 'prog-8', student_id: 'demo-student-2', lesson_id: 'les-20', completed: true, resume_position: 0, time_spent: 660, last_activity: new Date(Date.now() - 1 * 86400000).toISOString(), score: null, created_at: NOW },
+  { id: 'prog-9', student_id: 'demo-student-3', lesson_id: 'les-1', completed: true, resume_position: 0, time_spent: 600, last_activity: new Date(Date.now() - 10 * 86400000).toISOString(), score: null, created_at: NOW },
+  { id: 'prog-10', student_id: 'demo-student-3', lesson_id: 'les-3', completed: true, resume_position: 0, time_spent: 480, last_activity: new Date(Date.now() - 9 * 86400000).toISOString(), score: null, created_at: NOW },
+  { id: 'prog-11', student_id: 'demo-student-3', lesson_id: 'les-10', completed: true, resume_position: 0, time_spent: 480, last_activity: new Date(Date.now() - 7 * 86400000).toISOString(), score: null, created_at: NOW },
+  { id: 'prog-12', student_id: 'demo-student-3', lesson_id: 'les-25', completed: false, resume_position: 120, time_spent: 200, last_activity: new Date(Date.now() - 1 * 86400000).toISOString(), score: null, created_at: NOW },
+  { id: 'prog-13', student_id: 'demo-student-7', lesson_id: 'les-16', completed: true, resume_position: 0, time_spent: 540, last_activity: new Date(Date.now() - 5 * 86400000).toISOString(), score: null, created_at: NOW },
+  { id: 'prog-14', student_id: 'demo-student-7', lesson_id: 'les-18', completed: true, resume_position: 0, time_spent: 1320, last_activity: new Date(Date.now() - 3 * 86400000).toISOString(), score: null, created_at: NOW },
+  { id: 'prog-15', student_id: 'demo-student-7', lesson_id: 'les-19', completed: true, resume_position: 0, time_spent: 1200, last_activity: new Date(Date.now() - 2 * 86400000).toISOString(), score: 92, created_at: NOW },
+];
+
+// ------------------------------------------------------------------
+// 20. CERTIFICATES (pre-existing for completed courses)
+// ------------------------------------------------------------------
+const CERTIFICATES = [
+  { id: 'cert-1', student_id: 'demo-student-1', course_id: 'course-2', certificate_number: 'CERT-2025-0001', completed_at: new Date(Date.now() - 1 * 86400000).toISOString(), issued_at: new Date(Date.now() - 1 * 86400000).toISOString(), created_at: NOW },
+  { id: 'cert-2', student_id: 'demo-student-3', course_id: 'course-1', certificate_number: 'CERT-2025-0002', completed_at: new Date(Date.now() - 2 * 86400000).toISOString(), issued_at: new Date(Date.now() - 2 * 86400000).toISOString(), created_at: NOW },
+  { id: 'cert-3', student_id: 'demo-student-7', course_id: 'course-3', certificate_number: 'CERT-2025-0003', completed_at: new Date(Date.now() - 1 * 86400000).toISOString(), issued_at: new Date(Date.now() - 1 * 86400000).toISOString(), created_at: NOW },
+  { id: 'cert-4', student_id: 'demo-student-5', course_id: 'course-8', certificate_number: 'CERT-2025-0004', completed_at: new Date(Date.now() - 3 * 86400000).toISOString(), issued_at: new Date(Date.now() - 3 * 86400000).toISOString(), created_at: NOW },
+];
+
+// ------------------------------------------------------------------
 // HELPER: Map section + subject + category onto enrollments & course_sections
 // ------------------------------------------------------------------
 function enrichEnrollment(enr) {
@@ -590,6 +722,13 @@ export function buildDemoData() {
     notifications: NOTIFICATIONS,
     counselors: COUNSELORS,
     activities: ACTIVITY_LOG,
+    courseModules: COURSE_MODULES,
+    lessons: LESSONS,
+    assignments: ASSIGNMENTS,
+    quizzes: QUIZZES,
+    quizQuestions: QUIZ_QUESTIONS,
+    progress: PROGRESS,
+    certificates: CERTIFICATES,
   };
 }
 
@@ -611,6 +750,13 @@ export {
   USERS,
   AUDIT_LOG,
   ACTIVITY_LOG,
+  COURSE_MODULES,
+  LESSONS,
+  ASSIGNMENTS,
+  QUIZZES,
+  QUIZ_QUESTIONS,
+  PROGRESS,
+  CERTIFICATES,
 };
 
 // Helper to generate a new ID prefixed with demo-

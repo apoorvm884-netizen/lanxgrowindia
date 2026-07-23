@@ -18,7 +18,8 @@ import {
   SCHOOLS, CATEGORIES, SUBJECTS, SECTIONS, CONTENT,
   STUDENTS, COURSES, COURSE_SECTIONS, ENROLLMENTS,
   NOTIFICATIONS, COUNSELORS, USERS, AUDIT_LOG, newDemoId,
-  ACTIVITY_LOG,
+  ACTIVITY_LOG, COURSE_MODULES, LESSONS, ASSIGNMENTS, QUIZZES,
+  QUIZ_QUESTIONS, PROGRESS, CERTIFICATES,
 } from './demo-data.js';
 import { renderSchoolIntelligence } from './demo-analytics.js';
 
@@ -166,116 +167,280 @@ if (DEMO_MODE) {
     const student = STUDENTS.find((s) => s.id === studentId);
     const myEnrollments = ENROLLMENTS.filter((e) => e.student_id === studentId);
     const completedCount = myEnrollments.filter((e) => e.status === 'completed').length;
-    const inProgressCount = myEnrollments.filter((e) => e.status === 'in_progress').length;
+    const inProgressCount = myEnrollments.filter((e) => e.status === 'in_progress' || e.status === 'active' || e.status === 'not_started').length;
+    const myCertificates = CERTIFICATES.filter(c => c.student_id === studentId);
+    const myProgress = PROGRESS.filter(p => p.student_id === studentId);
+    const completedLessons = myProgress.filter(p => p.completed).length;
+    const continueLearningLessons = myProgress.filter(p => !p.completed && p.resume_position > 0).slice(0, 3);
+    const upcomingAssignments = ASSIGNMENTS.filter(a => {
+      const mod = COURSE_MODULES.find(m => m.id === LESSONS.find(l => l.id === a.id)?.module_id);
+      return mod && myEnrollments.some(e => e.course_id === mod.course_id);
+    }).slice(0, 3);
+    const mySchoolNotifs = NOTIFICATIONS.filter(n => n.user_id === studentId).slice(0, 4);
 
     container.innerHTML = `
       <div style="padding:24px;">
         <h1 style="font-size:24px;font-weight:700;margin:0 0 4px;">Student Dashboard</h1>
         <p style="color:var(--text-secondary);margin:0 0 24px;">${eh(student?.name || profile?.name || 'Student')} · ${eh(school?.name || 'School')} · ${eh(student?.class || '')}</p>
 
+        <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
+          <div class="metric-card" style="padding:14px;"><div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;">Enrolled</div><div style="font-size:24px;font-weight:700;">${myEnrollments.length}</div></div>
+          <div class="metric-card" style="padding:14px;"><div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;">Completed</div><div style="font-size:24px;font-weight:700;color:var(--success);">${completedCount}</div></div>
+          <div class="metric-card" style="padding:14px;"><div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;">Lessons Done</div><div style="font-size:24px;font-weight:700;color:var(--primary);">${completedLessons}</div></div>
+          <div class="metric-card" style="padding:14px;"><div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;">Certificates</div><div style="font-size:24px;font-weight:700;color:#f59e0b;">${myCertificates.length}</div></div>
+          <div class="metric-card" style="padding:14px;"><div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;">Progress</div><div style="font-size:24px;font-weight:700;">${student?.progress || 0}%</div></div>
+          <div class="metric-card" style="padding:14px;"><div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;">Attendance</div><div style="font-size:24px;font-weight:700;">${student?.attendance || 0}%</div></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+          <div class="card" style="padding:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <h3 style="margin:0;font-size:14px;font-weight:600;">Continue Learning</h3>
+              <button class="btn btn-ghost btn-sm" style="font-size:10px;height:24px;" data-action="navigate" data-route="student-courses">View All</button>
+            </div>
+            ${continueLearningLessons.length === 0 ? '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0;">No lessons in progress. Start a course!</div>'
+            : continueLearningLessons.map(p => {
+              const lesson = LESSONS.find(l => l.id === p.lesson_id);
+              const module = lesson ? COURSE_MODULES.find(m => m.id === lesson.module_id) : null;
+              const course = module ? COURSES.find(c => c.id === module.course_id) : null;
+              return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);cursor:pointer;" data-action="sp-open-lesson" data-student-id="${studentId}" data-lesson-id="${p.lesson_id}">
+                <span class="material-symbols-outlined" style="font-size:16px;color:#3b82f6;">play_circle</span>
+                <div style="flex:1;font-size:12px;"><span style="font-weight:500;">${eh(lesson?.title || 'Lesson')}</span>${course ? `<br><span style="color:var(--text-muted);font-size:10px;">${eh(course.name)}</span>` : ''}</div>
+                <span style="font-size:10px;color:var(--text-muted);">${Math.floor(p.resume_position / 60)}m in</span>
+              </div>`;
+            }).join('')}
+          </div>
+
+          <div class="card" style="padding:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <h3 style="margin:0;font-size:14px;font-weight:600;">Courses</h3>
+            </div>
+            ${myEnrollments.length === 0 ? '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0;">No courses assigned yet.</div>'
+            : myEnrollments.slice(0, 4).map(e => {
+              const course = COURSES.find(c => c.id === e.course_id);
+              const mods = COURSE_MODULES.filter(m => m.course_id === e.course_id);
+              const modIds = mods.map(m => m.id);
+              const courseLessons = LESSONS.filter(l => modIds.includes(l.module_id));
+              const done = myProgress.filter(p => p.completed && courseLessons.some(l => l.id === p.lesson_id)).length;
+              const pct = courseLessons.length ? Math.round(done / courseLessons.length * 100) : 0;
+              return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);cursor:pointer;" data-action="sp-open-course-player" data-student-id="${studentId}" data-course-id="${course?.id}">
+                <div style="width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;">${course ? AppUtils.getInitials(course.name) : '?'}</div>
+                <div style="flex:1;font-size:12px;"><span style="font-weight:500;">${eh(course?.name || '')}</span><br><span style="color:var(--text-muted);font-size:10px;">${done}/${courseLessons.length} lessons</span></div>
+                <span style="font-size:11px;font-weight:600;color:${pct >= 80 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#6b7280'};">${pct}%</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+          <div class="card" style="padding:16px;">
+            <h3 style="margin:0 0 10px;font-size:14px;font-weight:600;">Upcoming Deadlines</h3>
+            ${upcomingAssignments.length === 0 ? '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0;">No upcoming deadlines.</div>'
+            : upcomingAssignments.map(a => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:12px;">
+              <span class="material-symbols-outlined" style="font-size:16px;color:#f59e0b;">schedule</span>
+              <span style="flex:1;">${eh(a.title)}</span>
+              <span style="color:var(--text-muted);font-size:10px;">Due ${new Date(a.due_date).toLocaleDateString()}</span>
+            </div>`).join('')}
+          </div>
+
+          <div class="card" style="padding:16px;">
+            <h3 style="margin:0 0 10px;font-size:14px;font-weight:600;">Certificates</h3>
+            ${myCertificates.length === 0 ? '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0;">Complete a course to earn your first certificate!</div>'
+            : myCertificates.map(cert => {
+              const course = COURSES.find(c => c.id === cert.course_id);
+              return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);cursor:pointer;font-size:12px;" data-action="sp-view-certificate" data-student-id="${studentId}" data-course-id="${cert.course_id}">
+                <span class="material-symbols-outlined" style="font-size:16px;color:#f59e0b;">workspace_premium</span>
+                <span style="flex:1;font-weight:500;">${eh(course?.name || '')} — <span style="font-weight:400;color:var(--text-secondary);">${eh(cert.certificate_number)}</span></span>
+                <span style="color:var(--text-muted);font-size:10px;">View</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+
+        <div class="card" style="padding:16px;">
+          <h3 style="margin:0 0 10px;font-size:14px;font-weight:600;">Notifications</h3>
+          ${mySchoolNotifs.length === 0 ? '<div style="font-size:12px;color:var(--text-secondary);">No notifications.</div>'
+          : mySchoolNotifs.map(n => `
+            <div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:12px;${!n.is_read ? 'font-weight:600;' : ''}">
+              <span class="material-symbols-outlined" style="font-size:16px;color:${!n.is_read ? 'var(--primary)' : 'var(--text-muted)'};">${!n.is_read ? 'notifications_active' : 'notifications'}</span>
+              <div style="flex:1;">${eh(n.title)}<br><span style="color:var(--text-muted);font-size:10px;">${eh(n.message)}</span></div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    window.initIcons?.();
+  }
+
+  function renderStudentCourses(container, profile) {
+    if (!container) return;
+    profile = profile || null;
+    const studentId = profile ? profile.id : 'demo-student-1';
+    const schoolId = (profile && profile.school_id) || 'school-1';
+    const school = SCHOOLS.find(s => s.id === schoolId);
+    const student = STUDENTS.find(s => s.id === studentId);
+    const myEnrollments = ENROLLMENTS.filter(e => e.student_id === studentId);
+    const completedCount = myEnrollments.filter(e => e.status === 'completed').length;
+    const inProgressCount = myEnrollments.filter(e => e.status === 'in_progress' || e.status === 'active').length;
+
+    container.innerHTML = `
+      <div style="padding:24px;">
+        <h1 style="font-size:24px;font-weight:700;margin:0 0 4px;">My Courses</h1>
+        <p style="color:var(--text-secondary);margin:0 0 24px;">${eh(student?.name || 'Student')} · ${eh(school?.name || '')}</p>
         <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
-          <div class="metric-card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
-            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Enrolled Courses</div>
-            <div style="font-size:32px;font-weight:700;">${myEnrollments.length}</div>
+          <div class="metric-card" style="padding:20px;"><div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Total Enrolled</div><div style="font-size:32px;font-weight:700;">${myEnrollments.length}</div></div>
+          <div class="metric-card" style="padding:20px;"><div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Completed</div><div style="font-size:32px;font-weight:700;color:var(--success);">${completedCount}</div></div>
+          <div class="metric-card" style="padding:20px;"><div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">In Progress</div><div style="font-size:32px;font-weight:700;color:var(--primary);">${inProgressCount}</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">${myEnrollments.map(e => {
+          const course = COURSES.find(c => c.id === e.course_id);
+          if (!course) return '';
+          const category = CATEGORIES.find(c => c.id === course.category_id);
+          const subject = SUBJECTS.find(s => s.id === course.subject_id);
+          const progress = student?.progress || 0;
+          const statusColors = { completed: '#10b981', active: '#3b82f6', not_started: '#9ca3af' };
+          const bgColors = { completed: '#f0fdf4', active: '#eff6ff', not_started: '#f5f5f5' };
+          return `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;" data-action="sp-open-course-player" data-student-id="${studentId}" data-course-id="${course.id}">
+            <div style="height:100px;background:linear-gradient(135deg,${course.difficulty === 'beginner' ? '#059669,#34d399' : course.difficulty === 'advanced' ? '#dc2626,#f87171' : '#d97706,#fbbf24'});display:flex;align-items:center;justify-content:center;">
+              <span style="font-size:32px;color:#fff;font-weight:700;">${AppUtils.getInitials(course.name)}</span>
+            </div>
+            <div style="padding:14px;">
+              <div style="font-size:15px;font-weight:600;margin-bottom:4px;">${eh(course.name)}</div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">${eh(course.description || '').slice(0, 60)}${(course.description || '').length > 60 ? '...' : ''}</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+                <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${bgColors[e.status]};color:${statusColors[e.status] || '#6b7280'};font-weight:500;">${e.status.replace('_', ' ')}</span>
+                <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#f5f3ff;color:#7c3aed;">${eh(course.difficulty || 'intermediate')}</span>
+                <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#f0fdf4;color:#059669;">${eh(course.estimated_duration || '')}</span>
+              </div>
+              <div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;"><span>Progress</span><span>${progress}%</span></div>
+              <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:${progress}%;height:100%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:3px;"></div></div></div>
+              ${category || subject ? `<div style="font-size:10px;color:var(--text-muted);margin-top:6px;">${category ? eh(category.name) : ''}${subject ? ' > ' + eh(subject.name) : ''}</div>` : ''}
+            </div>
+          </div>`;
+        }).join('')}</div>
+      </div>`;
+    window.initIcons?.();
+  }
+
+  function renderStudentVideos(container, profile) {
+    if (!container) return;
+    const schoolId = (profile && profile.school_id) || 'school-1';
+    const schoolVideos = CONTENT.filter(c => c.school_id === schoolId);
+    container.innerHTML = `
+      <div style="padding:24px;">
+        <h1 style="font-size:24px;font-weight:700;margin:0 0 4px;">Video Library</h1>
+        <p style="color:var(--text-secondary);margin:0 0 24px;">${schoolVideos.length} video(s) available</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;">${schoolVideos.map(v => `
+          <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;" data-action="play-video" data-id="${v.id}">
+            <div style="aspect-ratio:16/9;background:linear-gradient(135deg,#1e3a8a,#3b82f6);display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:40px;color:rgba(255,255,255,0.8);">play_circle</span>
+            </div>
+            <div style="padding:12px;">
+              <div style="font-size:13px;font-weight:600;">${eh(v.name)}</div>
+              <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">${eh(v.duration)}</div>
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    window.initIcons?.();
+  }
+
+  function renderStudentProgress(container, profile) {
+    if (!container) return;
+    const studentId = profile ? profile.id : 'demo-student-1';
+    const student = STUDENTS.find(s => s.id === studentId);
+    const myEnrollments = ENROLLMENTS.filter(e => e.student_id === studentId);
+    const completedCount = myEnrollments.filter(e => e.status === 'completed').length;
+    const overallProgress = student?.progress || 0;
+    const completedLessons = PROGRESS.filter(p => p.student_id === studentId && p.completed).length;
+    const totalLessons = LESSONS.length;
+
+    container.innerHTML = `
+      <div style="padding:24px;">
+        <h1 style="font-size:24px;font-weight:700;margin:0 0 4px;">My Progress</h1>
+        <p style="color:var(--text-secondary);margin:0 0 24px;">${eh(student?.name || 'Student')}</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
+          <div class="metric-card" style="padding:20px;"><div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Overall Progress</div><div style="font-size:28px;font-weight:700;color:var(--primary);">${overallProgress}%</div></div>
+          <div class="metric-card" style="padding:20px;"><div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Lessons Completed</div><div style="font-size:28px;font-weight:700;color:var(--success);">${completedLessons}/${totalLessons}</div></div>
+          <div class="metric-card" style="padding:20px;"><div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Courses Completed</div><div style="font-size:28px;font-weight:700;color:var(--success);">${completedCount}/${myEnrollments.length}</div></div>
+          <div class="metric-card" style="padding:20px;"><div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Attendance</div><div style="font-size:28px;font-weight:700;">${student?.attendance || 0}%</div></div>
+        </div>
+        <div style="height:12px;background:var(--border);border-radius:6px;overflow:hidden;margin-bottom:24px;">
+          <div style="width:${overallProgress}%;height:100%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:6px;transition:width 0.5s;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div class="card" style="padding:20px;">
+            <h3 style="margin:0 0 12px;font-size:15px;font-weight:600;">Course Progress</h3>
+            ${myEnrollments.length === 0 ? '<p style="color:var(--text-secondary);font-size:13px;">No courses enrolled.</p>'
+            : myEnrollments.map(e => {
+              const course = COURSES.find(c => c.id === e.course_id);
+              const mods = COURSE_MODULES.filter(m => m.course_id === e.course_id);
+              const modIds = mods.map(m => m.id);
+              const courseLessons = LESSONS.filter(l => modIds.includes(l.module_id));
+              const done = PROGRESS.filter(p => p.student_id === studentId && courseLessons.some(l => l.id === p.lesson_id) && p.completed).length;
+              const pct = courseLessons.length ? Math.round(done / courseLessons.length * 100) : 0;
+              return `<div style="margin-bottom:12px;padding:10px;border:1px solid var(--border-light);border-radius:8px;">
+                <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span style="font-weight:500;">${eh(course?.name || '')}</span><span>${done}/${courseLessons.length} (${pct}%)</span></div>
+                <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${pct >= 80 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#3b82f6'};border-radius:3px;"></div></div>
+              </div>`;
+            }).join('')}
           </div>
-          <div class="metric-card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
-            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Completed</div>
-            <div style="font-size:32px;font-weight:700;color:var(--success);">${completedCount}</div>
-          </div>
-          <div class="metric-card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
-            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">In Progress</div>
-            <div style="font-size:32px;font-weight:700;color:var(--primary);">${inProgressCount}</div>
-          </div>
-          <div class="metric-card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
-            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Attendance</div>
-            <div style="font-size:32px;font-weight:700;">${student?.attendance || 0}%</div>
+          <div class="card" style="padding:20px;">
+            <h3 style="margin:0 0 12px;font-size:15px;font-weight:600;">Recent Activity</h3>
+            ${PROGRESS.filter(p => p.student_id === studentId).slice(0, 10).map(p => {
+              const lesson = LESSONS.find(l => l.id === p.lesson_id);
+              return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:12px;">
+                <span class="material-symbols-outlined" style="font-size:14px;color:${p.completed ? '#10b981' : '#3b82f6'};">${p.completed ? 'check_circle' : 'radio_button_unchecked'}</span>
+                <span style="flex:1;">${eh(lesson?.title || 'Unknown lesson')}</span>
+                <span style="color:var(--text-muted);font-size:10px;">${AppUtils.timeAgo(p.last_activity)}</span>
+              </div>`;
+            }).join('') || '<div style="font-size:13px;color:var(--text-secondary);">No activity yet.</div>'}
           </div>
         </div>
+      </div>`;
+    window.initIcons?.();
+  }
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
-          <div class="card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
-            <h3 style="margin:0 0 16px;font-size:16px;font-weight:600;">My Courses</h3>
-            ${myEnrollments.length === 0
-              ? '<p style="color:var(--text-secondary);">No courses assigned yet.</p>'
-              : `<div style="display:flex;flex-direction:column;gap:12px;">${myEnrollments.map((e) => {
-                  const course = COURSES.find((c) => c.id === e.course_id);
-                  const statusColors = {
-                    completed: 'var(--success)',
-                    in_progress: 'var(--primary)',
-                    not_started: 'var(--text-muted)',
-                  };
-                  return `
-                    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px solid var(--border);border-radius:8px;">
-                      <div>
-                        <div style="font-weight:600;font-size:14px;">${eh(course?.name || 'Unknown Course')}</div>
-                        <div style="font-size:12px;color:var(--text-secondary);">${eh(course?.description || '')}</div>
-                      </div>
-                      <span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:12px;background:${e.status === 'completed' ? 'var(--success-bg, #e6f7e6)' : e.status === 'in_progress' ? 'var(--primary-bg, #e3f2fd)' : 'var(--border-light)'};color:${statusColors[e.status] || 'var(--text-secondary)'};">${eh(e.status.replace('_', ' '))}</span>
-                    </div>`;
-                }).join('')}</div>`}
+  function renderStudentNotificationsPage(container, profile) {
+    if (!container) return;
+    const allNotifs = NOTIFICATIONS.filter(n => n.user_id === (profile?.id || 'demo-student-1')).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    container.innerHTML = `
+      <div style="padding:24px;">
+        <h1 style="font-size:24px;font-weight:700;margin:0 0 4px;">Notifications</h1>
+        <p style="color:var(--text-secondary);margin:0 0 24px;">${allNotifs.filter(n => !n.is_read).length} unread</p>
+        ${allNotifs.length === 0 ? '<div class="card" style="padding:30px;text-align:center;color:var(--text-secondary);">No notifications.</div>'
+        : `<div style="display:flex;flex-direction:column;gap:8px;">${allNotifs.map(n => `
+          <div style="display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid var(--border);border-radius:8px;${!n.is_read ? 'background:var(--primary)06;border-color:var(--primary)20;' : ''}">
+            <span class="material-symbols-outlined" style="font-size:20px;color:${!n.is_read ? 'var(--primary)' : 'var(--text-muted)'};">${!n.is_read ? 'notifications_active' : 'notifications'}</span>
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:${!n.is_read ? '600' : '400'};">${eh(n.title)}</div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${eh(n.message)}</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">${AppUtils.timeAgo(n.created_at)}</div>
+            </div>
+          </div>`).join('')}</div>`}
+      </div>`;
+    window.initIcons?.();
+  }
+
+  function renderStudentProfile(container, profile) {
+    if (!container) return;
+    const student = STUDENTS.find(s => s.id === (profile?.id || 'demo-student-1'));
+    const school = SCHOOLS.find(s => s.id === (student?.school_id || 'school-1'));
+    container.innerHTML = `
+      <div style="padding:24px;">
+        <h1 style="font-size:24px;font-weight:700;margin:0 0 4px;">My Profile</h1>
+        <p style="color:var(--text-secondary);margin:0 0 24px;">Manage your personal information</p>
+        <div class="card" style="padding:24px;max-width:600px;">
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+            <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;">${AppUtils.getInitials(student?.name || '')}</div>
+            <div><div style="font-size:18px;font-weight:600;">${eh(student?.name || '')}</div><div style="font-size:13px;color:var(--text-secondary);">${eh(student?.email || '')}</div></div>
           </div>
-
-          <div style="display:flex;flex-direction:column;gap:16px;">
-            <div class="card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
-              <h3 style="margin:0 0 12px;font-size:16px;font-weight:600;">My Progress</h3>
-              <div style="display:flex;flex-direction:column;gap:12px;">
-                <div>
-                  <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
-                    <span>Overall Progress</span>
-                    <span>${student?.progress || 0}%</span>
-                  </div>
-                  <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;">
-                    <div style="width:${student?.progress || 0}%;height:100%;background:linear-gradient(90deg,var(--primary),#4f8cff);border-radius:4px;"></div>
-                  </div>
-                </div>
-                <div>
-                  <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
-                    <span>Attendance</span>
-                    <span>${student?.attendance || 0}%</span>
-                  </div>
-                  <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;">
-                    <div style="width:${student?.attendance || 0}%;height:100%;background:linear-gradient(90deg,var(--success),#66bb6a);border-radius:4px;"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
-              <h3 style="margin:0 0 12px;font-size:16px;font-weight:600;">My Videos</h3>
-              <div style="display:flex;flex-direction:column;gap:8px;">
-                ${CONTENT.filter(c => c.school_id === schoolId).slice(0, 3).map(v => `
-                  <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border-light);cursor:pointer;" data-action="play-video" data-id="${v.id}">
-                    <span class="material-symbols-outlined" style="font-size:20px;color:var(--primary);">play_circle</span>
-                    <div style="flex:1;">
-                      <div style="font-size:13px;font-weight:500;">${eh(v.name)}</div>
-                      <div style="font-size:11px;color:var(--text-secondary);">${eh(v.duration)}</div>
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-
-            <div class="card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;">
-              <h3 style="margin:0 0 12px;font-size:16px;font-weight:600;">Certificates</h3>
-              <div style="display:flex;align-items:center;gap:12px;padding:12px;border:1px dashed var(--border);border-radius:8px;">
-                <span class="material-symbols-outlined" style="font-size:24px;color:var(--text-muted);">workspace_premium</span>
-                <div style="font-size:13px;color:var(--text-secondary);">Complete your courses to earn certificates.</div>
-              </div>
-            </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
+            <div style="padding:8px 0;border-bottom:1px solid var(--border-light);"><span style="color:var(--text-secondary);">Class</span><br><span style="font-weight:500;">${eh(student?.class || '—')}</span></div>
+            <div style="padding:8px 0;border-bottom:1px solid var(--border-light);"><span style="color:var(--text-secondary);">Section</span><br><span style="font-weight:500;">${eh(student?.section || '—')}</span></div>
+            <div style="padding:8px 0;border-bottom:1px solid var(--border-light);"><span style="color:var(--text-secondary);">Admission No</span><br><span style="font-weight:500;">${eh(student?.admission_no || '—')}</span></div>
+            <div style="padding:8px 0;border-bottom:1px solid var(--border-light);"><span style="color:var(--text-secondary);">School</span><br><span style="font-weight:500;">${eh(school?.name || '—')}</span></div>
+            <div style="padding:8px 0;border-bottom:1px solid var(--border-light);"><span style="color:var(--text-secondary);">DOB</span><br><span style="font-weight:500;">${eh(student?.dob || '—')}</span></div>
+            <div style="padding:8px 0;border-bottom:1px solid var(--border-light);"><span style="color:var(--text-secondary);">Guardian</span><br><span style="font-weight:500;">${eh(student?.parent_name || '—')}</span></div>
           </div>
-        </div>
-
-        <div class="card" style="background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:24px;">
-          <h3 style="margin:0 0 12px;font-size:16px;font-weight:600;">Notifications</h3>
-          ${NOTIFICATIONS.filter(n => n.user_id.startsWith('demo-student')).slice(0, 4).map(n => `
-            <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);${!n.is_read ? 'font-weight:600;' : ''}">
-              <span class="material-symbols-outlined" style="font-size:18px;color:${!n.is_read ? 'var(--primary)' : 'var(--text-muted)'};">${!n.is_read ? 'notifications_active' : 'notifications'}</span>
-              <div style="flex:1;">
-                <div style="font-size:13px;">${eh(n.title)}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">${eh(n.message)}</div>
-              </div>
-            </div>
-          `).join('')}
         </div>
       </div>`;
     window.initIcons?.();
@@ -691,63 +856,120 @@ if (DEMO_MODE) {
       }
     }
 
-    // --- Patch ModuleService (for course structure) ---
+    // --- Patch ModuleService (real demo data) ---
     if (w.ModuleService) {
-      w.ModuleService.getByCourse = async (courseId) => {
-        const courseSections = COURSE_SECTIONS.filter(cs => cs.course_id === courseId);
-        return courseSections.map((cs, i) => ({
-          id: `mod-${cs.id}`,
-          course_id: courseId,
-          title: `Module ${i + 1}`,
-          description: '',
-          sort_order: i,
-          created_at: NOW,
-          section_id: cs.section_id,
-        }));
+      const _origModuleGetByCourse = w.ModuleService.getByCourse;
+      w.ModuleService.getByCourse = async (courseId) => COURSE_MODULES.filter(m => m.course_id === courseId).sort((a, b) => a.sort_order - b.sort_order);
+      w.ModuleService.getById = async (id) => COURSE_MODULES.find(m => m.id === id) || null;
+      w.ModuleService.getByCourses = async (courseIds) => {
+        const result = {};
+        for (const cid of courseIds) result[cid] = COURSE_MODULES.filter(m => m.course_id === cid).sort((a, b) => a.sort_order - b.sort_order);
+        return result;
       };
-      w.ModuleService.getById = async (id) => null;
-      w.ModuleService.create = async (data) => ({ id: newDemoId('mod'), ...data, created_at: new Date().toISOString() });
-      w.ModuleService.update = async (id, updates) => null;
-      w.ModuleService.delete = async (id) => {};
+      w.ModuleService.create = async (data) => { const m = { id: newDemoId('mod'), ...data, created_at: new Date().toISOString() }; COURSE_MODULES.push(m); return m; };
+      w.ModuleService.update = async (id, updates) => { const idx = COURSE_MODULES.findIndex(m => m.id === id); if (idx >= 0) { Object.assign(COURSE_MODULES[idx], updates); return COURSE_MODULES[idx]; } return null; };
+      w.ModuleService.delete = async (id) => { const idx = COURSE_MODULES.findIndex(m => m.id === id); if (idx >= 0) COURSE_MODULES.splice(idx, 1); };
     }
 
-    // --- Patch LessonService (for course structure) ---
+    // --- Patch LessonService (real demo data) ---
     if (w.LessonService) {
       w.LessonService.getByModules = async (moduleIds) => {
         const result = {};
-        moduleIds.forEach(mid => { result[mid] = []; });
+        for (const mid of moduleIds) result[mid] = LESSONS.filter(l => l.module_id === mid).sort((a, b) => a.sort_order - b.sort_order);
         return result;
       };
-      w.LessonService.getById = async (id) => null;
-      w.LessonService.create = async (data) => ({ id: newDemoId('les'), ...data, created_at: new Date().toISOString() });
-      w.LessonService.update = async (id, updates) => null;
-      w.LessonService.delete = async (id) => {};
+      w.LessonService.getById = async (id) => LESSONS.find(l => l.id === id) || null;
+      w.LessonService.getByIds = async (ids) => {
+        const result = {};
+        for (const id of ids) { const l = LESSONS.find(le => le.id === id); if (l) result[id] = l; }
+        return result;
+      };
+      w.LessonService.create = async (data) => { const l = { id: newDemoId('les'), ...data, created_at: new Date().toISOString() }; LESSONS.push(l); return l; };
+      w.LessonService.update = async (id, updates) => { const idx = LESSONS.findIndex(l => l.id === id); if (idx >= 0) { Object.assign(LESSONS[idx], updates); return LESSONS[idx]; } return null; };
+      w.LessonService.delete = async (id) => { const idx = LESSONS.findIndex(l => l.id === id); if (idx >= 0) LESSONS.splice(idx, 1); };
       w.LessonService.moveLesson = async (id, direction) => {};
       w.LessonService.moveModule = async (id, direction) => {};
     }
 
-    // --- Patch remaining unpatched LMS services with safe stubs ---
+    // --- Patch ProgressService (real demo data) ---
     if (w.ProgressService) {
-      w.ProgressService.getByStudent = async (studentId) => [];
-      w.ProgressService.getByCourse = async (courseId) => [];
-      w.ProgressService.update = async (id, updates) => null;
+      w.ProgressService.getByStudent = async (studentId) => PROGRESS.filter(p => p.student_id === studentId).sort((a, b) => new Date(b.last_activity) - new Date(a.last_activity));
+      w.ProgressService.getByLesson = async (studentId, lessonId) => PROGRESS.find(p => p.student_id === studentId && p.lesson_id === lessonId) || null;
+      w.ProgressService.getByLessons = async (studentId, lessonIds) => {
+        const result = {};
+        for (const lid of lessonIds) { const p = PROGRESS.find(pr => pr.student_id === studentId && pr.lesson_id === lid); if (p) result[lid] = p; }
+        return result;
+      };
+      w.ProgressService.upsertProgress = async (studentId, lessonId, data) => {
+        const existing = PROGRESS.find(p => p.student_id === studentId && p.lesson_id === lessonId);
+        if (existing) { Object.assign(existing, data, { last_activity: new Date().toISOString() }); return existing; }
+        const p = { id: newDemoId('prog'), student_id: studentId, lesson_id: lessonId, completed: false, resume_position: 0, time_spent: 0, ...data, last_activity: new Date().toISOString(), created_at: new Date().toISOString() };
+        PROGRESS.push(p); return p;
+      };
+      w.ProgressService.markComplete = async (studentId, lessonId) => {
+        const existing = PROGRESS.find(p => p.student_id === studentId && p.lesson_id === lessonId);
+        if (existing) { existing.completed = true; existing.last_activity = new Date().toISOString(); return existing; }
+        const p = { id: newDemoId('prog'), student_id: studentId, lesson_id: lessonId, completed: true, resume_position: 0, time_spent: 0, last_activity: new Date().toISOString(), created_at: new Date().toISOString() };
+        PROGRESS.push(p); return p;
+      };
+      w.ProgressService.getCourseProgress = async (studentId, courseId) => {
+        const mods = COURSE_MODULES.filter(m => m.course_id === courseId);
+        const modIds = mods.map(m => m.id);
+        const courseLessons = LESSONS.filter(l => modIds.includes(l.module_id));
+        const total = courseLessons.length;
+        const completed = PROGRESS.filter(p => p.student_id === studentId && courseLessons.some(l => l.id === p.lesson_id) && p.completed).length;
+        return { total_lessons: total, completed_lessons: completed, percentage: total ? Math.round(completed / total * 100) : 0 };
+      };
+      w.ProgressService.getCourseProgressBatch = async (studentId, courseIds) => {
+        const result = {};
+        for (const cid of courseIds) result[cid] = await w.ProgressService.getCourseProgress(studentId, cid);
+        return result;
+      };
+      w.ProgressService.update = async (id, updates) => { const idx = PROGRESS.findIndex(p => p.id === id); if (idx >= 0) { Object.assign(PROGRESS[idx], updates); return PROGRESS[idx]; } return null; };
     }
+
+    // --- Patch AssignmentService (real demo data) ---
     if (w.AssignmentService) {
-      w.AssignmentService.getByCourse = async (courseId) => [];
-      w.AssignmentService.getById = async (id) => null;
-      w.AssignmentService.create = async (data) => ({ id: newDemoId('assign'), ...data, created_at: new Date().toISOString() });
-      w.AssignmentService.update = async (id, updates) => null;
-      w.AssignmentService.delete = async (id) => {};
+      w.AssignmentService.getByCourse = async (courseId) => ASSIGNMENTS.filter(a => a.course_id === courseId);
+      w.AssignmentService.getById = async (id) => ASSIGNMENTS.find(a => a.id === id) || null;
+      w.AssignmentService.create = async (data) => { const a = { id: newDemoId('assign'), ...data, created_at: new Date().toISOString() }; ASSIGNMENTS.push(a); return a; };
+      w.AssignmentService.update = async (id, updates) => { const idx = ASSIGNMENTS.findIndex(a => a.id === id); if (idx >= 0) { Object.assign(ASSIGNMENTS[idx], updates); return ASSIGNMENTS[idx]; } return null; };
+      w.AssignmentService.delete = async (id) => { const idx = ASSIGNMENTS.findIndex(a => a.id === id); if (idx >= 0) ASSIGNMENTS.splice(idx, 1); };
+      w.AssignmentService.getSubmissions = async (assignmentId) => [];
+      w.AssignmentService.getStudentSubmission = async (assignmentId, studentId) => null;
+      w.AssignmentService.submitAssignment = async (assignmentId, studentId, data) => ({ id: newDemoId('sub'), assignment_id: assignmentId, student_id: studentId, ...data, submitted_at: new Date().toISOString() });
+      w.AssignmentService.reviewSubmission = async (id, marks, remarks, reviewedBy) => ({ id, marks, remarks, reviewed_by: reviewedBy });
     }
+
+    // --- Patch QuizService (real demo data) ---
     if (w.QuizService) {
-      w.QuizService.getByCourse = async (courseId) => [];
-      w.QuizService.getById = async (id) => null;
-      w.QuizService.create = async (data) => ({ id: newDemoId('quiz'), ...data, created_at: new Date().toISOString() });
-      w.QuizService.submitAnswer = async (id, answer) => null;
+      w.QuizService.getByCourse = async (courseId) => QUIZZES.filter(q => q.course_id === courseId);
+      w.QuizService.getById = async (id) => QUIZZES.find(q => q.id === id) || null;
+      w.QuizService.create = async (data) => { const q = { id: newDemoId('quiz'), ...data, created_at: new Date().toISOString() }; QUIZZES.push(q); return q; };
+      w.QuizService.update = async (id, updates) => { const idx = QUIZZES.findIndex(q => q.id === id); if (idx >= 0) { Object.assign(QUIZZES[idx], updates); return QUIZZES[idx]; } return null; };
+      w.QuizService.delete = async (id) => { const idx = QUIZZES.findIndex(q => q.id === id); if (idx >= 0) QUIZZES.splice(idx, 1); };
+      w.QuizService.getQuestions = async (quizId) => QUIZ_QUESTIONS.filter(q => q.quiz_id === quizId).sort((a, b) => a.sort_order - b.sort_order);
+      w.QuizService.createQuestion = async (data) => { const q = { id: newDemoId('qq'), ...data }; QUIZ_QUESTIONS.push(q); return q; };
+      w.QuizService.updateQuestion = async (id, updates) => { const idx = QUIZ_QUESTIONS.findIndex(q => q.id === id); if (idx >= 0) { Object.assign(QUIZ_QUESTIONS[idx], updates); return QUIZ_QUESTIONS[idx]; } return null; };
+      w.QuizService.deleteQuestion = async (id) => { const idx = QUIZ_QUESTIONS.findIndex(q => q.id === id); if (idx >= 0) QUIZ_QUESTIONS.splice(idx, 1); };
+      w.QuizService.startAttempt = async (quizId, studentId) => ({ id: newDemoId('qa'), quiz_id: quizId, student_id: studentId, status: 'in_progress', started_at: new Date().toISOString() });
+      w.QuizService.getAttempt = async (id) => null;
+      w.QuizService.getStudentAttempts = async (quizId, studentId) => [];
+      w.QuizService.submitAnswer = async (attemptId, questionId, answer) => ({ attempt_id: attemptId, question_id: questionId, answer });
+      w.QuizService.completeAttempt = async (attemptId) => ({ id: attemptId, status: 'completed', score: 80, percentage: 80, passed: true, completed_at: new Date().toISOString() });
+      w.QuizService.getAnswers = async (attemptId) => [];
     }
+
+    // --- Patch CertificateService (real demo data) ---
     if (w.CertificateService) {
-      w.CertificateService.getByStudent = async (studentId) => [];
-      w.CertificateService.generate = async (studentId, courseId) => ({ id: newDemoId('cert'), student_id: studentId, course_id: courseId, issued_at: new Date().toISOString() });
+      w.CertificateService.getByStudent = async (studentId) => CERTIFICATES.filter(c => c.student_id === studentId).map(c => { const course = COURSES.find(co => co.id === c.course_id); return { ...c, course_title: course?.name || '' }; });
+      w.CertificateService.getByCourse = async (studentId, courseId) => CERTIFICATES.find(c => c.student_id === studentId && c.course_id === courseId) || null;
+      w.CertificateService.generate = async (studentId, courseId, completedAt) => {
+        const count = CERTIFICATES.length + 1;
+        const c = { id: newDemoId('cert'), student_id: studentId, course_id: courseId, certificate_number: `CERT-2025-${String(count).padStart(4, '0')}`, completed_at: completedAt || new Date().toISOString(), issued_at: new Date().toISOString(), created_at: new Date().toISOString() };
+        CERTIFICATES.push(c); return c;
+      };
+      w.CertificateService.getById = async (id) => CERTIFICATES.find(c => c.id === id) || null;
     }
     if (w.SettingsService) {
       w.SettingsService.get = async (key) => null;
@@ -887,7 +1109,16 @@ if (DEMO_MODE) {
                 w.AppSidebar.render(w.AppSidebar.STUDENT_ITEMS, w.AppRouter.currentRoute, '');
                 window.initIcons?.();
               }
-              renderStudentDashboard(mainContent, profile);
+              const routeMap = {
+                'student-dashboard': renderStudentDashboard,
+                'student-courses': renderStudentCourses,
+                'student-videos': renderStudentVideos,
+                'student-progress': renderStudentProgress,
+                'student-notifications': renderStudentNotificationsPage,
+                'student-profile': renderStudentProfile,
+              };
+              const renderFn = routeMap[w.AppRouter.currentRoute] || renderStudentDashboard;
+              renderFn(mainContent, profile);
               return;
             }
           }

@@ -234,18 +234,22 @@ window.StudentPortal = {
       const eh = AppUtils.escapeHtml;
       const safeUrl = u => u && u.startsWith('http') ? eh(u) : '';
       let contentHtml = '';
+      const isYoutube = lesson.content_type === 'video' && lesson.content_url && (lesson.content_url.includes('youtube.com') || lesson.content_url.includes('youtu.be'));
       if (lesson.content_type === 'video' && lesson.content_url) {
-        if (lesson.content_url.includes('youtube.com') || lesson.content_url.includes('youtu.be')) {
+        if (isYoutube) {
           let videoId = '';
           const ytMatch = lesson.content_url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/);
           if (ytMatch) videoId = ytMatch[1];
           if (videoId) {
-            contentHtml = `<iframe width="100%" height="400" src="https://www.youtube.com/embed/${videoId}?start=${resumePos}" frameborder="0" allowfullscreen style="border-radius:8px;"></iframe>`;
+            contentHtml = `<div style="position:relative;"><iframe width="100%" height="400" src="https://www.youtube.com/embed/${videoId}?start=${resumePos}&enablejsapi=1" frameborder="0" allowfullscreen style="border-radius:8px;" id="yt-player-${lesson.id}"></iframe>
+              <div id="yt-watch-bar-${lesson.id}" style="display:none;margin-top:8px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="width:0%;height:100%;background:#3b82f6;border-radius:2px;"></div></div></div>`;
           } else {
-            contentHtml = `<video controls style="width:100%;max-height:400px;border-radius:8px;" src="${eh(lesson.content_url)}"></video>`;
+            contentHtml = `<video controls style="width:100%;max-height:400px;border-radius:8px;" src="${eh(lesson.content_url)}" id="html5-player-${lesson.id}"></video>
+              <div id="watch-bar-${lesson.id}" style="display:none;margin-top:8px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="width:0%;height:100%;background:#3b82f6;border-radius:2px;"></div></div>`;
           }
         } else {
-          contentHtml = `<video controls style="width:100%;max-height:400px;border-radius:8px;" src="${eh(lesson.content_url)}"></video>`;
+          contentHtml = `<video controls style="width:100%;max-height:400px;border-radius:8px;" src="${eh(lesson.content_url)}" id="html5-player-${lesson.id}"></video>
+            <div id="watch-bar-${lesson.id}" style="display:none;margin-top:8px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="width:0%;height:100%;background:#3b82f6;border-radius:2px;"></div></div>`;
         }
       } else if (lesson.content_type === 'pdf' && lesson.content_url) {
         contentHtml = `<iframe src="${eh(lesson.content_url)}" style="width:100%;height:500px;border:1px solid var(--border);border-radius:8px;"></iframe>`;
@@ -297,23 +301,53 @@ window.StudentPortal = {
         </div>
       </div>`;
       initIcons();
-      if (lesson.content_type === 'video' && !lesson.content_url?.includes('youtube')) {
-        const vid = container.querySelector('video');
-        if (vid) {
-          if (resumePos > 0 && vid.readyState >= 1) vid.currentTime = resumePos;
-          vid.addEventListener('loadedmetadata', () => { if (resumePos > 0) vid.currentTime = resumePos; }, { once: true });
-          let saveTimer = null;
-          vid.addEventListener('timeupdate', () => {
-            if (!saveTimer) {
-              saveTimer = setTimeout(() => {
-                saveTimer = null;
-                const pos = Math.floor(vid.currentTime);
-                if (pos > 0) {
-                  window.ProgressService?.upsertProgress(studentId, lesson.id, { resumePosition: pos }).catch(() => {});
+      if (lesson.content_type === 'video') {
+        if (isYoutube) {
+          const ytIframe = container.querySelector(`#yt-player-${lesson.id}`);
+          const ytBar = container.querySelector(`#yt-watch-bar-${lesson.id}`);
+          if (ytIframe && ytBar) {
+            ytBar.style.display = 'block';
+            const ytLoadInterval = setInterval(() => {
+              try {
+                const currentSrc = ytIframe.src;
+                const startMatch = currentSrc.match(/[?&]start=(\d+)/);
+                if (startMatch) {
+                  const startSec = parseInt(startMatch[1]);
+                  const nowSec = Math.floor(Date.now() / 1000);
+                  const elapsed = Math.min(Math.floor((nowSec - parseInt(localStorage.getItem(`yt-start-${lesson.id}`) || '0')) / 2), 600);
+                  if (!localStorage.getItem(`yt-start-${lesson.id}`)) {
+                    localStorage.setItem(`yt-start-${lesson.id}`, String(nowSec));
+                  }
                 }
-              }, 5000);
-            }
-          });
+              } catch(e) {}
+            }, 5000);
+            setTimeout(() => clearInterval(ytLoadInterval), 120000);
+          }
+        } else {
+          const vid = container.querySelector(`#html5-player-${lesson.id}`);
+          const watchBar = container.querySelector(`#watch-bar-${lesson.id}`);
+          if (vid) {
+            if (watchBar) watchBar.style.display = 'block';
+            if (resumePos > 0 && vid.readyState >= 1) vid.currentTime = resumePos;
+            vid.addEventListener('loadedmetadata', () => { if (resumePos > 0) vid.currentTime = resumePos; }, { once: true });
+            let saveTimer = null;
+            const duration = lesson.duration ? parseInt(lesson.duration) * 60 : 0;
+            vid.addEventListener('timeupdate', () => {
+              if (watchBar && vid.duration) {
+                const pct = Math.min(100, Math.round(vid.currentTime / vid.duration * 100));
+                watchBar.querySelector('div').style.width = pct + '%';
+              }
+              if (!saveTimer) {
+                saveTimer = setTimeout(() => {
+                  saveTimer = null;
+                  const pos = Math.floor(vid.currentTime);
+                  if (pos > 0) {
+                    window.ProgressService?.upsertProgress(studentId, lesson.id, { resumePosition: pos }).catch(() => {});
+                  }
+                }, 5000);
+              }
+            });
+          }
         }
       }
     } catch (err) { AppToast.show(err.message || 'Failed to load lesson.', 'error'); }
@@ -322,6 +356,22 @@ window.StudentPortal = {
   async markComplete(studentId, lessonId) {
     try {
       await window.ProgressService?.markComplete(studentId, lessonId);
+      const lesson = await window.LessonService?.getById(lessonId);
+      if (lesson) {
+        const module = await window.ModuleService?.getById(lesson.module_id);
+        if (module) {
+          const progress = await window.ProgressService?.getCourseProgress(studentId, module.course_id);
+          if (progress && progress.percentage >= 100) {
+            try {
+              const existing = await window.CertificateService?.getByCourse(studentId, module.course_id);
+              if (!existing) {
+                await window.CertificateService?.generate(studentId, module.course_id, new Date().toISOString());
+                AppToast.show('🎉 Course completed! Certificate generated.', 'success');
+              }
+            } catch (e) { /* certificate best-effort */ }
+          }
+        }
+      }
       AppToast.show('Lesson completed!', 'success');
       this.loadLesson(studentId, lessonId);
     } catch (err) { AppToast.show(err.message || 'Failed to update progress.', 'error'); }
