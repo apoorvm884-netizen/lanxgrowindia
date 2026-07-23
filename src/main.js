@@ -31,12 +31,6 @@ import {
   CounselorService
 } from './services/index.js';
 
-// Conditional Demo Mode — only loads when VITE_DEMO_MODE=true
-import { DEMO_MODE } from './demo/demo-config.js';
-if (DEMO_MODE) {
-  import('./demo/demo-integration.js');
-}
-
 // Attach services to window — these override the old localStorage stubs
 window.SchoolService = SupabaseSchoolService;
 window.CategoryService = SupabaseCategoryService;
