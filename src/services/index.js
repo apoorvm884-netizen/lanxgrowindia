@@ -19,3 +19,6 @@ export { ProgressService } from './lms-progress-service.js';
 export { AssignmentService } from './lms-assignment-service.js';
 export { QuizService } from './lms-quiz-service.js';
 export { CertificateService } from './lms-certificate-service.js';
+export { GpsService } from './gps-service.js';
+export { InvitationService } from './invitation-service.js';
+export { AiService } from './ai-service.js';
