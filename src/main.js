@@ -28,7 +28,10 @@ import {
   AssignmentService,
   QuizService,
   CertificateService,
-  CounselorService
+  CounselorService,
+  GpsService,
+  InvitationService,
+  AiService
 } from './services/index.js';
 
 // Attach services to window — these override the old localStorage stubs
@@ -53,6 +56,9 @@ window.ProgressService = ProgressService;
 window.AssignmentService = AssignmentService;
 window.QuizService = QuizService;
 window.CertificateService = CertificateService;
+window.GpsService = GpsService;
+window.InvitationService = InvitationService;
+window.AiService = AiService;
 window.supabase = supabase;
 
 // ==============================================================
@@ -62,7 +68,7 @@ window.AppStorage = {
   KEY: 'lanxgrow_cos',
   _cache: null,
   _cacheTime: 0,
-  _cacheTTL: 30000,
+  _cacheTTL: 60000,
 
   async init() {
     // Schema is managed by Supabase migrations — no-op
@@ -77,14 +83,14 @@ window.AppStorage = {
         supabase.from('categories').select('*').order('name'),
         supabase.from('subjects').select('*').order('name'),
         supabase.from('sections').select('*').order('name'),
-        supabase.from('content').select('*').order('created_at', { ascending: false }),
+        supabase.from('content').select('*').order('created_at', { ascending: false }).limit(500),
         supabase.from('profiles').select('*'),
-        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200),
-        supabase.from('students').select('*').order('name'),
+        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100),
+        supabase.from('students').select('*').order('name').limit(500),
         supabase.from('courses').select('*').order('name'),
-        supabase.from('enrollments').select('*'),
+        supabase.from('enrollments').select('*').limit(1000),
         supabase.from('course_sections').select('*'),
-        supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(50)
+        supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(30)
       ]);
 
     const schools = schoolsRes.data || [];
@@ -323,7 +329,6 @@ window.AppModal = {
     }
     document.removeEventListener('keydown', this._keyHandler);
     if (id === 'modal-entity') document.getElementById('form-entity')?.reset();
-    setTimeout(() => { const overlay = document.getElementById(id); if (overlay && !overlay.classList.contains('active')) overlay.remove(); }, 300);
   },
   _keyHandler(e) {
     if (e.key === 'Escape') {
@@ -358,6 +363,7 @@ window.AppSidebar = {
     { id: 'roles-permissions', label: 'Roles & Permissions', icon: 'shield', route: 'roles-permissions' },
     { id: 'company-settings', label: 'Settings', icon: 'settings', route: 'company-settings' },
     { id: 'sep3', separator: true },
+    { id: 'invitations', label: 'Invitations', icon: 'mail', route: 'invitations' },
     { id: 'audit-log', label: 'Audit Log', icon: 'history', route: 'audit-log' },
   ],
 
@@ -389,6 +395,9 @@ window.AppSidebar = {
     { id: 'school-videos', label: 'Video Library', icon: 'video-library', route: 'school-videos' },
     { id: 'school-assignments', label: 'Assignments', icon: 'assignment', route: 'school-assignments' },
     { id: 'sep-s4', separator: true },
+    { id: 'school-gps', label: 'GPS Tracking', icon: 'location_on', route: 'school-gps' },
+    { id: 'school-orbit', label: 'AI Orbit', icon: 'smart_toy', route: 'school-orbit' },
+    { id: 'sep-s5-extra', separator: true },
     { id: 'school-reports', label: 'Reports', icon: 'bar-chart-3', route: 'school-reports' },
     { id: 'school-notifications', label: 'Notifications', icon: 'notifications', route: 'school-notifications' },
     { id: 'sep-s5', separator: true },
@@ -462,6 +471,10 @@ window.AppSidebar = {
     'support_agent': '<span class="material-symbols-outlined" style="font-size:20px;">support_agent</span>',
     'storage': '<span class="material-symbols-outlined" style="font-size:20px;">storage</span>',
     'celebration': '<span class="material-symbols-outlined" style="font-size:20px;">celebration</span>',
+    'location_on': '<span class="material-symbols-outlined" style="font-size:20px;">location_on</span>',
+    'smart_toy': '<span class="material-symbols-outlined" style="font-size:20px;">smart_toy</span>',
+    'mail': '<span class="material-symbols-outlined" style="font-size:20px;">mail</span>',
+    'gps_fixed': '<span class="material-symbols-outlined" style="font-size:20px;">gps_fixed</span>',
   },
 
   render(items, activeId, backLink) {
@@ -497,12 +510,12 @@ window.AppRouter = {
   SCHOOL_ROUTES: ['school-dashboard','school-categories','school-subjects','school-sections',
     'school-students','school-counselors','school-courses','school-videos',
     'school-drive','school-assignments','school-reports','school-notifications',
-    'school-settings','school-profile'],
+    'school-settings','school-profile','school-gps','school-orbit'],
   COMPANY_ROUTES: ['company-dashboard','schools','content-manager','drive-manager',
-    'media-library','school-admins','roles-permissions','company-settings','audit-log'],
+    'media-library','school-admins','roles-permissions','company-settings','audit-log','invitations'],
 
   COMPANY_ADMIN_ROUTES: ['company-dashboard','schools','content-manager','drive-manager',
-    'media-library','school-admins','roles-permissions','company-settings','audit-log'],
+    'media-library','school-admins','roles-permissions','company-settings','audit-log','invitations'],
 
   async _getProfile() {
     if (!this._currentProfile) this._currentProfile = await AuthService.getProfile();
@@ -662,6 +675,9 @@ window.AppRouter = {
         break;
       case 'audit-log':
         try { await AppAuditLog.render(main); } catch (err) { this._renderError(main, err); }
+        break;
+      case 'invitations':
+        try { await this.renderInvitations(main); } catch (err) { this._renderError(main, err); }
         break;
       default:
         try { await this.renderCompanyDashboard(main); } catch (err) { this._renderError(main, err); }
@@ -1058,6 +1074,14 @@ window.AppRouter = {
     }
     if (this.currentRoute === 'school-profile') {
       window.SchoolProfile.render(main, data, school);
+      return;
+    }
+    if (this.currentRoute === 'school-gps') {
+      await window.AppGpsTracking.render(main, school, schoolId);
+      return;
+    }
+    if (this.currentRoute === 'school-orbit') {
+      await window.AppAiOrbit.render(main, school, schoolId);
       return;
     }
 
@@ -2636,10 +2660,25 @@ document.addEventListener('click', async function (e) {
   if (action === 'add-content') { AppContent.openCreate(id); return; }
   if (action === 'edit-content') { AppContent.edit(id); return; }
   if (action === 'delete-content') { AppContent.confirmDelete(id); return; }
-  if (action === 'play-video' || action === 'view-content') { AppContent.play(id); return; }
+  if (action === 'play-video' || action === 'view-content') {
+    const pdata = await AppStorage.load();
+    const pitem = pdata.content.find(c => c.id === id);
+    if (pitem && pitem.type === 'Video') {
+      const pschool = pdata.schools.find(s => s.id === pitem.school_id);
+      AppVideoPlayer.open(pitem, pschool);
+    } else {
+      AppContent.play(id);
+    }
+    return;
+  }
   if (action === 'view-content-file') { AppContent.play(id); return; }
   // Admin
   // User Management
+  if (action === 'gps-focus-vehicle') {
+    const lat = parseFloat(el.dataset.lat); const lng = parseFloat(el.dataset.lng);
+    if (lat && lng && AppGpsTracking._map) { AppGpsTracking._map.setView([lat, lng], 16); const marker = AppGpsTracking._markers[el.dataset.vehicleId]; if (marker) marker.openPopup(); }
+    return;
+  }
   if (action === 'add-user') { AppToast.show('User invitation — coming in a future update.', 'info'); return; }
   if (action === 'edit-user') { AppUserManagement.openEditModal(id); return; }
   if (action === 'save-edit-user') { AppUserManagement.saveEditUser(id); return; }
@@ -3969,6 +4008,860 @@ document.addEventListener('keydown', function (e) {
     else { AppGlobalSearch.open(); }
   }
 });
+
+// ==============================================================
+// GPS TRACKING MODULE
+// ==============================================================
+window.AppGpsTracking = {
+  _channel: null,
+  _map: null,
+  _markers: {},
+  _currentSchoolId: null,
+
+  async render(main, school, schoolId) {
+    this._currentSchoolId = schoolId;
+    const [vehicles, locations, events] = await Promise.all([
+      GpsService.getVehicles(schoolId),
+      GpsService.getCurrentLocations(schoolId),
+      GpsService.getEvents(schoolId, 20)
+    ]);
+
+    const locationsByVehicle = {};
+    locations.forEach(l => { locationsByVehicle[l.vehicle_id] = l; });
+
+    main.innerHTML = `<div class="fade-in">
+      <div class="page-header">
+        <div class="page-header-left">
+          <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;margin-bottom:4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
+          <h1 class="page-title">GPS Tracking</h1>
+          <p class="page-subtitle">${AppUtils.escapeHtml(school.name)} — Live vehicle tracking</p>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary" id="btn-manage-vehicles"><span class="material-symbols-outlined" style="font-size:18px;">directions_bus</span> Manage Vehicles</button>
+          <button class="btn btn-secondary" id="btn-manage-devices"><span class="material-symbols-outlined" style="font-size:18px;">gps_fixed</span> Manage Devices</button>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;min-height:500px;" id="gps-layout">
+        <div class="card" style="padding:0;overflow:hidden;position:relative;">
+          <div id="gps-map" style="width:100%;height:100%;min-height:500px;background:#e8e8e8;"></div>
+          <div style="position:absolute;top:12px;right:12px;z-index:1000;display:flex;gap:8px;">
+            <button class="btn btn-sm" style="background:white;border:1px solid #ddd;height:32px;" id="btn-gps-refresh"><span class="material-symbols-outlined" style="font-size:16px;">refresh</span></button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div class="card" style="padding:0;">
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px;">
+              <span class="material-symbols-outlined" style="font-size:18px;color:var(--primary);">directions_bus</span>
+              Vehicles (${vehicles.length})
+            </div>
+            <div id="gps-vehicle-list" style="max-height:280px;overflow-y:auto;">
+              ${vehicles.length === 0 ? '<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px;">No vehicles added yet. Click "Manage Vehicles" to add one.</div>' :
+                vehicles.map(v => {
+                  const loc = locationsByVehicle[v.id];
+                  const isMoving = loc && loc.motion_state === 'moving';
+                  const isStopped = loc && loc.motion_state === 'stopped';
+                  const stateColor = isMoving ? '#22c55e' : isStopped ? '#f59e0b' : '#94a3b8';
+                  const stateLabel = isMoving ? 'Moving' : isStopped ? 'Stopped' : 'No Signal';
+                  const speed = loc ? Math.round(loc.speed_kmph || 0) : 0;
+                  return `<div class="gps-vehicle-item" style="padding:10px 16px;border-bottom:1px solid var(--border-light);cursor:pointer;transition:background 0.15s;" data-action="gps-focus-vehicle" data-vehicle-id="${v.id}" data-lat="${loc?.latitude || ''}" data-lng="${loc?.longitude || ''}">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                      <div style="width:8px;height:8px;border-radius:50%;background:${stateColor};flex-shrink:0;"></div>
+                      <div style="flex:1;min-width:0;">
+                        <div style="font-size:13px;font-weight:600;">${AppUtils.escapeHtml(v.label)}</div>
+                        <div style="font-size:11px;color:var(--text-muted);">${AppUtils.escapeHtml(v.registration_number || 'No reg.')} · ${stateLabel}${isMoving ? ` · ${speed} km/h` : ''}</div>
+                      </div>
+                    </div>
+                  </div>`;
+                }).join('')}
+            </div>
+          </div>
+          <div class="card" style="padding:0;">
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px;">
+              <span class="material-symbols-outlined" style="font-size:18px;color:var(--warning);">notifications_active</span>
+              Recent Events
+            </div>
+            <div id="gps-event-list" style="max-height:200px;overflow-y:auto;">
+              ${events.length === 0 ? '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">No events recorded yet.</div>' :
+                events.map(e => `<div style="padding:8px 16px;border-bottom:1px solid var(--border-light);font-size:12px;">
+                  <div style="font-weight:500;">${AppUtils.escapeHtml(e.vehicles?.label || 'Vehicle')} — ${AppUtils.escapeHtml(e.event_type)}</div>
+                  <div style="color:var(--text-muted);margin-top:2px;">${AppUtils.formatDate(e.occurred_at)}</div>
+                </div>`).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+    initIcons();
+    this._initMap(locations, vehicles);
+    this._bindEvents(schoolId, vehicles);
+  },
+
+  _initMap(locations, vehicles) {
+    const mapEl = document.getElementById('gps-map');
+    if (!mapEl) return;
+
+    // Load Leaflet CSS dynamically if not already
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+
+    // Load Leaflet JS dynamically
+    const loadLeaflet = () => {
+      return new Promise((resolve) => {
+        if (window.L) { resolve(); return; }
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.onload = resolve;
+        document.head.appendChild(script);
+      });
+    };
+
+    loadLeaflet().then(() => {
+      if (this._map) { this._map.remove(); this._map = null; }
+      this._markers = {};
+
+      // Default center: India
+      let center = [20.5937, 78.9629];
+      let zoom = 5;
+
+      if (locations.length > 0) {
+        const lats = locations.map(l => l.latitude);
+        const lngs = locations.map(l => l.longitude);
+        center = [(Math.min(...lats) + Math.max(...lats)) / 2, (Math.min(...lngs) + Math.max(...lngs)) / 2];
+        zoom = 12;
+      }
+
+      this._map = window.L.map('gps-map').setView(center, zoom);
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap',
+        maxZoom: 19
+      }).addTo(this._map);
+
+      // Add markers for each vehicle with a current location
+      const vehiclesById = {};
+      vehicles.forEach(v => { vehiclesById[v.id] = v; });
+
+      locations.forEach(loc => {
+        const v = vehiclesById[loc.vehicle_id];
+        if (!v) return;
+        const isMoving = loc.motion_state === 'moving';
+        const color = isMoving ? '#22c55e' : '#f59e0b';
+        const icon = window.L.divIcon({
+          className: 'gps-marker',
+          html: `<div style="width:32px;height:32px;background:${color};border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
+            <span class="material-symbols-outlined" style="font-size:16px;color:white;">directions_bus</span>
+          </div>`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        });
+        const marker = window.L.marker([loc.latitude, loc.longitude], { icon }).addTo(this._map);
+        marker.bindPopup(`<div style="min-width:160px;">
+          <strong>${AppUtils.escapeHtml(v.label)}</strong><br>
+          <span style="font-size:12px;color:#666;">${AppUtils.escapeHtml(v.registration_number || 'No registration')}</span><br>
+          <span style="font-size:12px;">${isMoving ? 'Moving' : 'Stopped'} · ${Math.round(loc.speed_kmph || 0)} km/h</span><br>
+          ${v.driver_name ? `<span style="font-size:12px;">Driver: ${AppUtils.escapeHtml(v.driver_name)}</span><br>` : ''}
+          ${v.driver_phone ? `<span style="font-size:12px;">Phone: ${AppUtils.escapeHtml(v.driver_phone)}</span>` : ''}
+        </div>`);
+        this._markers[loc.vehicle_id] = marker;
+      });
+
+      // Fit bounds if we have markers
+      if (locations.length > 0) {
+        const bounds = window.L.latLngBounds(locations.map(l => [l.latitude, l.longitude]));
+        this._map.fitBounds(bounds, { padding: [40, 40] });
+      }
+    });
+
+    // Subscribe to realtime updates
+    if (this._channel) GpsService.unsubscribe(this._channel);
+    this._channel = GpsService.subscribeToLocations(this._currentSchoolId, (payload) => {
+      const loc = payload.new;
+      if (!loc || !this._map) return;
+      if (this._markers[loc.vehicle_id]) {
+        this._markers[loc.vehicle_id].setLatLng([loc.latitude, loc.longitude]);
+      }
+    });
+  },
+
+  _bindEvents(schoolId, vehicles) {
+    document.getElementById('btn-manage-vehicles')?.addEventListener('click', () => {
+      this._showVehicleModal(schoolId, vehicles);
+    });
+    document.getElementById('btn-manage-devices')?.addEventListener('click', async () => {
+      const devices = await GpsService.getDevices(schoolId);
+      this._showDeviceModal(schoolId, devices, vehicles);
+    });
+    document.getElementById('btn-gps-refresh')?.addEventListener('click', async () => {
+      const school = await window.SchoolService.getById(schoolId);
+      await this.render(document.getElementById('main-content'), school, schoolId);
+      AppToast.show('Map refreshed');
+    });
+  },
+
+  _showVehicleModal(schoolId, vehicles) {
+    let overlay = document.getElementById('modal-gps-vehicles');
+    if (overlay) overlay.remove();
+
+    const html = `<div class="modal-overlay active" id="modal-gps-vehicles" role="dialog" aria-modal="true">
+      <div class="modal" style="max-width:700px;">
+        <div class="modal-header"><h2 class="modal-title">Manage Vehicles</h2><button class="modal-close" onclick="document.getElementById('modal-gps-vehicles').classList.remove('active');">&times;</button></div>
+        <div class="modal-body">
+          <div style="margin-bottom:16px;display:flex;gap:8px;">
+            <input type="text" class="form-input" id="gps-v-label" placeholder="Vehicle name (e.g. Bus 1)" style="flex:1;">
+            <input type="text" class="form-input" id="gps-v-reg" placeholder="Reg. number" style="width:140px;">
+            <input type="number" class="form-input" id="gps-v-capacity" placeholder="Seats" style="width:80px;">
+            <input type="text" class="form-input" id="gps-v-driver" placeholder="Driver name" style="width:140px;">
+            <input type="text" class="form-input" id="gps-v-phone" placeholder="Phone" style="width:120px;">
+            <button class="btn btn-primary btn-sm" id="btn-add-vehicle" style="height:44px;white-space:nowrap;">Add</button>
+          </div>
+          <div class="table-container"><table><thead><tr><th>Label</th><th>Reg.</th><th>Capacity</th><th>Driver</th><th>Phone</th><th>Status</th><th></th></tr></thead>
+          <tbody id="gps-vehicles-tbody">
+            ${vehicles.map(v => `<tr>
+              <td class="font-semibold">${AppUtils.escapeHtml(v.label)}</td>
+              <td>${AppUtils.escapeHtml(v.registration_number || '—')}</td>
+              <td>${v.capacity || '—'}</td>
+              <td>${AppUtils.escapeHtml(v.driver_name || '—')}</td>
+              <td>${AppUtils.escapeHtml(v.driver_phone || '—')}</td>
+              <td><span class="status-badge status-${v.status === 'active' ? 'active' : 'inactive'}">${v.status}</span></td>
+              <td><button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-vehicle" data-id="${v.id}"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button></td>
+            </tr>`).join('')}
+          </tbody></table></div>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    initIcons();
+
+    document.getElementById('btn-add-vehicle')?.addEventListener('click', async () => {
+      const label = document.getElementById('gps-v-label').value.trim();
+      if (!label) { AppToast.show('Vehicle name is required', 'error'); return; }
+      try {
+        await GpsService.createVehicle({
+          school_id: schoolId, label,
+          registration_number: document.getElementById('gps-v-reg').value.trim() || null,
+          capacity: parseInt(document.getElementById('gps-v-capacity').value) || null,
+          driver_name: document.getElementById('gps-v-driver').value.trim() || null,
+          driver_phone: document.getElementById('gps-v-phone').value.trim() || null
+        });
+        AppToast.show('Vehicle added');
+        document.getElementById('modal-gps-vehicles').classList.remove('active');
+        const school = await window.SchoolService.getById(schoolId);
+        await this.render(document.getElementById('main-content'), school, schoolId);
+      } catch (e) { AppToast.show(e.message, 'error'); }
+    });
+
+    document.getElementById('gps-vehicles-tbody')?.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-action="delete-vehicle"]');
+      if (!btn) return;
+      if (!confirm('Delete this vehicle?')) return;
+      try {
+        await GpsService.deleteVehicle(btn.dataset.id);
+        AppToast.show('Vehicle deleted');
+        document.getElementById('modal-gps-vehicles').classList.remove('active');
+        const school = await window.SchoolService.getById(schoolId);
+        await this.render(document.getElementById('main-content'), school, schoolId);
+      } catch (e) { AppToast.show(e.message, 'error'); }
+    });
+  },
+
+  _showDeviceModal(schoolId, devices, vehicles) {
+    let overlay = document.getElementById('modal-gps-devices');
+    if (overlay) overlay.remove();
+
+    const html = `<div class="modal-overlay active" id="modal-gps-devices" role="dialog" aria-modal="true">
+      <div class="modal" style="max-width:650px;">
+        <div class="modal-header"><h2 class="modal-title">Manage GPS Devices</h2><button class="modal-close" onclick="document.getElementById('modal-gps-devices').classList.remove('active');">&times;</button></div>
+        <div class="modal-body">
+          <div style="margin-bottom:16px;display:flex;gap:8px;">
+            <input type="text" class="form-input" id="gps-d-uid" placeholder="Device UID / IMEI" style="flex:1;">
+            <input type="text" class="form-input" id="gps-d-sim" placeholder="SIM number" style="width:140px;">
+            <select class="form-select" id="gps-d-vehicle" style="width:160px;">
+              <option value="">No vehicle</option>
+              ${vehicles.map(v => `<option value="${v.id}">${AppUtils.escapeHtml(v.label)}</option>`).join('')}
+            </select>
+            <button class="btn btn-primary btn-sm" id="btn-add-device" style="height:44px;">Add</button>
+          </div>
+          <div class="table-container"><table><thead><tr><th>Device UID</th><th>SIM</th><th>Vehicle</th><th>Status</th><th>Last Seen</th><th></th></tr></thead>
+          <tbody id="gps-devices-tbody">
+            ${devices.map(d => `<tr>
+              <td class="font-semibold">${AppUtils.escapeHtml(d.device_uid)}</td>
+              <td>${AppUtils.escapeHtml(d.sim_number || '—')}</td>
+              <td>${AppUtils.escapeHtml(d.vehicles?.label || '—')}</td>
+              <td><span class="status-badge status-${d.status === 'active' ? 'active' : 'inactive'}">${d.status}</span></td>
+              <td style="font-size:12px;color:var(--text-muted);">${d.last_seen_at ? AppUtils.formatDate(d.last_seen_at) : 'Never'}</td>
+              <td><button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-device" data-id="${d.id}"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button></td>
+            </tr>`).join('')}
+          </tbody></table></div>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    initIcons();
+
+    document.getElementById('btn-add-device')?.addEventListener('click', async () => {
+      const uid = document.getElementById('gps-d-uid').value.trim();
+      if (!uid) { AppToast.show('Device UID is required', 'error'); return; }
+      try {
+        await GpsService.createDevice({
+          school_id: schoolId, device_uid: uid,
+          sim_number: document.getElementById('gps-d-sim').value.trim() || null,
+          vehicle_id: document.getElementById('gps-d-vehicle').value || null
+        });
+        AppToast.show('Device added');
+        document.getElementById('modal-gps-devices').classList.remove('active');
+      } catch (e) { AppToast.show(e.message, 'error'); }
+    });
+
+    document.getElementById('gps-devices-tbody')?.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-action="delete-device"]');
+      if (!btn) return;
+      if (!confirm('Delete this GPS device?')) return;
+      try {
+        await GpsService.deleteDevice(btn.dataset.id);
+        AppToast.show('Device deleted');
+        document.getElementById('modal-gps-devices').classList.remove('active');
+      } catch (e) { AppToast.show(e.message, 'error'); }
+    });
+  }
+};
+
+// ==============================================================
+// AI ORBIT Q&A MODULE
+// ==============================================================
+window.AppAiOrbit = {
+  async render(main, school, schoolId) {
+    const [escalations, settings, conversations] = await Promise.all([
+      AiService.getEscalations(schoolId).catch(() => []),
+      AiService.getSchoolSettings(schoolId).catch(() => null),
+      AiService.getConversations(schoolId, 20).catch(() => [])
+    ]);
+    const openCount = escalations.filter(e => e.status === 'open').length;
+
+    main.innerHTML = `<div class="fade-in">
+      <div class="page-header">
+        <div class="page-header-left">
+          <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;margin-bottom:4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
+          <h1 class="page-title">AI Orbit</h1>
+          <p class="page-subtitle">${AppUtils.escapeHtml(school.name)} — Student Q&A powered by AI</p>
+        </div>
+        <button class="btn btn-secondary" id="btn-orbit-settings"><span class="material-symbols-outlined" style="font-size:18px;">settings</span> Settings</button>
+      </div>
+
+      <!-- Stats -->
+      <div class="metrics-grid" style="margin-bottom:24px;">
+        <div class="metric-card">
+          <div class="metric-icon" style="background:#E5F2FF;color:#1A56DB;"><span class="material-symbols-outlined">smart_toy</span></div>
+          <div><div class="metric-label">Status</div><div class="metric-value" style="font-size:18px;">${settings?.enabled !== false ? '<span style="color:#22c55e;">Active</span>' : '<span style="color:#ef4444;">Disabled</span>'}</div></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon" style="background:#FEF3C7;color:#D97706;"><span class="material-symbols-outlined">help</span></div>
+          <div><div class="metric-label">Daily Limit</div><div class="metric-value" style="font-size:18px;">${settings?.daily_question_limit || 10} / student</div></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon" style="background:#FEE2E2;color:#DC2626;"><span class="material-symbols-outlined">priority_high</span></div>
+          <div><div class="metric-label">Open Escalations</div><div class="metric-value" style="font-size:18px;">${openCount}</div></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon" style="background:#F0FDF4;color:#16A34A;"><span class="material-symbols-outlined">chat</span></div>
+          <div><div class="metric-label">Conversations</div><div class="metric-value" style="font-size:18px;">${conversations.length}</div></div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs" style="margin-bottom:20px;">
+        <button class="tab active" data-orbit-tab="escalations">Escalation Queue (${openCount})</button>
+        <button class="tab" data-orbit-tab="conversations">Recent Conversations</button>
+        <button class="tab" data-orbit-tab="providers">AI Providers</button>
+      </div>
+
+      <!-- Escalation Queue -->
+      <div id="orbit-tab-escalations" class="card" style="padding:0;">
+        ${escalations.length === 0
+          ? '<div class="empty-state" style="padding:40px;"><span class="material-symbols-outlined" style="font-size:40px;">check_circle</span><h3>No escalations</h3><p>When students need more help, their questions will appear here.</p></div>'
+          : `<div class="table-container"><table><thead><tr><th>Student</th><th>Question</th><th>AI Answer</th><th>Reason</th><th>Status</th><th>Date</th><th></th></tr></thead>
+          <tbody>${escalations.map(e => `<tr>
+            <td class="font-semibold">${AppUtils.escapeHtml(e.profiles?.full_name || 'Student')}</td>
+            <td style="max-width:200px;"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${AppUtils.escapeHtml(e.question)}</div></td>
+            <td style="max-width:200px;font-size:12px;color:var(--text-secondary);"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${AppUtils.escapeHtml(e.ai_answer || '—')}</div></td>
+            <td><span class="status-badge">${AppUtils.escapeHtml(e.reason)}</span></td>
+            <td><span class="status-badge status-${e.status === 'open' ? 'pending' : 'active'}">${e.status}</span></td>
+            <td style="font-size:12px;color:var(--text-muted);">${AppUtils.formatDate(e.created_at)}</td>
+            <td>${e.status === 'open' ? `<button class="btn btn-primary btn-sm" data-action="reply-escalation" data-id="${e.id}" style="height:28px;font-size:11px;">Reply</button>` : `<span style="font-size:12px;color:var(--success);">Resolved</span>`}</td>
+          </tr>`).join('')}</tbody></table></div>`}
+      </div>
+
+      <!-- Conversations -->
+      <div id="orbit-tab-conversations" class="card" style="padding:0;display:none;">
+        ${conversations.length === 0
+          ? '<div class="empty-state" style="padding:40px;"><span class="material-symbols-outlined" style="font-size:40px;">chat</span><h3>No conversations yet</h3><p>Student AI conversations will show up here.</p></div>'
+          : `<div class="table-container"><table><thead><tr><th>Student</th><th>Title</th><th>Messages</th><th>Flagged</th><th>Last Active</th></tr></thead>
+          <tbody>${conversations.map(c => `<tr>
+            <td class="font-semibold">${AppUtils.escapeHtml(c.profiles?.full_name || 'Student')}</td>
+            <td>${AppUtils.escapeHtml(c.title || 'Untitled')}</td>
+            <td>${c.message_count}</td>
+            <td>${c.flagged ? '<span class="status-badge status-pending">Flagged</span>' : '—'}</td>
+            <td style="font-size:12px;color:var(--text-muted);">${AppUtils.formatDate(c.last_message_at)}</td>
+          </tr>`).join('')}</tbody></table></div>`}
+      </div>
+
+      <!-- Providers -->
+      <div id="orbit-tab-providers" class="card" style="padding:0;display:none;">
+        <div style="padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:13px;font-weight:600;">AI Provider Chain</div>
+          <button class="btn btn-primary btn-sm" id="btn-add-provider"><span class="material-symbols-outlined" style="font-size:16px;">add</span> Add Provider</button>
+        </div>
+        <div id="orbit-providers-list" style="padding:16px;">
+          <div style="color:var(--text-muted);font-size:13px;">Loading providers...</div>
+        </div>
+      </div>
+    </div>`;
+    initIcons();
+    this._bindEvents(schoolId, school);
+    this._loadProviders();
+  },
+
+  _bindEvents(schoolId, school) {
+    // Tab switching
+    document.querySelectorAll('[data-orbit-tab]').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('[data-orbit-tab]').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelectorAll('[id^="orbit-tab-"]').forEach(p => p.style.display = 'none');
+        document.getElementById(`orbit-tab-${tab.dataset.orbitTab}`).style.display = '';
+      });
+    });
+
+    // Reply to escalation
+    document.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-action="reply-escalation"]');
+      if (!btn) return;
+      const reply = prompt('Type your reply to the student:');
+      if (!reply) return;
+      try {
+        const profile = await AuthService.getProfile();
+        await AiService.replyToEscalation(btn.dataset.id, reply, profile?.id);
+        AppToast.show('Reply sent');
+        await this.render(document.getElementById('main-content'), school, schoolId);
+      } catch (err) { AppToast.show(err.message, 'error'); }
+    });
+
+    // Settings button
+    document.getElementById('btn-orbit-settings')?.addEventListener('click', async () => {
+      const settings = await AiService.getSchoolSettings(schoolId).catch(() => null);
+      this._showSettingsModal(schoolId, settings, school);
+    });
+
+    // Add provider button
+    document.getElementById('btn-add-provider')?.addEventListener('click', () => {
+      this._showProviderModal(null);
+    });
+  },
+
+  async _loadProviders() {
+    try {
+      const providers = await AiService.getProviders();
+      const container = document.getElementById('orbit-providers-list');
+      if (!container) return;
+      if (providers.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding:24px;"><span class="material-symbols-outlined" style="font-size:32px;">smart_toy</span><h3>No providers configured</h3><p>Add an AI provider like OpenRouter or Gemini to enable AI Q&A.</p></div>';
+        return;
+      }
+      container.innerHTML = providers.map(p => {
+        const isHealthy = !p.needs_attention && p.consecutive_failures === 0;
+        const statusColor = isHealthy ? '#22c55e' : p.needs_attention ? '#ef4444' : '#f59e0b';
+        return `<div style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:var(--radius-md);margin-bottom:8px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:${statusColor};flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;">${AppUtils.escapeHtml(p.label)}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${AppUtils.escapeHtml(p.provider)} · ${AppUtils.escapeHtml(p.model)} · Priority: ${p.priority}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span class="status-badge status-${p.enabled ? 'active' : 'inactive'}">${p.enabled ? 'Enabled' : 'Disabled'}</span>
+            <span style="font-size:11px;color:var(--text-muted);margin-left:4px;">Key: ${AppUtils.escapeHtml(p.key_fingerprint || 'Not set')}</span>
+          </div>
+          <button class="btn btn-ghost btn-sm" data-action="edit-provider" data-id="${p.id}" style="height:28px;"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
+          <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-provider" data-id="${p.id}" style="height:28px;"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
+        </div>`;
+      }).join('');
+      initIcons();
+    } catch (err) {
+      const container = document.getElementById('orbit-providers-list');
+      if (container) container.innerHTML = `<div style="color:var(--error);font-size:13px;">Error loading providers: ${AppUtils.escapeHtml(err.message)}</div>`;
+    }
+  },
+
+  _showSettingsModal(schoolId, settings, school) {
+    let overlay = document.getElementById('modal-orbit-settings');
+    if (overlay) overlay.remove();
+    const s = settings || {};
+    const html = `<div class="modal-overlay active" id="modal-orbit-settings" role="dialog" aria-modal="true">
+      <div class="modal" style="max-width:500px;">
+        <div class="modal-header"><h2 class="modal-title">AI Orbit Settings</h2><button class="modal-close" onclick="document.getElementById('modal-orbit-settings').classList.remove('active');">&times;</button></div>
+        <div class="modal-body">
+          <div class="form-group"><label class="form-label">AI Enabled</label>
+            <select class="form-select" id="orbit-s-enabled"><option value="true" ${s.enabled !== false ? 'selected' : ''}>Yes</option><option value="false" ${s.enabled === false ? 'selected' : ''}>No</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">Daily Question Limit (per student)</label>
+            <input type="number" class="form-input" id="orbit-s-limit" value="${s.daily_question_limit || 10}" min="0" max="200">
+          </div>
+          <div class="form-group"><label class="form-label">Max Response Words</label>
+            <input type="number" class="form-input" id="orbit-s-words" value="${s.max_response_words || 1000}" min="100" max="5000">
+          </div>
+          <div class="form-group"><label class="form-label">Allow Escalation</label>
+            <select class="form-select" id="orbit-s-escalation"><option value="true" ${s.allow_escalation !== false ? 'selected' : ''}>Yes</option><option value="false" ${s.allow_escalation === false ? 'selected' : ''}>No</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">Student Access</label>
+            <select class="form-select" id="orbit-s-access"><option value="true" ${s.student_access !== false ? 'selected' : ''}>Yes</option><option value="false" ${s.student_access === false ? 'selected' : ''}>No</option></select>
+          </div>
+          <button class="btn btn-primary" id="btn-save-orbit-settings" style="width:100%;margin-top:16px;">Save Settings</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    document.getElementById('btn-save-orbit-settings')?.addEventListener('click', async () => {
+      try {
+        await AiService.upsertSchoolSettings(schoolId, {
+          enabled: document.getElementById('orbit-s-enabled').value === 'true',
+          daily_question_limit: parseInt(document.getElementById('orbit-s-limit').value) || 10,
+          max_response_words: parseInt(document.getElementById('orbit-s-words').value) || 1000,
+          allow_escalation: document.getElementById('orbit-s-escalation').value === 'true',
+          student_access: document.getElementById('orbit-s-access').value === 'true'
+        });
+        AppToast.show('Settings saved');
+        document.getElementById('modal-orbit-settings').classList.remove('active');
+        await this.render(document.getElementById('main-content'), school, schoolId);
+      } catch (err) { AppToast.show(err.message, 'error'); }
+    });
+  },
+
+  _showProviderModal(provider) {
+    let overlay = document.getElementById('modal-orbit-provider');
+    if (overlay) overlay.remove();
+    const p = provider || {};
+    const isEdit = !!p.id;
+    const html = `<div class="modal-overlay active" id="modal-orbit-provider" role="dialog" aria-modal="true">
+      <div class="modal" style="max-width:500px;">
+        <div class="modal-header"><h2 class="modal-title">${isEdit ? 'Edit' : 'Add'} AI Provider</h2><button class="modal-close" onclick="document.getElementById('modal-orbit-provider').classList.remove('active');">&times;</button></div>
+        <div class="modal-body">
+          <div class="form-group"><label class="form-label">Label</label><input type="text" class="form-input" id="prov-label" value="${AppUtils.escapeHtml(p.label || '')}" placeholder="e.g. OpenRouter GPT-4"></div>
+          <div class="form-group"><label class="form-label">Provider</label>
+            <select class="form-select" id="prov-provider">
+              <option value="openrouter" ${p.provider === 'openrouter' ? 'selected' : ''}>OpenRouter</option>
+              <option value="gemini" ${p.provider === 'gemini' ? 'selected' : ''}>Google Gemini</option>
+              <option value="openai" ${p.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
+              <option value="anthropic" ${p.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Model</label><input type="text" class="form-input" id="prov-model" value="${AppUtils.escapeHtml(p.model || '')}" placeholder="e.g. google/gemini-2.0-flash"></div>
+          <div class="form-group"><label class="form-label">API Key</label><input type="password" class="form-input" id="prov-key" placeholder="${isEdit ? 'Leave blank to keep existing' : 'Enter API key'}"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group"><label class="form-label">Priority (lower = first)</label><input type="number" class="form-input" id="prov-priority" value="${p.priority || 100}" min="1"></div>
+            <div class="form-group"><label class="form-label">Temperature</label><input type="number" class="form-input" id="prov-temp" value="${p.temperature || 0.3}" min="0" max="2" step="0.1"></div>
+          </div>
+          <button class="btn btn-primary" id="btn-save-provider" style="width:100%;margin-top:16px;">${isEdit ? 'Update' : 'Add'} Provider</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    document.getElementById('btn-save-provider')?.addEventListener('click', async () => {
+      const label = document.getElementById('prov-label').value.trim();
+      const model = document.getElementById('prov-model').value.trim();
+      if (!label || !model) { AppToast.show('Label and model are required', 'error'); return; }
+      try {
+        const payload = {
+          label, model,
+          provider: document.getElementById('prov-provider').value,
+          priority: parseInt(document.getElementById('prov-priority').value) || 100,
+          temperature: parseFloat(document.getElementById('prov-temp').value) || 0.3
+        };
+        let savedProvider;
+        if (isEdit) {
+          savedProvider = await AiService.updateProvider(p.id, payload);
+        } else {
+          savedProvider = await AiService.createProvider(payload);
+        }
+        const apiKey = document.getElementById('prov-key').value.trim();
+        if (apiKey) {
+          await AiService.setProviderKey(savedProvider.id, apiKey);
+        }
+        AppToast.show(isEdit ? 'Provider updated' : 'Provider added');
+        document.getElementById('modal-orbit-provider').classList.remove('active');
+        this._loadProviders();
+      } catch (err) { AppToast.show(err.message, 'error'); }
+    });
+  }
+};
+
+// ==============================================================
+// INVITATION MODULE
+// ==============================================================
+window.AppInvitations = {
+  async render(main) {
+    const profile = await AuthService.getProfile();
+    const invitations = await InvitationService.getAll();
+    const data = await AppStorage.load();
+
+    main.innerHTML = `<div class="fade-in">
+      <div class="page-header">
+        <div class="page-header-left"><h1 class="page-title">Invitations</h1><p class="page-subtitle">Invite school admins, counselors, and teachers to join the platform.</p></div>
+        <button class="btn btn-primary" id="btn-new-invitation"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span> New Invitation</button>
+      </div>
+
+      <div class="management-bar" style="margin-bottom:16px;">
+        <div class="search-bar" style="max-width:300px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="inv-search" placeholder="Search by email..."></div>
+        <select class="form-select" id="inv-status-filter" style="width:140px;height:44px;font-size:13px;">
+          <option value="">All Status</option><option value="pending">Pending</option><option value="accepted">Accepted</option><option value="revoked">Revoked</option><option value="expired">Expired</option>
+        </select>
+      </div>
+
+      <div class="card" style="padding:0;">
+        ${invitations.length === 0
+          ? '<div class="empty-state" style="padding:48px;"><span class="material-symbols-outlined" style="font-size:40px;">mail</span><h3>No invitations yet</h3><p>Click "New Invitation" to invite people to the platform.</p></div>'
+          : `<div class="table-container"><table><thead><tr><th>Email</th><th>Role</th><th>School</th><th>Status</th><th>Sent</th><th>Expires</th><th></th></tr></thead>
+          <tbody>${invitations.map(inv => {
+            const schoolName = inv.schools?.name || '—';
+            const isExpired = inv.status === 'pending' && new Date(inv.expires_at) < new Date();
+            const displayStatus = isExpired ? 'expired' : inv.status;
+            const statusClass = { pending: 'pending', accepted: 'active', revoked: 'inactive', expired: 'inactive' };
+            return `<tr>
+              <td class="font-semibold">${AppUtils.escapeHtml(inv.email)}</td>
+              <td><span class="status-badge">${AppUtils.escapeHtml(inv.role)}</span></td>
+              <td>${AppUtils.escapeHtml(schoolName)}</td>
+              <td><span class="status-badge status-${statusClass[displayStatus] || ''}">${displayStatus}</span></td>
+              <td style="font-size:12px;color:var(--text-muted);">${AppUtils.formatDate(inv.created_at)}</td>
+              <td style="font-size:12px;color:var(--text-muted);">${AppUtils.formatDate(inv.expires_at)}</td>
+              <td style="white-space:nowrap;">
+                ${inv.status === 'pending' ? `<button class="btn btn-ghost btn-sm" data-action="resend-invite" data-id="${inv.id}" title="Resend"><span class="material-symbols-outlined" style="font-size:16px;">refresh</span></button>
+                <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="revoke-invite" data-id="${inv.id}" title="Revoke"><span class="material-symbols-outlined" style="font-size:16px;">block</span></button>` : ''}
+              </td>
+            </tr>`;
+          }).join('')}</tbody></table></div>`}
+      </div>
+    </div>`;
+    initIcons();
+    this._bindEvents(data, profile);
+  },
+
+  _bindEvents(data, profile) {
+    document.getElementById('btn-new-invitation')?.addEventListener('click', () => {
+      this._showInviteModal(data.schools, profile);
+    });
+
+    document.addEventListener('click', async (e) => {
+      const resendBtn = e.target.closest('[data-action="resend-invite"]');
+      if (resendBtn) {
+        try {
+          await InvitationService.resend(resendBtn.dataset.id);
+          AppToast.show('Invitation resent');
+          await this.render(document.getElementById('main-content'));
+        } catch (err) { AppToast.show(err.message, 'error'); }
+        return;
+      }
+      const revokeBtn = e.target.closest('[data-action="revoke-invite"]');
+      if (revokeBtn) {
+        if (!confirm('Revoke this invitation?')) return;
+        try {
+          await InvitationService.revoke(revokeBtn.dataset.id);
+          AppToast.show('Invitation revoked');
+          await this.render(document.getElementById('main-content'));
+        } catch (err) { AppToast.show(err.message, 'error'); }
+      }
+    });
+  },
+
+  _showInviteModal(schools, profile) {
+    let overlay = document.getElementById('modal-invitation');
+    if (overlay) overlay.remove();
+
+    const html = `<div class="modal-overlay active" id="modal-invitation" role="dialog" aria-modal="true">
+      <div class="modal" style="max-width:480px;">
+        <div class="modal-header"><h2 class="modal-title">Send Invitation</h2><button class="modal-close" onclick="document.getElementById('modal-invitation').classList.remove('active');">&times;</button></div>
+        <div class="modal-body">
+          <div class="form-group"><label class="form-label">Email Address</label><input type="email" class="form-input" id="inv-email" placeholder="person@example.com" required></div>
+          <div class="form-group"><label class="form-label">Role</label>
+            <select class="form-select" id="inv-role">
+              <option value="school_admin">School Admin</option>
+              <option value="counselor">Counselor</option>
+              <option value="teacher">Teacher</option>
+              <option value="company_admin">Company Admin</option>
+            </select>
+          </div>
+          <div class="form-group" id="inv-school-group"><label class="form-label">School</label>
+            <select class="form-select" id="inv-school">
+              <option value="">Select a school...</option>
+              ${schools.map(s => `<option value="${s.id}">${AppUtils.escapeHtml(s.name)}</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn btn-primary" id="btn-send-invite" style="width:100%;margin-top:16px;"><span class="material-symbols-outlined" style="font-size:18px;">send</span> Send Invitation</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    initIcons();
+
+    // Hide school selector for company admin role
+    document.getElementById('inv-role')?.addEventListener('change', (e) => {
+      document.getElementById('inv-school-group').style.display = e.target.value === 'company_admin' ? 'none' : '';
+    });
+
+    document.getElementById('btn-send-invite')?.addEventListener('click', async () => {
+      const email = document.getElementById('inv-email').value.trim();
+      const role = document.getElementById('inv-role').value;
+      const schoolId = document.getElementById('inv-school').value;
+      if (!email) { AppToast.show('Email is required', 'error'); return; }
+      if (role !== 'company_admin' && !schoolId) { AppToast.show('Please select a school', 'error'); return; }
+      try {
+        await InvitationService.create({
+          email, role,
+          school_id: role !== 'company_admin' ? schoolId : null,
+          invited_by: profile?.id
+        });
+        AppToast.show(`Invitation sent to ${email}`);
+        document.getElementById('modal-invitation').classList.remove('active');
+        await this.render(document.getElementById('main-content'));
+      } catch (err) { AppToast.show(err.message, 'error'); }
+    });
+  }
+};
+
+// Add renderInvitations to AppRouter
+AppRouter.renderInvitations = async function(main) {
+  await window.AppInvitations.render(main);
+};
+
+// ==============================================================
+// VIDEO PLAYER MODULE
+// ==============================================================
+window.AppVideoPlayer = {
+  _resumePositions: {},
+
+  open(contentItem, school) {
+    const projectUrl = window.supabase?.supabaseUrl || 'https://rbldzenddjrxxzkaofby.supabase.co';
+    const streamUrl = `${projectUrl}/functions/v1/drive-stream`;
+
+    let overlay = document.getElementById('modal-video-player');
+    if (overlay) overlay.remove();
+
+    const savedPos = this._resumePositions[contentItem.id] || 0;
+
+    const html = `<div class="modal-overlay active" id="modal-video-player" role="dialog" aria-modal="true" style="z-index:2000;">
+      <div class="modal" style="max-width:960px;padding:0;overflow:hidden;background:#000;">
+        <div style="position:relative;">
+          <!-- Close button -->
+          <button id="vp-close" style="position:absolute;top:12px;right:12px;z-index:10;background:rgba(0,0,0,0.6);border:none;color:white;width:36px;height:36px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+            <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+          </button>
+
+          <!-- Video element -->
+          <video id="vp-video" style="width:100%;max-height:540px;background:#000;" preload="metadata">
+            <source src="${streamUrl}?content_id=${contentItem.id}" type="video/mp4">
+            Your browser does not support video playback.
+          </video>
+
+          <!-- Custom controls -->
+          <div id="vp-controls" style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.85));padding:12px 16px;">
+            <!-- Progress bar -->
+            <div id="vp-progress-wrap" style="width:100%;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;cursor:pointer;margin-bottom:10px;position:relative;">
+              <div id="vp-progress-bar" style="height:100%;background:#1A56DB;border-radius:2px;width:0%;transition:width 0.1s;"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;color:white;">
+              <button id="vp-play" style="background:none;border:none;color:white;cursor:pointer;padding:0;">
+                <span class="material-symbols-outlined" style="font-size:28px;">play_arrow</span>
+              </button>
+              <span id="vp-time" style="font-size:12px;font-family:monospace;min-width:90px;">0:00 / 0:00</span>
+              <div style="flex:1;"></div>
+              <select id="vp-speed" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);color:white;font-size:12px;padding:2px 6px;border-radius:4px;cursor:pointer;">
+                <option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1" selected>1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option>
+              </select>
+              <button id="vp-pip" style="background:none;border:none;color:white;cursor:pointer;padding:0;" title="Picture-in-Picture">
+                <span class="material-symbols-outlined" style="font-size:22px;">picture_in_picture_alt</span>
+              </button>
+              <button id="vp-fullscreen" style="background:none;border:none;color:white;cursor:pointer;padding:0;">
+                <span class="material-symbols-outlined" style="font-size:22px;">fullscreen</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Video info -->
+        <div style="background:var(--surface);padding:16px 20px;border-top:1px solid var(--border);">
+          <div style="font-size:16px;font-weight:600;color:var(--text-primary);">${AppUtils.escapeHtml(contentItem.name)}</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">${AppUtils.escapeHtml(school?.name || '')} · ${AppUtils.escapeHtml(contentItem.type || 'Video')}</div>
+        </div>
+      </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+    initIcons();
+
+    const video = document.getElementById('vp-video');
+    const playBtn = document.getElementById('vp-play');
+    const timeEl = document.getElementById('vp-time');
+    const progressBar = document.getElementById('vp-progress-bar');
+    const progressWrap = document.getElementById('vp-progress-wrap');
+
+    if (savedPos > 0) video.currentTime = savedPos;
+
+    const formatTime = (s) => {
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return `${m}:${sec.toString().padStart(2, '0')}`;
+    };
+
+    video.addEventListener('timeupdate', () => {
+      const pct = video.duration ? (video.currentTime / video.duration * 100) : 0;
+      progressBar.style.width = pct + '%';
+      timeEl.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration || 0)}`;
+      this._resumePositions[contentItem.id] = video.currentTime;
+    });
+
+    video.addEventListener('play', () => { playBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:28px;">pause</span>'; });
+    video.addEventListener('pause', () => { playBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:28px;">play_arrow</span>'; });
+
+    playBtn.addEventListener('click', () => { video.paused ? video.play() : video.pause(); });
+
+    progressWrap.addEventListener('click', (e) => {
+      const rect = progressWrap.getBoundingClientRect();
+      const pct = (e.clientX - rect.left) / rect.width;
+      if (video.duration) video.currentTime = pct * video.duration;
+    });
+
+    document.getElementById('vp-speed').addEventListener('change', (e) => { video.playbackRate = parseFloat(e.target.value); });
+
+    document.getElementById('vp-fullscreen')?.addEventListener('click', () => {
+      const container = document.getElementById('modal-video-player')?.querySelector('.modal');
+      if (container?.requestFullscreen) container.requestFullscreen();
+    });
+
+    document.getElementById('vp-pip')?.addEventListener('click', () => {
+      if (document.pictureInPictureElement) document.exitPictureInPicture();
+      else if (video.requestPictureInPicture) video.requestPictureInPicture();
+    });
+
+    document.getElementById('vp-close').addEventListener('click', () => {
+      video.pause();
+      document.getElementById('modal-video-player').classList.remove('active');
+      setTimeout(() => document.getElementById('modal-video-player')?.remove(), 300);
+    });
+
+    // Keyboard shortcuts
+    const keyHandler = (e) => {
+      if (e.key === 'Escape') { document.getElementById('vp-close')?.click(); document.removeEventListener('keydown', keyHandler); }
+      if (e.key === ' ' || e.key === 'k') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
+      if (e.key === 'ArrowRight') { video.currentTime = Math.min(video.duration, video.currentTime + 10); }
+      if (e.key === 'ArrowLeft') { video.currentTime = Math.max(0, video.currentTime - 10); }
+      if (e.key === 'f') { document.getElementById('vp-fullscreen')?.click(); }
+    };
+    document.addEventListener('keydown', keyHandler);
+  }
+};
 
 // ==============================================================
 // INIT APP
