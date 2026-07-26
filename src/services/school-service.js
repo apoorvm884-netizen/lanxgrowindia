@@ -59,7 +59,11 @@ export const SchoolService = {
         student_limit: school.student_limit || null,
         teacher_limit: school.teacher_limit || null,
         counselor_limit: school.counselor_limit || null,
-        storage_limit: school.storage_limit || null
+        storage_limit: school.storage_limit || null,
+        latitude: school.latitude || null,
+        longitude: school.longitude || null,
+        attendance_radius_m: school.attendance_radius_m || 200,
+        admin_password: school.admin_password || null
       })
       .select()
       .single();
@@ -95,6 +99,10 @@ export const SchoolService = {
     if (updates.teacher_limit !== undefined) payload.teacher_limit = updates.teacher_limit;
     if (updates.counselor_limit !== undefined) payload.counselor_limit = updates.counselor_limit;
     if (updates.storage_limit !== undefined) payload.storage_limit = updates.storage_limit;
+    if (updates.latitude !== undefined) payload.latitude = updates.latitude;
+    if (updates.longitude !== undefined) payload.longitude = updates.longitude;
+    if (updates.attendance_radius_m !== undefined) payload.attendance_radius_m = updates.attendance_radius_m;
+    if (updates.admin_password !== undefined) payload.admin_password = updates.admin_password;
 
     const { data, error } = await supabase
       .from('schools')
