@@ -62,50 +62,57 @@ window.AiService = AiService;
 window.supabase = supabase;
 
 // ==============================================================
-// DATA LAYER — Supabase-backed (replaces localStorage AppStorage)
+// DATA LAYER — Supabase-backed with lazy loading & caching
 // ==============================================================
 window.AppStorage = {
   KEY: 'lanxgrow_cos',
   _cache: null,
   _cacheTime: 0,
-  _cacheTTL: 60000,
+  _cacheTTL: 60000,          // 60s before re-fetch
+  _partialCache: {},          // Per-table cache with independent TTLs
+  _partialTTL: 120000,        // 2 minutes for individual tables
 
   async init() {
     // Schema is managed by Supabase migrations — no-op
   },
 
+  // Fetch a single table with its own cache
+  async _fetchTable(table, query) {
+    const key = table;
+    const cached = this._partialCache[key];
+    if (cached && (Date.now() - cached.time) < this._partialTTL) return cached.data;
+
+    const { data, error } = await query;
+    if (error) { console.error(`Fetch ${table} error:`, error.message); return cached?.data || []; }
+    const result = data || [];
+    this._partialCache[key] = { data: result, time: Date.now() };
+    return result;
+  },
+
+  // Core data needed by almost every page (schools, categories, subjects, sections)
+  async loadCore() {
+    const [schools, categories, subjects, sections] = await Promise.all([
+      this._fetchTable('schools', supabase.from('schools').select('*').order('name')),
+      this._fetchTable('categories', supabase.from('categories').select('*').order('name')),
+      this._fetchTable('subjects', supabase.from('subjects').select('*').order('name')),
+      this._fetchTable('sections', supabase.from('sections').select('*').order('name')),
+    ]);
+    return { schools, categories, subjects, sections };
+  },
+
+  // Full load — kept for backward compatibility but with smarter caching
   async load(forceRefresh) {
     if (!forceRefresh && this._cache && (Date.now() - this._cacheTime) < this._cacheTTL) return this._cache;
-    const [schoolsRes, categoriesRes, subjectsRes, sectionsRes, contentRes, profilesRes, logsRes,
-           studentsRes, coursesRes, enrollmentsRes, courseSectionsRes, notificationsRes] =
-      await Promise.all([
-        supabase.from('schools').select('*').order('name'),
-        supabase.from('categories').select('*').order('name'),
-        supabase.from('subjects').select('*').order('name'),
-        supabase.from('sections').select('*').order('name'),
-        supabase.from('content').select('*').order('created_at', { ascending: false }).limit(500),
-        supabase.from('profiles').select('*'),
-        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100),
-        supabase.from('students').select('*').order('name').limit(500),
-        supabase.from('courses').select('*').order('name'),
-        supabase.from('enrollments').select('*').limit(1000),
-        supabase.from('course_sections').select('*'),
-        supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(30)
-      ]);
 
-    const schools = schoolsRes.data || [];
-    const categories = categoriesRes.data || [];
-    const subjects = subjectsRes.data || [];
-    const sections = sectionsRes.data || [];
-    const content = contentRes.data || [];
-    const profiles = profilesRes.data || [];
-    const auditLog = logsRes.data || [];
-    const students = studentsRes.data || [];
-    const courses = coursesRes.data || [];
-    const enrollments = enrollmentsRes.data || [];
-    const courseSections = courseSectionsRes.data || [];
-    const notifications = notificationsRes.data || [];
+    // Fetch core + secondary tables in parallel batches
+    const [core, contentRes, profilesRes, notificationsRes] = await Promise.all([
+      this.loadCore(),
+      this._fetchTable('content', supabase.from('content').select('*').order('created_at', { ascending: false }).limit(500)),
+      this._fetchTable('profiles', supabase.from('profiles').select('*')),
+      this._fetchTable('notifications', supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(30)),
+    ]);
 
+    const profiles = profilesRes || [];
     const users = profiles.map(p => ({
       id: p.id,
       name: p.name,
@@ -115,12 +122,77 @@ window.AppStorage = {
       schoolId: p.school_id
     }));
 
-    this._cache = { schools, categories, subjects, sections, content, users, auditLog, students, courses, enrollments, courseSections, notifications };
+    this._cache = {
+      ...core,
+      content: contentRes || [],
+      users,
+      notifications: notificationsRes || [],
+      // Lazy-loaded tables — will be populated on demand
+      auditLog: this._partialCache.auditLog?.data || [],
+      students: this._partialCache.students?.data || [],
+      courses: this._partialCache.courses?.data || [],
+      enrollments: this._partialCache.enrollments?.data || [],
+      courseSections: this._partialCache.courseSections?.data || [],
+    };
     this._cacheTime = Date.now();
     return this._cache;
   },
 
+  // On-demand loaders for heavy tables (called only when the page needs them)
+  async loadAuditLog(limit = 100) {
+    const data = await this._fetchTable('auditLog',
+      supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(limit));
+    if (this._cache) this._cache.auditLog = data;
+    return data;
+  },
+
+  async loadStudents(schoolId, page = 1, pageSize = 50) {
+    let query = supabase.from('students').select('*', { count: 'exact' }).order('name');
+    if (schoolId) query = query.eq('school_id', schoolId);
+    query = query.range((page - 1) * pageSize, page * pageSize - 1);
+    const { data, error, count } = await query;
+    if (error) { console.error('Students fetch error:', error.message); return { data: [], count: 0 }; }
+    const result = data || [];
+    if (this._cache) this._cache.students = result;
+    return { data: result, count: count || 0 };
+  },
+
+  async loadCourses(schoolId) {
+    let query = supabase.from('courses').select('*').order('name');
+    if (schoolId) query = query.eq('school_id', schoolId);
+    const data = await this._fetchTable('courses', query);
+    if (this._cache) this._cache.courses = data;
+    return data;
+  },
+
+  async loadEnrollments(courseId) {
+    let query = supabase.from('enrollments').select('*').limit(1000);
+    if (courseId) query = query.eq('course_id', courseId);
+    const data = await this._fetchTable('enrollments', query);
+    if (this._cache) this._cache.enrollments = data;
+    return data;
+  },
+
+  async loadCourseSections(courseId) {
+    let query = supabase.from('course_sections').select('*');
+    if (courseId) query = query.eq('course_id', courseId);
+    const data = await this._fetchTable('courseSections', query);
+    if (this._cache) this._cache.courseSections = data;
+    return data;
+  },
+
   invalidate() {
+    this._cache = null;
+    this._cacheTime = 0;
+    // Keep partial cache but mark it stale
+    for (const key in this._partialCache) {
+      this._partialCache[key].time = 0;
+    }
+  },
+
+  // Invalidate only a specific table's cache
+  invalidateTable(table) {
+    if (this._partialCache[table]) this._partialCache[table].time = 0;
     this._cache = null;
     this._cacheTime = 0;
   },
@@ -362,6 +434,7 @@ window.AppSidebar = {
     { id: 'school-admins', label: 'School Admins', icon: 'user-cog', route: 'school-admins' },
     { id: 'roles-permissions', label: 'Roles & Permissions', icon: 'shield', route: 'roles-permissions' },
     { id: 'company-settings', label: 'Settings', icon: 'settings', route: 'company-settings' },
+    { id: 'api-keys', label: 'API Keys', icon: 'key', route: 'api-keys' },
     { id: 'sep3', separator: true },
     { id: 'invitations', label: 'Invitations', icon: 'mail', route: 'invitations' },
     { id: 'audit-log', label: 'Audit Log', icon: 'history', route: 'audit-log' },
@@ -387,14 +460,15 @@ window.AppSidebar = {
     { id: 'school-students', label: 'Students', icon: 'groups', route: 'school-students' },
     { id: 'school-counselors', label: 'Counselors', icon: 'badge', route: 'school-counselors' },
     { id: 'sep-s2', separator: true },
-    { id: 'school-courses', label: 'Courses', icon: 'book-open', route: 'school-courses' },
-    { id: 'school-categories', label: 'Categories', icon: 'folder-tree', route: 'school-categories' },
+    { id: 'school-categories', label: 'Classes', icon: 'folder-tree', route: 'school-categories' },
     { id: 'school-subjects', label: 'Subjects', icon: 'auto_stories', route: 'school-subjects' },
+    { id: 'school-courses', label: 'Courses', icon: 'book-open', route: 'school-courses' },
     { id: 'sep-s3', separator: true },
     { id: 'school-drive', label: 'Drive', icon: 'cloud', route: 'school-drive' },
     { id: 'school-videos', label: 'Video Library', icon: 'video-library', route: 'school-videos' },
     { id: 'school-assignments', label: 'Assignments', icon: 'assignment', route: 'school-assignments' },
     { id: 'sep-s4', separator: true },
+    { id: 'school-attendance', label: 'Attendance', icon: 'how_to_reg', route: 'school-attendance' },
     { id: 'school-gps', label: 'GPS Tracking', icon: 'location_on', route: 'school-gps' },
     { id: 'school-orbit', label: 'AI Orbit', icon: 'smart_toy', route: 'school-orbit' },
     { id: 'sep-s5-extra', separator: true },
@@ -475,6 +549,8 @@ window.AppSidebar = {
     'smart_toy': '<span class="material-symbols-outlined" style="font-size:20px;">smart_toy</span>',
     'mail': '<span class="material-symbols-outlined" style="font-size:20px;">mail</span>',
     'gps_fixed': '<span class="material-symbols-outlined" style="font-size:20px;">gps_fixed</span>',
+    'key': '<span class="material-symbols-outlined" style="font-size:20px;">key</span>',
+    'how_to_reg': '<span class="material-symbols-outlined" style="font-size:20px;">how_to_reg</span>',
   },
 
   render(items, activeId, backLink) {
@@ -510,9 +586,9 @@ window.AppRouter = {
   SCHOOL_ROUTES: ['school-dashboard','school-categories','school-subjects','school-sections',
     'school-students','school-counselors','school-courses','school-videos',
     'school-drive','school-assignments','school-reports','school-notifications',
-    'school-settings','school-profile','school-gps','school-orbit'],
+    'school-settings','school-profile','school-gps','school-orbit','school-attendance'],
   COMPANY_ROUTES: ['company-dashboard','schools','content-manager','drive-manager',
-    'media-library','school-admins','roles-permissions','company-settings','audit-log','invitations'],
+    'media-library','school-admins','roles-permissions','company-settings','api-keys','audit-log','invitations'],
 
   COMPANY_ADMIN_ROUTES: ['company-dashboard','schools','content-manager','drive-manager',
     'media-library','school-admins','roles-permissions','company-settings','audit-log','invitations'],
@@ -673,6 +749,9 @@ window.AppRouter = {
       case 'company-settings':
         try { await this.renderCompanySettings(main); } catch (err) { this._renderError(main, err); }
         break;
+      case 'api-keys':
+        try { await this.renderApiKeys(main); } catch (err) { this._renderError(main, err); }
+        break;
       case 'audit-log':
         try { await AppAuditLog.render(main); } catch (err) { this._renderError(main, err); }
         break;
@@ -754,8 +833,9 @@ window.AppRouter = {
           <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-purple" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">people</span></div><div class="metric-info"><h2 style="font-size:22px;">${teachersCount || 0}</h2><p>Teachers</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#fef2f2;color:#ef4444;"><span class="material-symbols-outlined" style="font-size:20px;">badge</span></div><div class="metric-info"><h2 style="font-size:22px;">${schoolCounselors.length}</h2><p>Counselors</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-orange" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">school</span></div><div class="metric-info"><h2 style="font-size:22px;">${schoolCourses.length}</h2><p>Courses</p></div></div>
-          <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#f0fdf4;color:#10b981;"><span class="material-symbols-outlined" style="font-size:20px;">folder</span></div><div class="metric-info"><h2 style="font-size:22px;">${cats.length}</h2><p>Categories</p></div></div>
+          <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#f0fdf4;color:#10b981;"><span class="material-symbols-outlined" style="font-size:20px;">folder</span></div><div class="metric-info"><h2 style="font-size:22px;">${cats.length}</h2><p>Classes</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#f5f3ff;color:#8b5cf6;"><span class="material-symbols-outlined" style="font-size:20px;">auto_stories</span></div><div class="metric-info"><h2 style="font-size:22px;">${subjects.length}</h2><p>Subjects</p></div></div>
+          <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#ecfdf5;color:#059669;"><span class="material-symbols-outlined" style="font-size:20px;">how_to_reg</span></div><div class="metric-info"><h2 style="font-size:22px;">${teachersCount || 0}</h2><p>Attendance Teacher</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-blue" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">video_library</span></div><div class="metric-info"><h2 style="font-size:22px;">${content.length}</h2><p>Videos</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#fffbeb;color:#f59e0b;"><span class="material-symbols-outlined" style="font-size:20px;">storage</span></div><div class="metric-info"><h2 style="font-size:22px;">${storageLabel}</h2><p>Storage Used</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#fee2e2;color:#ef4444;"><span class="material-symbols-outlined" style="font-size:20px;">notifications</span></div><div class="metric-info"><h2 style="font-size:22px;">${schoolNotifications.filter(n => !n.is_read).length}</h2><p>Notifications</p></div></div>
@@ -771,7 +851,7 @@ window.AppRouter = {
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-counselors"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">support_agent</span> Add Counselor</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-courses"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">playlist_add</span> Create Course</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-assignments"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">assignment</span> Assign Course</button>
-            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-categories"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">folder</span> Categories</button>
+            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-categories"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">folder</span> Classes</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-reports"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">bar_chart</span> Reports</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-videos"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">video_library</span> Videos</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-notifications"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">notifications</span> Notifications${schoolNotifications.filter(n => !n.is_read).length ? `<span style="background:var(--danger);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;">${schoolNotifications.filter(n => !n.is_read).length}</span>` : ''}</button>
@@ -791,6 +871,8 @@ window.AppRouter = {
               <div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Email</span><br><span style="font-weight:500;">${AppUtils.escapeHtml(school?.email || '—')}</span></div>
               <div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Address</span><br><span style="font-weight:500;">${[school?.address_line1, school?.city, school?.state].filter(Boolean).join(', ') || '—'}</span></div>
               <div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Plan</span><br><span class="status-badge status-active" style="font-size:10px;text-transform:capitalize;">${AppUtils.escapeHtml(school?.plan || 'basic')}</span></div>
+              ${isSuperAdmin && school?.admin_password ? `<div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Admin Password</span><br><span style="font-weight:500;font-family:monospace;font-size:12px;">${AppUtils.escapeHtml(school.admin_password)}</span></div>` : ''}
+              ${school?.latitude ? `<div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">GPS Location</span><br><span style="font-weight:500;font-size:12px;">${school.latitude.toFixed(4)}, ${school.longitude?.toFixed(4) || '—'}</span></div>` : ''}
             </div>
           </div>
 
@@ -897,13 +979,13 @@ window.AppRouter = {
               ${parentId ? `<button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-categories" data-id="">` : `<button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard">`}<span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
               <span style="font-size:12px;color:var(--text-secondary);">${schoolName}${parentCat ? ' / ' + AppUtils.escapeHtml(parentCat.name) : ''}</span>
             </div>
-            <h1 class="page-title">${parentCat ? AppUtils.escapeHtml(parentCat.name) : 'Categories'}</h1>
-            <p class="page-subtitle">${parentCat ? 'Sub-categories under ' + AppUtils.escapeHtml(parentCat.name) : 'Manage the category hierarchy for ' + schoolName}.</p>
+            <h1 class="page-title">${parentCat ? AppUtils.escapeHtml(parentCat.name) : 'Classes'}</h1>
+            <p class="page-subtitle">${parentCat ? 'Sub-classes under ' + AppUtils.escapeHtml(parentCat.name) : 'Manage classes (e.g. 7th, 8th, 9th…12th) for ' + schoolName}.</p>
           </div>
-          <button class="btn btn-primary" data-action="add-category"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add ${parentCat ? 'Sub-category' : 'Category'}</button>
+          <button class="btn btn-primary" data-action="add-category"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add ${parentCat ? 'Sub-class' : 'Class'}</button>
         </div>
         <div class="card" style="padding:0;overflow:hidden;">
-          ${cats.length === 0 ? `<div class="empty-state" style="padding:40px;"><span class="material-symbols-outlined" style="font-size:40px;">folder</span><h3>No ${parentCat ? 'sub-categories' : 'categories'} yet</h3><p>${parentCat ? 'Add sub-categories to organize content under ' + AppUtils.escapeHtml(parentCat.name) + '.' : 'Create your first category to organize your curriculum.'}</p></div>`
+          ${cats.length === 0 ? `<div class="empty-state" style="padding:40px;"><span class="material-symbols-outlined" style="font-size:40px;">folder</span><h3>No ${parentCat ? 'sub-classes' : 'classes'} yet</h3><p>${parentCat ? 'Add sub-classes to organize content under ' + AppUtils.escapeHtml(parentCat.name) + '.' : 'Create your first class (e.g. 7th, 8th) to organize your curriculum.'}</p></div>`
           : `<div style="padding:8px 0;">${cats.map(c => {
             const subCount = data.subjects.filter(s => s.category_id === c.id).length;
             const childCount = allCats.filter(ch => ch.parent_id === c.id).length;
@@ -911,7 +993,7 @@ window.AppRouter = {
               <span class="material-symbols-outlined" style="font-size:18px;color:var(--primary);margin-right:10px;">${childCount > 0 ? 'folder' : 'folder_open'}</span>
               <div style="flex:1;min-width:0;">
                 <div style="font-size:14px;font-weight:600;">${AppUtils.escapeHtml(c.name)}</div>
-                <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">${subCount} subjects · ${childCount} sub-categories</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:1px;">${subCount} subjects · ${childCount} sub-classes</div>
               </div>
               <div style="display:flex;gap:4px;">
                 ${childCount > 0 || subCount > 0 ? `<button class="btn btn-ghost btn-sm" data-action="open-category" data-id="${c.id}" title="Open" style="height:30px;font-size:11px;"><span class="material-symbols-outlined" style="font-size:14px;">open_in_new</span> Open</button>` : ''}
@@ -1084,9 +1166,77 @@ window.AppRouter = {
       await window.AppAiOrbit.render(main, school, schoolId);
       return;
     }
+    if (this.currentRoute === 'school-attendance') {
+      await this.renderAttendance(main, school, schoolId);
+      return;
+    }
 
     main.innerHTML = `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">school</span><h3>School Workspace</h3><p>Navigate using the sidebar.</p></div>`;
     initIcons();
+  },
+
+  // --- ATTENDANCE PAGE ---
+  async renderAttendance(main, school, schoolId) {
+    const today = new Date().toISOString().split('T')[0];
+    const dateFilter = document.getElementById('attendance-date-filter')?.value || today;
+
+    const { data: records } = await supabase
+      .from('attendance')
+      .select('*, profiles:user_id(name, role)')
+      .eq('school_id', schoolId)
+      .eq('date', dateFilter)
+      .order('check_in_time', { ascending: false });
+
+    const attendanceList = records || [];
+    const present = attendanceList.filter(a => a.status === 'present').length;
+    const unattended = attendanceList.filter(a => a.status === 'unattended').length;
+    const absent = attendanceList.filter(a => a.status === 'absent').length;
+
+    main.innerHTML = `<div class="fade-in">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h1 class="page-title">Attendance</h1>
+          <p class="page-subtitle">Location-verified attendance for teachers and counselors.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="date" class="form-input" id="attendance-date-filter" value="${dateFilter}" style="width:160px;height:36px;font-size:13px;">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px;">
+        <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-blue" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">groups</span></div><div class="metric-info"><h2 style="font-size:20px;">${attendanceList.length}</h2><p>Total</p></div></div>
+        <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-green" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">check_circle</span></div><div class="metric-info"><h2 style="font-size:20px;">${present}</h2><p>Present</p></div></div>
+        <div class="metric-card" style="padding:14px;"><div class="metric-icon metric-icon-orange" style="width:36px;height:36px;"><span class="material-symbols-outlined" style="font-size:18px;">warning</span></div><div class="metric-info"><h2 style="font-size:20px;">${unattended}</h2><p>Unattended</p></div></div>
+        <div class="metric-card" style="padding:14px;"><div class="metric-icon" style="width:36px;height:36px;background:#fef2f2;color:#ef4444;"><span class="material-symbols-outlined" style="font-size:18px;">cancel</span></div><div class="metric-info"><h2 style="font-size:20px;">${absent}</h2><p>Absent</p></div></div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        ${attendanceList.length === 0
+          ? `<div class="empty-state" style="padding:40px;"><span class="material-symbols-outlined" style="font-size:40px;">how_to_reg</span><h3>No attendance records</h3><p>Attendance is recorded automatically when teachers/counselors log in.</p></div>`
+          : `<div class="table-container"><table><thead><tr><th>Name</th><th>Role</th><th>Check In</th><th>Status</th><th>Location Verified</th></tr></thead><tbody>
+            ${attendanceList.map(a => {
+              const name = a.profiles?.name || 'Unknown';
+              const role = a.profiles?.role || '—';
+              const checkIn = a.check_in_time ? new Date(a.check_in_time).toLocaleTimeString() : '—';
+              const statusColor = a.status === 'present' ? 'status-active' : a.status === 'unattended' ? 'status-pending' : 'status-suspended';
+              return `<tr>
+                <td class="font-semibold">${AppUtils.escapeHtml(name)}</td>
+                <td style="font-size:13px;color:var(--text-secondary);">${AppUtils.escapeHtml(role)}</td>
+                <td style="font-size:13px;">${checkIn}</td>
+                <td><span class="status-badge ${statusColor}">${AppUtils.escapeHtml(a.status)}</span></td>
+                <td>${a.location_verified ? '<span style="color:#10b981;">Yes</span>' : '<span style="color:#f59e0b;">No</span>'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody></table></div>`}
+      </div>
+      <div style="margin-top:12px;padding:10px;background:var(--surface-low);border-radius:var(--radius-md);font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:8px;">
+        <span class="material-symbols-outlined" style="font-size:16px;">info</span>
+        "Present" = logged in within ${school.attendance_radius_m || 200}m of school. "Unattended" = logged in from outside or location unavailable.
+      </div>
+    </div>`;
+    initIcons();
+
+    document.getElementById('attendance-date-filter')?.addEventListener('change', () => {
+      this.renderAttendance(main, school, schoolId);
+    });
   },
 
   // --- SCHOOL DRIVE MANAGER ---
@@ -1425,6 +1575,98 @@ window.AppRouter = {
     });
     container.innerHTML = this._settingsTabContent(tab, settings);
     initIcons();
+  },
+
+  // --- API KEYS MANAGEMENT ---
+  async renderApiKeys(main) {
+    let keys = [];
+    try {
+      const { data, error } = await supabase.from('api_keys').select('*').order('created_at', { ascending: false });
+      if (!error) keys = data || [];
+    } catch (_) {}
+
+    const keyTypes = [
+      { value: 'drive_api', label: 'Google Drive API Key' },
+      { value: 'gemini', label: 'Gemini AI Key' },
+      { value: 'openai', label: 'OpenAI Key' },
+      { value: 'openrouter', label: 'OpenRouter Key' },
+      { value: 'other', label: 'Other' }
+    ];
+
+    main.innerHTML = `<div class="fade-in">
+      <div class="page-header">
+        <div class="page-header-left"><h1 class="page-title">API Keys</h1><p class="page-subtitle">Manage Drive and AI API keys shared across all schools.</p></div>
+        <button class="btn btn-primary" id="btn-add-api-key"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add Key</button>
+      </div>
+      <div id="api-key-form" style="display:none;margin-bottom:20px;" class="card" >
+        <div style="padding:20px;">
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Add API Key</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Key Type</label>
+              <select class="form-select" id="api-key-type">
+                ${keyTypes.map(t => `<option value="${t.value}">${t.label}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Key Name / Label</label>
+              <input class="form-input" type="text" id="api-key-name" placeholder="e.g. Production Drive Key">
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:12px;">
+            <label class="form-label">API Key Value</label>
+            <input class="form-input" type="text" id="api-key-value" placeholder="Paste your API key here">
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn btn-primary btn-sm" id="btn-save-api-key">Save Key</button>
+            <button class="btn btn-secondary btn-sm" id="btn-cancel-api-key">Cancel</button>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        ${keys.length === 0 ? `<div class="empty-state" style="padding:40px;"><span class="material-symbols-outlined" style="font-size:40px;">key</span><h3>No API keys configured</h3><p>Add Drive or AI API keys to enable content sync and AI features across all schools.</p></div>`
+        : `<div class="table-container"><table><thead><tr><th>Type</th><th>Name</th><th>Key</th><th>Status</th><th>Created</th><th style="width:80px;"></th></tr></thead><tbody>
+          ${keys.map(k => {
+            const masked = k.key_value ? k.key_value.slice(0, 8) + '••••••••' + k.key_value.slice(-4) : '—';
+            const typeLabel = keyTypes.find(t => t.value === k.key_type)?.label || k.key_type;
+            return `<tr>
+              <td><span style="font-size:12px;padding:2px 8px;border-radius:4px;background:var(--surface-low);font-weight:500;">${AppUtils.escapeHtml(typeLabel)}</span></td>
+              <td class="font-semibold">${AppUtils.escapeHtml(k.key_name)}</td>
+              <td style="font-family:monospace;font-size:12px;color:var(--text-secondary);">${AppUtils.escapeHtml(masked)}</td>
+              <td><span class="status-badge ${k.is_active ? 'status-active' : 'status-suspended'}">${k.is_active ? 'Active' : 'Inactive'}</span></td>
+              <td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(k.created_at)}</td>
+              <td class="td-actions">
+                <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-api-key" data-id="${k.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
+              </td></tr>`;
+          }).join('')}
+        </tbody></table></div>`}
+      </div>
+      <div style="margin-top:16px;padding:12px;background:var(--surface-low);border-radius:var(--radius-md);display:flex;align-items:center;gap:10px;">
+        <span class="material-symbols-outlined" style="font-size:16px;color:var(--text-muted);">info</span>
+        <span style="font-size:12px;color:var(--text-secondary);">API keys are shared across all schools. Drive keys are used for content sync, AI keys for Orbit chat and transcription.</span>
+      </div>
+    </div>`;
+    initIcons();
+
+    // Bind events
+    document.getElementById('btn-add-api-key')?.addEventListener('click', () => {
+      document.getElementById('api-key-form').style.display = 'block';
+    });
+    document.getElementById('btn-cancel-api-key')?.addEventListener('click', () => {
+      document.getElementById('api-key-form').style.display = 'none';
+    });
+    document.getElementById('btn-save-api-key')?.addEventListener('click', async () => {
+      const keyType = document.getElementById('api-key-type').value;
+      const keyName = document.getElementById('api-key-name').value.trim();
+      const keyValue = document.getElementById('api-key-value').value.trim();
+      if (!keyName || !keyValue) { AppToast.show('Name and key value are required.', 'error'); return; }
+      try {
+        const { error } = await supabase.from('api_keys').insert({ key_type: keyType, key_name: keyName, key_value: keyValue });
+        if (error) throw error;
+        AppToast.show('API key saved.', 'success');
+        this.renderApiKeys(main);
+      } catch (err) { AppToast.show('Failed: ' + err.message, 'error'); }
+    });
   },
 
   // --- COMPANY DASHBOARD ---
@@ -2009,6 +2251,9 @@ window.AppContent = {
     if (sectionId) {
       const sec = data.sections.find(s => s.id === sectionId);
       if (sec) { schoolSelect.value = sec.school_id; this.populateSections(sec.school_id, sectionId); }
+    } else if (AppRouter.currentSchoolId) {
+      schoolSelect.value = AppRouter.currentSchoolId;
+      this.populateSections(AppRouter.currentSchoolId, null);
     }
     document.getElementById('modal-title').textContent = 'Add Content';
     AppModal.open('modal-entity');
@@ -2389,6 +2634,17 @@ function openSchoolForm(schoolData) {
   document.getElementById('school-input-storage-limit').value = schoolData?.storage_limit || '';
 
   document.getElementById('school-input-status').value = schoolData?.status || 'active';
+
+  // GPS & Password fields
+  const latEl = document.getElementById('school-input-latitude');
+  const lngEl = document.getElementById('school-input-longitude');
+  const radiusEl = document.getElementById('school-input-attendance-radius');
+  const pwdEl = document.getElementById('school-input-admin-password');
+  if (latEl) latEl.value = schoolData?.latitude || '';
+  if (lngEl) lngEl.value = schoolData?.longitude || '';
+  if (radiusEl) radiusEl.value = schoolData?.attendance_radius_m || 200;
+  if (pwdEl) pwdEl.value = schoolData?.admin_password || '';
+
   document.getElementById('school-display-id').textContent = schoolData?.id || 'Auto-generated';
   document.getElementById('school-display-created').textContent = schoolData?.created_at ? AppUtils.formatDate(schoolData.created_at) : '—';
 
@@ -2462,7 +2718,11 @@ async function handleSchoolSubmit() {
       teacher_limit: parseInt(document.getElementById('school-input-teacher-limit').value) || null,
       counselor_limit: parseInt(document.getElementById('school-input-counselor-limit').value) || null,
       storage_limit: document.getElementById('school-input-storage-limit').value.trim() || null,
-      status: document.getElementById('school-input-status').value || 'active'
+      status: document.getElementById('school-input-status').value || 'active',
+      latitude: parseFloat(document.getElementById('school-input-latitude')?.value) || null,
+      longitude: parseFloat(document.getElementById('school-input-longitude')?.value) || null,
+      attendance_radius_m: parseInt(document.getElementById('school-input-attendance-radius')?.value) || 200,
+      admin_password: document.getElementById('school-input-admin-password')?.value.trim() || null
     };
 
     if (isEdit) {
@@ -2650,6 +2910,18 @@ document.addEventListener('click', async function (e) {
   if (action === 'edit-subject') { AppSubjects.edit(id); return; }
   if (action === 'delete-subject') { AppSubjects.confirmDelete(id); return; }
   if (action === 'open-subject') { AppRouter.navigate('school-sections', { schoolId: AppRouter.currentSchoolId, subjectId: id }); return; }
+
+  // API Keys
+  if (action === 'delete-api-key') {
+    if (!confirm('Delete this API key?')) return;
+    try {
+      const { error } = await supabase.from('api_keys').delete().eq('id', id);
+      if (error) throw error;
+      AppToast.show('Key deleted.', 'success');
+      AppRouter.render();
+    } catch (err) { AppToast.show('Failed: ' + err.message, 'error'); }
+    return;
+  }
 
   // Sections
   if (action === 'add-section') { AppSections.openCreate(); return; }
@@ -3994,6 +4266,77 @@ async function handleContentFileUpload(fileInput) {
 }
 
 // ==============================================================
+// ATTENDANCE RECORDING (location-based)
+// ==============================================================
+async function recordAttendance() {
+  try {
+    const profile = await AuthService.getProfile();
+    if (!profile || !profile.school_id) return;
+    // Only record for teachers/counselors/school_admins
+    if (!['teacher','counselor','school_admin'].includes(profile.role)) return;
+
+    const { data: school } = await supabase.from('schools').select('latitude, longitude, attendance_radius_m').eq('id', profile.school_id).single();
+    if (!school) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    // Check if already recorded today
+    const { data: existing } = await supabase.from('attendance').select('id').eq('user_id', profile.id).eq('date', today).single();
+    if (existing) return; // Already recorded
+
+    // Get current location
+    if (navigator.geolocation && school.latitude && school.longitude) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const dist = haversineDistance(pos.coords.latitude, pos.coords.longitude, school.latitude, school.longitude);
+          const radius = school.attendance_radius_m || 200;
+          const verified = dist <= radius;
+          await supabase.from('attendance').insert({
+            user_id: profile.id,
+            school_id: profile.school_id,
+            date: today,
+            check_in_time: new Date().toISOString(),
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            status: verified ? 'present' : 'unattended',
+            location_verified: verified,
+          });
+        },
+        async () => {
+          // Location denied — mark as unattended
+          await supabase.from('attendance').insert({
+            user_id: profile.id,
+            school_id: profile.school_id,
+            date: today,
+            check_in_time: new Date().toISOString(),
+            status: 'unattended',
+            location_verified: false,
+          });
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      // No GPS on school or no browser geolocation — mark unattended
+      await supabase.from('attendance').insert({
+        user_id: profile.id,
+        school_id: profile.school_id,
+        date: today,
+        check_in_time: new Date().toISOString(),
+        status: 'unattended',
+        location_verified: false,
+      });
+    }
+  } catch (_) { /* attendance is non-critical */ }
+}
+
+function haversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ==============================================================
 // GLOBAL SEARCH KEYBOARD SHORTCUT
 // ==============================================================
 document.addEventListener('keydown', function (e) {
@@ -4737,14 +5080,17 @@ AppRouter.renderInvitations = async function(main) {
 };
 
 // ==============================================================
-// VIDEO PLAYER MODULE
+// VIDEO PLAYER MODULE (with AI Ask Panel)
 // ==============================================================
 window.AppVideoPlayer = {
   _resumePositions: {},
+  _conversationId: null,
+  _askPanelOpen: false,
 
   open(contentItem, school) {
     const projectUrl = window.supabase?.supabaseUrl || 'https://rbldzenddjrxxzkaofby.supabase.co';
     const streamUrl = `${projectUrl}/functions/v1/drive-stream`;
+    this._conversationId = null;
 
     let overlay = document.getElementById('modal-video-player');
     if (overlay) overlay.remove();
@@ -4752,48 +5098,89 @@ window.AppVideoPlayer = {
     const savedPos = this._resumePositions[contentItem.id] || 0;
 
     const html = `<div class="modal-overlay active" id="modal-video-player" role="dialog" aria-modal="true" style="z-index:2000;">
-      <div class="modal" style="max-width:960px;padding:0;overflow:hidden;background:#000;">
-        <div style="position:relative;">
-          <!-- Close button -->
-          <button id="vp-close" style="position:absolute;top:12px;right:12px;z-index:10;background:rgba(0,0,0,0.6);border:none;color:white;width:36px;height:36px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;">
-            <span class="material-symbols-outlined" style="font-size:20px;">close</span>
-          </button>
+      <div style="display:flex;max-width:1280px;width:95vw;max-height:90vh;margin:auto;gap:0;border-radius:12px;overflow:hidden;box-shadow:0 24px 48px rgba(0,0,0,0.4);">
+        <!-- Video section -->
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:#000;">
+          <div style="position:relative;flex:1;min-height:0;">
+            <!-- Close button -->
+            <button id="vp-close" style="position:absolute;top:12px;right:12px;z-index:10;background:rgba(0,0,0,0.6);border:none;color:white;width:36px;height:36px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+            </button>
 
-          <!-- Video element -->
-          <video id="vp-video" style="width:100%;max-height:540px;background:#000;" preload="metadata">
-            <source src="${streamUrl}?content_id=${contentItem.id}" type="video/mp4">
-            Your browser does not support video playback.
-          </video>
+            <!-- Video element -->
+            <video id="vp-video" style="width:100%;height:100%;max-height:540px;background:#000;object-fit:contain;" preload="metadata">
+              <source src="${streamUrl}?content_id=${contentItem.id}" type="video/mp4">
+              Your browser does not support video playback.
+            </video>
 
-          <!-- Custom controls -->
-          <div id="vp-controls" style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.85));padding:12px 16px;">
-            <!-- Progress bar -->
-            <div id="vp-progress-wrap" style="width:100%;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;cursor:pointer;margin-bottom:10px;position:relative;">
-              <div id="vp-progress-bar" style="height:100%;background:#1A56DB;border-radius:2px;width:0%;transition:width 0.1s;"></div>
+            <!-- Custom controls -->
+            <div id="vp-controls" style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.85));padding:12px 16px;">
+              <div id="vp-progress-wrap" style="width:100%;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;cursor:pointer;margin-bottom:10px;position:relative;">
+                <div id="vp-progress-bar" style="height:100%;background:#1A56DB;border-radius:2px;width:0%;transition:width 0.1s;"></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;color:white;">
+                <button id="vp-play" style="background:none;border:none;color:white;cursor:pointer;padding:0;">
+                  <span class="material-symbols-outlined" style="font-size:28px;">play_arrow</span>
+                </button>
+                <span id="vp-time" style="font-size:12px;font-family:monospace;min-width:90px;">0:00 / 0:00</span>
+                <div style="flex:1;"></div>
+                <select id="vp-speed" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);color:white;font-size:12px;padding:2px 6px;border-radius:4px;cursor:pointer;">
+                  <option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1" selected>1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option>
+                </select>
+                <button id="vp-pip" style="background:none;border:none;color:white;cursor:pointer;padding:0;" title="Picture-in-Picture">
+                  <span class="material-symbols-outlined" style="font-size:22px;">picture_in_picture_alt</span>
+                </button>
+                <button id="vp-fullscreen" style="background:none;border:none;color:white;cursor:pointer;padding:0;">
+                  <span class="material-symbols-outlined" style="font-size:22px;">fullscreen</span>
+                </button>
+                <button id="vp-toggle-ask" style="background:none;border:none;color:white;cursor:pointer;padding:0;" title="Ask AI">
+                  <span class="material-symbols-outlined" style="font-size:22px;">smart_toy</span>
+                </button>
+              </div>
             </div>
-            <div style="display:flex;align-items:center;gap:12px;color:white;">
-              <button id="vp-play" style="background:none;border:none;color:white;cursor:pointer;padding:0;">
-                <span class="material-symbols-outlined" style="font-size:28px;">play_arrow</span>
-              </button>
-              <span id="vp-time" style="font-size:12px;font-family:monospace;min-width:90px;">0:00 / 0:00</span>
-              <div style="flex:1;"></div>
-              <select id="vp-speed" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);color:white;font-size:12px;padding:2px 6px;border-radius:4px;cursor:pointer;">
-                <option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1" selected>1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option>
-              </select>
-              <button id="vp-pip" style="background:none;border:none;color:white;cursor:pointer;padding:0;" title="Picture-in-Picture">
-                <span class="material-symbols-outlined" style="font-size:22px;">picture_in_picture_alt</span>
-              </button>
-              <button id="vp-fullscreen" style="background:none;border:none;color:white;cursor:pointer;padding:0;">
-                <span class="material-symbols-outlined" style="font-size:22px;">fullscreen</span>
-              </button>
-            </div>
+          </div>
+
+          <!-- Video info bar -->
+          <div style="background:var(--surface, #f8f9fa);padding:12px 20px;border-top:1px solid var(--border, #e5e7eb);">
+            <div style="font-size:15px;font-weight:600;color:var(--text-primary, #111);">${AppUtils.escapeHtml(contentItem.name)}</div>
+            <div style="font-size:12px;color:var(--text-secondary, #6b7280);margin-top:2px;">${AppUtils.escapeHtml(school?.name || '')} · ${AppUtils.escapeHtml(contentItem.type || 'Video')}</div>
           </div>
         </div>
 
-        <!-- Video info -->
-        <div style="background:var(--surface);padding:16px 20px;border-top:1px solid var(--border);">
-          <div style="font-size:16px;font-weight:600;color:var(--text-primary);">${AppUtils.escapeHtml(contentItem.name)}</div>
-          <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">${AppUtils.escapeHtml(school?.name || '')} · ${AppUtils.escapeHtml(contentItem.type || 'Video')}</div>
+        <!-- Ask AI Panel (sidebar) -->
+        <div id="vp-ask-panel" style="width:340px;background:var(--surface, #fff);display:flex;flex-direction:column;border-left:1px solid var(--border, #e5e7eb);transition:width 0.3s,opacity 0.3s;">
+          <!-- Panel header -->
+          <div style="padding:14px 16px;border-bottom:1px solid var(--border, #e5e7eb);display:flex;align-items:center;gap:10px;">
+            <span class="material-symbols-outlined" style="font-size:22px;color:var(--primary, #1A56DB);">smart_toy</span>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:600;color:var(--text-primary, #111);">Ask AI</div>
+              <div style="font-size:11px;color:var(--text-secondary, #6b7280);">Questions about this video</div>
+            </div>
+            <button id="vp-ask-close" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--text-muted, #9ca3af);">
+              <span class="material-symbols-outlined" style="font-size:18px;">close</span>
+            </button>
+          </div>
+
+          <!-- Chat messages -->
+          <div id="vp-ask-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:0;">
+            <div style="text-align:center;padding:24px 12px;">
+              <span class="material-symbols-outlined" style="font-size:40px;color:var(--primary, #1A56DB);opacity:0.5;">school</span>
+              <p style="font-size:13px;color:var(--text-secondary, #6b7280);margin-top:8px;">Ask me anything about this video! I'll use the course material to help you understand.</p>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px;">
+                <button class="vp-ask-suggestion" style="background:var(--card-bg, #f3f4f6);border:1px solid var(--border, #e5e7eb);border-radius:16px;padding:6px 12px;font-size:11px;cursor:pointer;color:var(--text-primary, #111);transition:background 0.15s;" data-suggestion="Explain the main concept">Explain the main concept</button>
+                <button class="vp-ask-suggestion" style="background:var(--card-bg, #f3f4f6);border:1px solid var(--border, #e5e7eb);border-radius:16px;padding:6px 12px;font-size:11px;cursor:pointer;color:var(--text-primary, #111);transition:background 0.15s;" data-suggestion="Give me a summary">Give me a summary</button>
+                <button class="vp-ask-suggestion" style="background:var(--card-bg, #f3f4f6);border:1px solid var(--border, #e5e7eb);border-radius:16px;padding:6px 12px;font-size:11px;cursor:pointer;color:var(--text-primary, #111);transition:background 0.15s;" data-suggestion="What are the key points?">What are the key points?</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat input -->
+          <div style="padding:12px 16px;border-top:1px solid var(--border, #e5e7eb);display:flex;gap:8px;align-items:flex-end;">
+            <textarea id="vp-ask-input" placeholder="Type your question..." rows="1" style="flex:1;border:1px solid var(--border, #e5e7eb);border-radius:8px;padding:8px 12px;font-size:13px;resize:none;font-family:inherit;min-height:38px;max-height:100px;outline:none;background:var(--card-bg, #fff);color:var(--text-primary, #111);"></textarea>
+            <button id="vp-ask-send" style="background:var(--primary, #1A56DB);border:none;color:white;width:38px;height:38px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity 0.15s;" title="Send">
+              <span class="material-symbols-outlined" style="font-size:20px;">send</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>`;
@@ -4836,7 +5223,7 @@ window.AppVideoPlayer = {
     document.getElementById('vp-speed').addEventListener('change', (e) => { video.playbackRate = parseFloat(e.target.value); });
 
     document.getElementById('vp-fullscreen')?.addEventListener('click', () => {
-      const container = document.getElementById('modal-video-player')?.querySelector('.modal');
+      const container = document.getElementById('modal-video-player')?.querySelector('.modal') || document.getElementById('modal-video-player')?.firstElementChild;
       if (container?.requestFullscreen) container.requestFullscreen();
     });
 
@@ -4851,13 +5238,156 @@ window.AppVideoPlayer = {
       setTimeout(() => document.getElementById('modal-video-player')?.remove(), 300);
     });
 
+    // ── Ask Panel toggle ────────────────────────────────────
+    const askPanel = document.getElementById('vp-ask-panel');
+    const toggleAsk = document.getElementById('vp-toggle-ask');
+    const askClose = document.getElementById('vp-ask-close');
+
+    toggleAsk?.addEventListener('click', () => {
+      this._askPanelOpen = !this._askPanelOpen;
+      askPanel.style.width = this._askPanelOpen ? '340px' : '0px';
+      askPanel.style.opacity = this._askPanelOpen ? '1' : '0';
+      askPanel.style.overflow = this._askPanelOpen ? '' : 'hidden';
+    });
+
+    askClose?.addEventListener('click', () => {
+      this._askPanelOpen = false;
+      askPanel.style.width = '0px';
+      askPanel.style.opacity = '0';
+      askPanel.style.overflow = 'hidden';
+    });
+
+    // ── Ask Panel chat logic ────────────────────────────────
+    const askInput = document.getElementById('vp-ask-input');
+    const askSend = document.getElementById('vp-ask-send');
+    const askMessages = document.getElementById('vp-ask-messages');
+
+    const sendMessage = async () => {
+      const text = askInput.value.trim();
+      if (!text) return;
+
+      // Clear suggestions on first message
+      const suggestions = askMessages.querySelector('[style*="text-align:center"]');
+      if (suggestions) suggestions.remove();
+
+      // Show user message
+      askMessages.insertAdjacentHTML('beforeend', `
+        <div style="align-self:flex-end;max-width:85%;background:var(--primary, #1A56DB);color:white;padding:8px 12px;border-radius:12px 12px 2px 12px;font-size:13px;line-height:1.5;word-break:break-word;">${AppUtils.escapeHtml(text)}</div>
+      `);
+
+      askInput.value = '';
+      askInput.style.height = '38px';
+
+      // Show typing indicator
+      const typingId = 'vp-typing-' + Date.now();
+      askMessages.insertAdjacentHTML('beforeend', `
+        <div id="${typingId}" style="align-self:flex-start;max-width:85%;background:var(--card-bg, #f3f4f6);padding:10px 14px;border-radius:12px 12px 12px 2px;font-size:13px;color:var(--text-secondary, #6b7280);">
+          <div style="display:flex;gap:4px;align-items:center;">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--text-muted, #9ca3af);animation:vp-dot-pulse 1.4s infinite;"></div>
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--text-muted, #9ca3af);animation:vp-dot-pulse 1.4s 0.2s infinite;"></div>
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--text-muted, #9ca3af);animation:vp-dot-pulse 1.4s 0.4s infinite;"></div>
+          </div>
+        </div>
+      `);
+      askMessages.scrollTop = askMessages.scrollHeight;
+
+      try {
+        const session = await window.supabase?.auth?.getSession?.();
+        const token = session?.data?.session?.access_token || '';
+
+        const res = await fetch(`${projectUrl}/functions/v1/orbit-chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            message: text,
+            conversation_id: AppVideoPlayer._conversationId || undefined,
+            school_id: school?.id || contentItem.school_id,
+            content_id: contentItem.id,
+          }),
+        });
+
+        const data = await res.json();
+        document.getElementById(typingId)?.remove();
+
+        if (data.error && !data.reply) {
+          askMessages.insertAdjacentHTML('beforeend', `
+            <div style="align-self:flex-start;max-width:85%;background:#fef2f2;color:#dc2626;padding:8px 12px;border-radius:12px 12px 12px 2px;font-size:13px;line-height:1.5;">
+              ${AppUtils.escapeHtml(data.error)}
+            </div>
+          `);
+        } else {
+          AppVideoPlayer._conversationId = data.conversation_id;
+          // Simple markdown-like rendering for the AI reply
+          const formatted = AppUtils.escapeHtml(data.reply || 'No response')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n/g, '<br>');
+
+          askMessages.insertAdjacentHTML('beforeend', `
+            <div style="align-self:flex-start;max-width:85%;background:var(--card-bg, #f3f4f6);padding:10px 14px;border-radius:12px 12px 12px 2px;font-size:13px;line-height:1.6;color:var(--text-primary, #111);word-break:break-word;">
+              ${formatted}
+              ${data.escalated ? '<div style="margin-top:6px;font-size:11px;color:#f59e0b;display:flex;align-items:center;gap:4px;"><span class="material-symbols-outlined" style="font-size:14px;">info</span> Your question has been forwarded to a teacher.</div>' : ''}
+            </div>
+          `);
+        }
+      } catch (err) {
+        document.getElementById(typingId)?.remove();
+        askMessages.insertAdjacentHTML('beforeend', `
+          <div style="align-self:flex-start;max-width:85%;background:#fef2f2;color:#dc2626;padding:8px 12px;border-radius:12px 12px 12px 2px;font-size:13px;line-height:1.5;">
+            Unable to reach the AI service. Please try again later.
+          </div>
+        `);
+      }
+
+      askMessages.scrollTop = askMessages.scrollHeight;
+      initIcons();
+    };
+
+    askSend?.addEventListener('click', sendMessage);
+    askInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+
+    // Auto-resize textarea
+    askInput?.addEventListener('input', () => {
+      askInput.style.height = '38px';
+      askInput.style.height = Math.min(askInput.scrollHeight, 100) + 'px';
+    });
+
+    // Suggestion chips
+    document.querySelectorAll('.vp-ask-suggestion').forEach(btn => {
+      btn.addEventListener('click', () => {
+        askInput.value = btn.dataset.suggestion;
+        sendMessage();
+      });
+    });
+
+    // Inject animation keyframes if not already present
+    if (!document.getElementById('vp-ask-styles')) {
+      const style = document.createElement('style');
+      style.id = 'vp-ask-styles';
+      style.textContent = `
+        @keyframes vp-dot-pulse { 0%,80%,100% { opacity:0.3;transform:scale(0.8); } 40% { opacity:1;transform:scale(1); } }
+        @media (max-width: 768px) {
+          #modal-video-player > div { flex-direction:column !important; max-height:95vh !important; }
+          #vp-ask-panel { width:100% !important; max-height:45vh; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
     // Keyboard shortcuts
     const keyHandler = (e) => {
+      // Don't capture keys when typing in the ask panel
+      if (e.target.id === 'vp-ask-input') return;
       if (e.key === 'Escape') { document.getElementById('vp-close')?.click(); document.removeEventListener('keydown', keyHandler); }
       if (e.key === ' ' || e.key === 'k') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
       if (e.key === 'ArrowRight') { video.currentTime = Math.min(video.duration, video.currentTime + 10); }
       if (e.key === 'ArrowLeft') { video.currentTime = Math.max(0, video.currentTime - 10); }
       if (e.key === 'f') { document.getElementById('vp-fullscreen')?.click(); }
+      if (e.key === 'a') { toggleAsk?.click(); } // Toggle Ask panel with 'a' key
     };
     document.addEventListener('keydown', keyHandler);
   }
@@ -4975,6 +5505,8 @@ async function initApp() {
     document.getElementById('app-layout').classList.remove('hidden');
     AppRouter.init();
     initIcons();
+    // Record attendance after login
+    recordAttendance();
   });
 
   // Google OAuth
@@ -5018,8 +5550,23 @@ async function initApp() {
   document.getElementById('btn-theme-toggle').addEventListener('click', () => {
     document.documentElement.classList.toggle('dark');
     const isDark = document.documentElement.classList.contains('dark');
+    document.documentElement.classList.toggle('light', !isDark);
+    try { localStorage.setItem('lanxgrow-theme', isDark ? 'dark' : 'light'); } catch {}
+    const icon = document.querySelector('#btn-theme-toggle .material-symbols-outlined');
+    if (icon) icon.textContent = isDark ? 'light_mode' : 'dark_mode';
     AppToast.show(isDark ? 'Dark mode enabled.' : 'Light mode enabled.');
   });
+
+  // Restore saved theme
+  try {
+    const saved = localStorage.getItem('lanxgrow-theme');
+    if (saved === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+      const icon = document.querySelector('#btn-theme-toggle .material-symbols-outlined');
+      if (icon) icon.textContent = 'light_mode';
+    }
+  } catch {}
 
   // Logout
   document.getElementById('btn-logout').addEventListener('click', async () => {
@@ -5036,6 +5583,21 @@ async function initApp() {
 
   // School form save
   document.getElementById('btn-save-school').addEventListener('click', handleSchoolSubmit);
+
+  // Auto-detect GPS location for school
+  document.getElementById('btn-get-location')?.addEventListener('click', () => {
+    if (!navigator.geolocation) { AppToast.show('Geolocation not supported by browser.', 'error'); return; }
+    AppToast.show('Detecting location...', 'info');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        document.getElementById('school-input-latitude').value = pos.coords.latitude.toFixed(6);
+        document.getElementById('school-input-longitude').value = pos.coords.longitude.toFixed(6);
+        AppToast.show('Location detected!', 'success');
+      },
+      (err) => AppToast.show('Location error: ' + err.message, 'error'),
+      { enableHighAccuracy: true }
+    );
+  });
 
   // Sidebar
   document.getElementById('sidebar-toggle').addEventListener('click', () => {
