@@ -55,6 +55,101 @@
   --topnav-height: 64px;
   --transition: 200ms ease;
 }
+/* ─── Dark Mode ─────────────────────────────────────────── */
+html.dark {
+  --primary: #6b7dff;
+  --primary-hover: #8490ff;
+  --primary-container: #3448c5;
+  --primary-subtle: rgba(107,125,255,0.12);
+  --on-primary: #ffffff;
+  --on-primary-container: #c3c9ff;
+  --secondary: #a0adc4;
+  --secondary-container: #2c3344;
+  --background: #0f1117;
+  --surface: #1a1d27;
+  --surface-low: #15171f;
+  --surface-container: #21242f;
+  --surface-high: #282c3a;
+  --surface-highest: #303546;
+  --on-surface: #e4e6eb;
+  --on-surface-variant: #b0b4c0;
+  --outline: #6c7080;
+  --outline-variant: #3c4050;
+  --border: #2a2e3b;
+  --border-light: #252836;
+  --success: #34d399;
+  --success-light: rgba(52,211,153,0.12);
+  --warning: #fbbf24;
+  --warning-light: rgba(251,191,36,0.12);
+  --danger: #f87171;
+  --danger-light: rgba(248,113,113,0.12);
+  --info: #38bdf8;
+  --info-light: rgba(56,189,248,0.12);
+  --text-primary: #e4e6eb;
+  --text-secondary: #9ca3b4;
+  --text-muted: #6b7280;
+  --card-bg: #1e2130;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.35);
+  --shadow-xl: 0 8px 32px rgba(0,0,0,0.4);
+  color-scheme: dark;
+}
+html.dark body { background: var(--background); color: var(--on-surface); }
+html.dark .form-input,
+html.dark .form-select,
+html.dark .form-textarea,
+html.dark textarea,
+html.dark select {
+  background: var(--surface-container);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+html.dark .form-input:focus,
+html.dark .form-select:focus,
+html.dark .form-textarea:focus,
+html.dark textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(107,125,255,0.15);
+}
+html.dark .modal { background: var(--surface); border: 1px solid var(--border); }
+html.dark .modal-overlay { background: rgba(0,0,0,0.7); }
+html.dark .modal-header { border-bottom-color: var(--border); }
+html.dark .modal-footer { border-top-color: var(--border); }
+html.dark table th { background: var(--surface-container); color: var(--text-secondary); border-bottom-color: var(--border); }
+html.dark table td { border-bottom-color: var(--border); }
+html.dark table tr:hover td { background: var(--surface-low); }
+html.dark .card { background: var(--surface); border-color: var(--border); }
+html.dark .school-card { background: var(--surface); border-color: var(--border); }
+html.dark .metric-card { background: var(--surface); border-color: var(--border); }
+html.dark .subject-card { background: var(--surface); border-color: var(--border); }
+html.dark .search-bar { background: var(--surface-container); border-color: var(--border); }
+html.dark .search-bar input { color: var(--text-primary); }
+html.dark .search-bar input::placeholder { color: var(--text-muted); }
+html.dark .btn-secondary { background: var(--surface-container); color: var(--on-surface); border-color: var(--border); }
+html.dark .btn-secondary:hover:not(:disabled) { background: var(--surface-high); }
+html.dark .btn-ghost { color: var(--text-secondary); }
+html.dark .btn-ghost:hover:not(:disabled) { background: var(--surface-container); color: var(--on-surface); }
+html.dark .sidebar { background: var(--surface); border-right-color: var(--border); }
+html.dark .nav-item:hover { background: var(--surface-container); }
+html.dark .nav-item.active { background: var(--primary-subtle); color: var(--primary); }
+html.dark .topnav { background: var(--surface); border-bottom-color: var(--border); }
+html.dark .badge { opacity: 0.9; }
+html.dark .empty-state { color: var(--text-secondary); }
+html.dark .explorer-item:hover { background: var(--surface-container); }
+html.dark ::selection { background: rgba(107,125,255,0.3); }
+html.dark ::-webkit-scrollbar { width: 8px; }
+html.dark ::-webkit-scrollbar-track { background: var(--surface); }
+html.dark ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: var(--outline-variant); }
+html.dark .toast { background: var(--surface-high); color: var(--text-primary); border-color: var(--border); }
+html.dark .login-card { background: var(--surface); border-color: var(--border); }
+html.dark code { background: var(--surface-container); color: var(--primary); }
+html.dark .status-active, html.dark .badge-success { background: var(--success-light); color: var(--success); }
+html.dark .status-inactive, html.dark .badge-danger { background: var(--danger-light); color: var(--danger); }
+html.dark .badge-warning { background: var(--warning-light); color: var(--warning); }
+html.dark .badge-info { background: var(--info-light); color: var(--info); }
+
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
 body { font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.5; color: var(--on-surface); background: var(--background); -webkit-font-smoothing: antialiased; }
@@ -599,6 +694,7 @@ tr:hover td { background: var(--surface-low); }
         <button class="school-tab-btn" data-tab="address" style="flex:1;padding:10px 8px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer;">Address</button>
         <button class="school-tab-btn" data-tab="academic" style="flex:1;padding:10px 8px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer;">Academic</button>
         <button class="school-tab-btn" data-tab="subscription" style="flex:1;padding:10px 8px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer;">Subscription</button>
+        <button class="school-tab-btn" data-tab="location" style="flex:1;padding:10px 8px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer;">Location & Access</button>
       </div>
 
       <div id="school-tab-general" class="school-tab-panel">
@@ -750,6 +846,46 @@ tr:hover td { background: var(--surface-low); }
         <div style="margin-top:16px;padding:12px;background:var(--surface-low);border-radius:var(--radius-md);display:flex;align-items:center;gap:10px;">
           <span class="material-symbols-outlined" style="font-size:18px;color:var(--text-muted);">info</span>
           <span style="font-size:12px;color:var(--text-secondary);">All limits can be adjusted later from School Settings.</span>
+        </div>
+      </div>
+
+      <!-- Location & Access Tab -->
+      <div id="school-tab-location" class="school-tab-panel" style="display:none;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">GPS Location (for attendance verification)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-latitude">Latitude</label>
+            <input class="form-input" type="number" step="any" id="school-input-latitude" placeholder="e.g. 28.6139">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-longitude">Longitude</label>
+            <input class="form-input" type="number" step="any" id="school-input-longitude" placeholder="e.g. 77.2090">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-attendance-radius">Radius (meters)</label>
+            <input class="form-input" type="number" id="school-input-attendance-radius" placeholder="200" min="50" value="200">
+          </div>
+        </div>
+        <div style="margin-top:8px;padding:10px;background:var(--surface-low);border-radius:var(--radius-md);display:flex;align-items:center;gap:10px;">
+          <span class="material-symbols-outlined" style="font-size:16px;color:var(--text-muted);">location_on</span>
+          <span style="font-size:12px;color:var(--text-secondary);">Teachers and counselors must log in within this radius to be marked as "attended." Outside this radius they can still use the portal but attendance shows as "unattended."</span>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" id="btn-get-location">
+          <span class="material-symbols-outlined" style="font-size:16px;">my_location</span> Auto-detect Location
+        </button>
+
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin:20px 0 12px;">School Admin Password</div>
+        <div style="display:grid;grid-template-columns:1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-admin-password">Admin Password</label>
+            <div style="position:relative;">
+              <input class="form-input" type="text" id="school-input-admin-password" placeholder="Set a simple password for school admin login">
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:8px;padding:10px;background:var(--surface-low);border-radius:var(--radius-md);display:flex;align-items:center;gap:10px;">
+          <span class="material-symbols-outlined" style="font-size:16px;color:var(--text-muted);">lock</span>
+          <span style="font-size:12px;color:var(--text-secondary);">Super admin can view and reset this password at any time from the school settings.</span>
         </div>
       </div>
 
