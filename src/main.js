@@ -15,6 +15,7 @@ import {
   DriveService,
   StudentService,
   NotificationService,
+  AccountService,
   SettingsService,
   PermissionsService,
   ModuleService,
@@ -38,6 +39,7 @@ window.AuditLogService = AuditLogService;
 window.DriveService = DriveService;
 window.StudentService = StudentService;
 window.NotificationService = NotificationService;
+window.AccountService = AccountService;
 window.CounselorService = CounselorService;
 window.SettingsService = SettingsService;
 window.PermissionsService = PermissionsService;
@@ -2563,6 +2565,8 @@ function openSchoolForm(schoolData) {
   document.getElementById('school-input-contact').value = schoolData?.contact_person || '';
   document.getElementById('school-input-phone').value = schoolData?.phone || '';
   document.getElementById('school-input-email').value = schoolData?.email || '';
+  document.getElementById('school-input-login-email').value = schoolData?.email || '';
+  document.getElementById('school-input-login-password').value = '';
   document.getElementById('school-input-website').value = schoolData?.website || '';
 
   document.getElementById('school-input-addr1').value = schoolData?.address_line1 || '';
@@ -2675,6 +2679,14 @@ async function handleSchoolSubmit() {
       longitude: parseFloat(document.getElementById('school-input-longitude')?.value) || null,
       attendance_radius_m: parseInt(document.getElementById('school-input-attendance-radius')?.value) || 200
     };
+    const loginEmail = document.getElementById('school-input-login-email')?.value.trim().toLowerCase() || '';
+    const loginPassword = document.getElementById('school-input-login-password')?.value || '';
+    if (!loginEmail || (!isEdit && loginPassword.length < 8) || (isEdit && loginPassword && loginPassword.length < 8)) {
+      AppToast.show('A valid login email and password of at least 8 characters are required.', 'error');
+      btn.disabled = false;
+      btn.textContent = isEdit ? 'Save Changes' : 'Save School';
+      return;
+    }
     if (AppRouter._currentProfile?.role === 'super_admin') {
       const trackingSheetId = document.getElementById('school-input-tracking-sheet-id')?.value.trim() || '';
       if (trackingSheetId && !/^[A-Za-z0-9_-]{20,200}$/.test(trackingSheetId)) {
@@ -2688,10 +2700,31 @@ async function handleSchoolSubmit() {
 
     if (isEdit) {
       await SchoolService.update(id, payload);
+      if (loginPassword) {
+        await AccountService.setLogin({
+          email: loginEmail,
+          password: loginPassword,
+          fullName: payload.principal_name || payload.contact_person || name,
+          role: 'school_admin',
+          schoolId: id
+        });
+      }
       AppToast.show('School updated.', 'success');
     } else {
-      await SchoolService.create(payload);
-      AppToast.show('School created.', 'success');
+      const school = await SchoolService.create({ ...payload, email: loginEmail });
+      try {
+        await AccountService.provision({
+          email: loginEmail,
+          password: loginPassword,
+          fullName: payload.principal_name || payload.contact_person || name,
+          role: 'school_admin',
+          schoolId: school.id
+        });
+      } catch (accountError) {
+        await SchoolService.delete(school.id).catch(() => undefined);
+        throw accountError;
+      }
+      AppToast.show('School and School Admin login created.', 'success');
     }
     AppModal.close('modal-school');
     AppStorage.invalidate();
