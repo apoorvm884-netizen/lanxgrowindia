@@ -19,38 +19,34 @@ export const InvitationService = {
   },
 
   async create(invitation) {
-    const { data, error } = await supabase
-      .from('invitations')
-      .insert({
-        email: invitation.email.toLowerCase().trim(),
+    const { data, error } = await supabase.functions.invoke('invite-user', {
+      body: {
+        action: 'create',
+        email: invitation.email,
         role: invitation.role,
         school_id: invitation.school_id || null,
         company_id: invitation.company_id || null,
-        student_id: invitation.student_id || null,
-        invited_by: invitation.invited_by || null,
-        status: 'pending'
-      })
-      .select('*, schools(name)')
-      .single();
+        redirectTo: window.location.origin
+      }
+    });
     if (error) throw error;
+    if (data?.error) throw new Error(data.error);
 
     await AuditLogService.log(
       'created', 'Invitation',
       invitation.email,
       `Invited ${invitation.email} as ${invitation.role}`
     );
-    return data;
+    return data.invitation;
   },
 
   async resend(id) {
-    const { data, error } = await supabase
-      .from('invitations')
-      .update({ status: 'pending', expires_at: new Date(Date.now() + 14 * 86400000).toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await supabase.functions.invoke('invite-user', {
+      body: { action: 'resend', id, redirectTo: window.location.origin }
+    });
     if (error) throw error;
-    return data;
+    if (data?.error) throw new Error(data.error);
+    return data.invitation;
   },
 
   async revoke(id) {
