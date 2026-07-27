@@ -1,11 +1,12 @@
 import { supabase } from '../lib/supabase.js';
+import { edgeFunctionError } from './edge-function-error.js';
 
 async function invoke(action, body = {}) {
   const { data, error } = await supabase.functions.invoke('admin-access', {
     body: { action, ...body }
   });
   if (error || data?.error) {
-    throw new Error(data?.error || error?.message || 'Administrative action failed.');
+    throw await edgeFunctionError(error, data, 'Administrative action failed.');
   }
   return data;
 }
