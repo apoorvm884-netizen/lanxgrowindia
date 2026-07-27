@@ -29,7 +29,7 @@ export const PermissionsService = {
         role,
         permission,
         enabled
-      })
+      }, { onConflict: 'role,permission' })
       .select()
       .single();
     if (error) throw error;
