@@ -46,6 +46,7 @@ export async function render(main, data, router) {
         const studentCount = studentCountBySchool[s.id] || 0;
         const teacherCount = teacherCountBySchool[s.id] || 0;
         const eh = AppUtils.escapeHtml;
+        const canConfigureTracking = router._currentProfile?.role === 'super_admin';
         return `<div class="school-card" style="cursor:pointer;" data-action="open-school" data-id="${s.id}">
           <div class="school-card-top">
             <div class="school-logo ${logoClass}">${AppUtils.getInitials(eh(s.name))}</div>
@@ -62,6 +63,15 @@ export async function render(main, data, router) {
             <div class="school-stat"><div class="school-stat-value">${stats.subjects}</div><div class="school-stat-label">Subjects</div></div>
             <div class="school-stat"><div class="school-stat-value">${stats.videos}</div><div class="school-stat-label">Videos</div></div>
           </div>
+          ${canConfigureTracking ? `<div style="padding:10px 16px;border-top:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <span style="font-size:11px;color:${s.tracking_sheet_id ? 'var(--success)' : 'var(--text-muted)'};">
+              ${s.tracking_sheet_id ? 'Tracking Sheet linked' : 'No Tracking Sheet'}
+            </span>
+            <button class="btn btn-secondary btn-sm" style="height:30px;font-size:11px;" data-action="configure-tracking-sheet" data-id="${s.id}">
+              <span class="material-symbols-outlined" style="font-size:15px;">table_view</span>
+              ${s.tracking_sheet_id ? 'Change Sheet' : 'Add Sheet'}
+            </button>
+          </div>` : ''}
         </div>`;
       }).join('')}</div>
       ${totalPages > 1 ? `<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:16px;">
