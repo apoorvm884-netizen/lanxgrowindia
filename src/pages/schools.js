@@ -47,6 +47,7 @@ export async function render(main, data, router) {
         const teacherCount = teacherCountBySchool[s.id] || 0;
         const eh = AppUtils.escapeHtml;
         const canConfigureTracking = router._currentProfile?.role === 'super_admin';
+        const canDeleteSchool = ['super_admin', 'company_admin'].includes(router._currentProfile?.role);
         return `<div class="school-card" style="cursor:pointer;" data-action="open-school" data-id="${s.id}">
           <div class="school-card-top">
             <div class="school-logo ${logoClass}">${AppUtils.getInitials(eh(s.name))}</div>
@@ -70,6 +71,11 @@ export async function render(main, data, router) {
             <button class="btn btn-secondary btn-sm" style="height:30px;font-size:11px;" data-action="configure-tracking-sheet" data-id="${s.id}">
               <span class="material-symbols-outlined" style="font-size:15px;">table_view</span>
               ${s.tracking_sheet_id ? 'Change Sheet' : 'Add Sheet'}
+            </button>
+          </div>` : ''}
+          ${canDeleteSchool ? `<div style="padding:10px 16px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;">
+            <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-school" data-id="${s.id}">
+              <span class="material-symbols-outlined" style="font-size:16px;">delete</span> Delete School
             </button>
           </div>` : ''}
         </div>`;
