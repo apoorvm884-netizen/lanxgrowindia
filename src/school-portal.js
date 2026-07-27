@@ -113,9 +113,9 @@ window.SchoolStudents = {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'modal-student';
-    overlay.innerHTML = `<div class="modal" style="max-width:640px;">
+    overlay.innerHTML = `<div class="modal" style="max-width:640px;display:flex;flex-direction:column;overflow:hidden;">
       <div class="modal-header"><h3 class="modal-title">Add Student</h3><button class="modal-close" data-close-modal="modal-student"><span class="material-symbols-outlined">close</span></button></div>
-      <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+      <div class="modal-body" style="min-height:0;overflow-y:auto;">
         <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Basic Information</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="sp-input-student-name" placeholder="Enter student name"></div>
@@ -182,9 +182,9 @@ window.SchoolStudents = {
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
       overlay.id = 'modal-student';
-      overlay.innerHTML = `<div class="modal" style="max-width:640px;">
+      overlay.innerHTML = `<div class="modal" style="max-width:640px;display:flex;flex-direction:column;overflow:hidden;">
         <div class="modal-header"><h3 class="modal-title">Edit Student</h3><button class="modal-close" data-close-modal="modal-student"><span class="material-symbols-outlined">close</span></button></div>
-        <div class="modal-body" style="max-height:70vh;overflow-y:auto;">
+        <div class="modal-body" style="min-height:0;overflow-y:auto;">
           <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Basic Information</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="sp-input-student-name" value="${eh(student.name)}"></div>
