@@ -1,8 +1,5 @@
 import { supabase } from '../lib/supabase.js';
-
-function edgeError(error, data, fallback) {
-  return new Error(data?.error || error?.context?.body?.error || error?.message || fallback);
-}
+import { edgeFunctionError } from './edge-function-error.js';
 
 export const AccountService = {
   async provision({ email, password, fullName, role, schoolId, studentId, counselorId }) {
@@ -17,7 +14,7 @@ export const AccountService = {
         counselor_id: counselorId || null
       }
     });
-    if (error || data?.error) throw edgeError(error, data, 'Could not create the login account.');
+    if (error || data?.error) throw await edgeFunctionError(error, data, 'Could not create the login account.');
     return data;
   },
 
@@ -35,7 +32,7 @@ export const AccountService = {
         counselor_id: counselorId || null
       }
     });
-    if (error || data?.error) throw edgeError(error, data, 'Could not reset the login password.');
+    if (error || data?.error) throw await edgeFunctionError(error, data, 'Could not reset the login password.');
     return data;
   },
 
@@ -50,7 +47,7 @@ export const AccountService = {
         school_id: schoolId
       }
     });
-    if (error || data?.error) throw edgeError(error, data, 'Could not create or reset the login.');
+    if (error || data?.error) throw await edgeFunctionError(error, data, 'Could not create or reset the login.');
     return data;
   }
 };
