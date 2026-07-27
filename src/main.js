@@ -31,7 +31,8 @@ import {
   CounselorService,
   GpsService,
   InvitationService,
-  AiService
+  AiService,
+  TrackingConfigService
 } from './services/index.js';
 
 // Attach services to window — these override the old localStorage stubs
@@ -59,6 +60,7 @@ window.CertificateService = CertificateService;
 window.GpsService = GpsService;
 window.InvitationService = InvitationService;
 window.AiService = AiService;
+window.TrackingConfigService = TrackingConfigService;
 window.supabase = supabase;
 
 // ==============================================================
@@ -2756,6 +2758,115 @@ async function handleSchoolSubmit() {
   btn.textContent = isEdit ? 'Save Changes' : 'Save School';
 }
 
+function renderTrackingConfigStatus(config) {
+  const privateStatus = document.getElementById('tracking-private-key-status');
+  const webhookStatus = document.getElementById('tracking-webhook-secret-status');
+  const inlineStatus = document.getElementById('tracking-backend-inline-status');
+  const setStatus = (element, configured) => {
+    if (!element) return;
+    element.textContent = configured ? 'Configured' : 'Not configured';
+    element.className = `status-badge ${configured ? 'status-active' : 'status-suspended'}`;
+  };
+  setStatus(privateStatus, config?.privateKeyConfigured);
+  setStatus(webhookStatus, config?.webhookSecretConfigured);
+  if (inlineStatus) {
+    const ready = Boolean(
+      config?.serviceAccountEmail &&
+      config?.privateKeyConfigured &&
+      config?.webhookSecretConfigured
+    );
+    inlineStatus.textContent = ready
+      ? 'Backend credentials configured securely.'
+      : 'Backend setup is incomplete.';
+    inlineStatus.style.color = ready ? 'var(--success)' : 'var(--warning)';
+  }
+  const removePrivate = document.getElementById('btn-remove-tracking-private-key');
+  const removeWebhook = document.getElementById('btn-remove-tracking-webhook-secret');
+  if (removePrivate) removePrivate.disabled = !config?.privateKeyConfigured;
+  if (removeWebhook) removeWebhook.disabled = !config?.webhookSecretConfigured;
+}
+
+async function openTrackingConfig() {
+  if (AppRouter._currentProfile?.role !== 'super_admin') {
+    AppToast.show('Only Super Admin can manage tracking credentials.', 'error');
+    return;
+  }
+  AppModal.open('modal-tracking-config');
+  const loading = document.getElementById('tracking-config-loading');
+  const form = document.getElementById('tracking-config-form');
+  loading.style.display = '';
+  loading.textContent = 'Loading secure configuration...';
+  form.style.display = 'none';
+  document.getElementById('tracking-private-key').value = '';
+  document.getElementById('tracking-webhook-secret').value = '';
+  try {
+    const config = await TrackingConfigService.getStatus();
+    document.getElementById('tracking-service-account-email').value = config?.serviceAccountEmail || '';
+    document.getElementById('tracking-input-speed-unit').value = config?.inputSpeedUnit || 'knots';
+    document.getElementById('tracking-stop-speed').value = config?.stopSpeedKmh ?? 2;
+    document.getElementById('tracking-stop-radius').value = config?.stopRadiusMeters ?? 20;
+    document.getElementById('tracking-stop-minutes').value = config?.stopMinutes ?? 3;
+    document.getElementById('tracking-journey-end-minutes').value = config?.journeyEndMinutes ?? 10;
+    const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+    document.getElementById('tracking-telemetry-url').textContent =
+      `${baseUrl}/functions/v1/tracking-telemetry`;
+    renderTrackingConfigStatus(config);
+    loading.style.display = 'none';
+    form.style.display = '';
+  } catch (error) {
+    loading.textContent = error.message || 'Secure configuration could not be loaded.';
+    AppToast.show(loading.textContent, 'error');
+  }
+}
+
+async function handleTrackingConfigSave() {
+  const button = document.getElementById('btn-save-tracking-config');
+  button.disabled = true;
+  button.textContent = 'Saving securely...';
+  try {
+    const payload = {
+      serviceAccountEmail: document.getElementById('tracking-service-account-email').value.trim(),
+      privateKey: document.getElementById('tracking-private-key').value.trim(),
+      webhookSecret: document.getElementById('tracking-webhook-secret').value.trim(),
+      inputSpeedUnit: document.getElementById('tracking-input-speed-unit').value,
+      stopSpeedKmh: Number(document.getElementById('tracking-stop-speed').value),
+      stopRadiusMeters: Number(document.getElementById('tracking-stop-radius').value),
+      stopMinutes: Number(document.getElementById('tracking-stop-minutes').value),
+      journeyEndMinutes: Number(document.getElementById('tracking-journey-end-minutes').value)
+    };
+    if (!payload.serviceAccountEmail) throw new Error('Google service account email is required.');
+    if (payload.journeyEndMinutes <= payload.stopMinutes) {
+      throw new Error('Journey End minutes must be greater than Stop Duration.');
+    }
+    const config = await TrackingConfigService.save(payload);
+    document.getElementById('tracking-private-key').value = '';
+    document.getElementById('tracking-webhook-secret').value = '';
+    renderTrackingConfigStatus(config);
+    AppToast.show('Tracking credentials saved securely in Supabase Vault.', 'success');
+  } catch (error) {
+    AppToast.show(error.message || 'Failed to save tracking configuration.', 'error');
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Save Secure Configuration';
+  }
+}
+
+async function removeTrackingSecret(secretType) {
+  const label = secretType === 'private_key' ? 'Google private key' : 'webhook secret';
+  const confirmed = await AppConfirm.show(
+    `Remove the saved ${label} from Supabase Vault? Tracking will stop until a replacement is saved.`,
+    `Remove ${label}?`
+  );
+  if (!confirmed) return;
+  try {
+    const config = await TrackingConfigService.removeSecret(secretType);
+    renderTrackingConfigStatus(config);
+    AppToast.show(`${label} removed from Supabase Vault.`, 'success');
+  } catch (error) {
+    AppToast.show(error.message || `Failed to remove ${label}.`, 'error');
+  }
+}
+
 async function handleEntitySubmit() {
   const btn = document.getElementById('btn-save-entity');
   const type = document.getElementById('entity-type').value;
@@ -2906,6 +3017,10 @@ document.addEventListener('click', async function (e) {
     openSchoolForm(school);
     document.querySelector('.school-tab-btn[data-tab="location"]')?.click();
     setTimeout(() => document.getElementById('school-input-tracking-sheet-id')?.focus(), 100);
+    return;
+  }
+  if (action === 'manage-tracking-backend') {
+    await openTrackingConfig();
     return;
   }
   if (action === 'open-school') { AppRouter.navigate('school-dashboard', { schoolId: id }); return; }
@@ -5736,6 +5851,19 @@ async function initApp() {
 
   // School form save
   document.getElementById('btn-save-school').addEventListener('click', handleSchoolSubmit);
+  document.getElementById('btn-save-tracking-config')?.addEventListener('click', handleTrackingConfigSave);
+  document.getElementById('btn-generate-tracking-secret')?.addEventListener('click', () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    document.getElementById('tracking-webhook-secret').value =
+      Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    AppToast.show('A new webhook secret was generated. Save to activate it.', 'info');
+  });
+  document.getElementById('btn-remove-tracking-private-key')?.addEventListener('click', () => {
+    removeTrackingSecret('private_key');
+  });
+  document.getElementById('btn-remove-tracking-webhook-secret')?.addEventListener('click', () => {
+    removeTrackingSecret('webhook_secret');
+  });
 
   // Auto-detect GPS location for school
   document.getElementById('btn-get-location')?.addEventListener('click', () => {
