@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LANXGROW COS</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root {
+  --primary: #142cae;
+  --primary-hover: #2036b5;
+  --primary-container: #3448c5;
+  --primary-subtle: #f0f2ff;
+  --on-primary: #ffffff;
+  --on-primary-container: #c3c9ff;
+  --secondary: #555f73;
+  --secondary-container: #d6e0f8;
+  --background: #f7f8fb;
+  --surface: #ffffff;
+  --surface-low: #f1f3ff;
+  --surface-container: #e9edff;
+  --surface-high: #e2e8fc;
+  --surface-highest: #dde2f6;
+  --on-surface: #151b29;
+  --on-surface-variant: #454654;
+  --outline: #757685;
+  --outline-variant: #c5c5d6;
+  --border: #e5e8f0;
+  --success: #22c55e;
+  --success-light: #dcfce7;
+  --warning: #f59e0b;
+  --warning-light: #fef3c7;
+  --danger: #dc2626;
+  --danger-light: #fee2e2;
+  --info: #0284c7;
+  --info-light: #e0f2fe;
+  --text-primary: #151b29;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --shadow-sm: 0 1px 2px rgba(21,27,41,0.04);
+  --shadow-md: 0 2px 8px rgba(21,27,41,0.06);
+  --shadow-lg: 0 4px 16px rgba(21,27,41,0.08);
+  --shadow-xl: 0 8px 32px rgba(21,27,41,0.10);
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+  --sidebar-width: 260px;
+  --topnav-height: 64px;
+  --transition: 200ms ease;
+}
+/* ─── Dark Mode ─────────────────────────────────────────── */
+html.dark {
+  --primary: #6b7dff;
+  --primary-hover: #8490ff;
+  --primary-container: #3448c5;
+  --primary-subtle: rgba(107,125,255,0.12);
+  --on-primary: #ffffff;
+  --on-primary-container: #c3c9ff;
+  --secondary: #a0adc4;
+  --secondary-container: #2c3344;
+  --background: #0f1117;
+  --surface: #1a1d27;
+  --surface-low: #15171f;
+  --surface-container: #21242f;
+  --surface-high: #282c3a;
+  --surface-highest: #303546;
+  --on-surface: #e4e6eb;
+  --on-surface-variant: #b0b4c0;
+  --outline: #6c7080;
+  --outline-variant: #3c4050;
+  --border: #2a2e3b;
+  --border-light: #252836;
+  --success: #34d399;
+  --success-light: rgba(52,211,153,0.12);
+  --warning: #fbbf24;
+  --warning-light: rgba(251,191,36,0.12);
+  --danger: #f87171;
+  --danger-light: rgba(248,113,113,0.12);
+  --info: #38bdf8;
+  --info-light: rgba(56,189,248,0.12);
+  --text-primary: #e4e6eb;
+  --text-secondary: #9ca3b4;
+  --text-muted: #6b7280;
+  --card-bg: #1e2130;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.35);
+  --shadow-xl: 0 8px 32px rgba(0,0,0,0.4);
+  color-scheme: dark;
+}
+html.dark body { background: var(--background); color: var(--on-surface); }
+html.dark .form-input,
+html.dark .form-select,
+html.dark .form-textarea,
+html.dark textarea,
+html.dark select {
+  background: var(--surface-container);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+html.dark .form-input:focus,
+html.dark .form-select:focus,
+html.dark .form-textarea:focus,
+html.dark textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(107,125,255,0.15);
+}
+html.dark .modal { background: var(--surface); border: 1px solid var(--border); }
+html.dark .modal-overlay { background: rgba(0,0,0,0.7); }
+html.dark .modal-header { border-bottom-color: var(--border); }
+html.dark .modal-footer { border-top-color: var(--border); }
+html.dark table th { background: var(--surface-container); color: var(--text-secondary); border-bottom-color: var(--border); }
+html.dark table td { border-bottom-color: var(--border); }
+html.dark table tr:hover td { background: var(--surface-low); }
+html.dark .card { background: var(--surface); border-color: var(--border); }
+html.dark .school-card { background: var(--surface); border-color: var(--border); }
+html.dark .metric-card { background: var(--surface); border-color: var(--border); }
+html.dark .subject-card { background: var(--surface); border-color: var(--border); }
+html.dark .search-bar { background: var(--surface-container); border-color: var(--border); }
+html.dark .search-bar input { color: var(--text-primary); }
+html.dark .search-bar input::placeholder { color: var(--text-muted); }
+html.dark .btn-secondary { background: var(--surface-container); color: var(--on-surface); border-color: var(--border); }
+html.dark .btn-secondary:hover:not(:disabled) { background: var(--surface-high); }
+html.dark .btn-ghost { color: var(--text-secondary); }
+html.dark .btn-ghost:hover:not(:disabled) { background: var(--surface-container); color: var(--on-surface); }
+html.dark .sidebar { background: var(--surface); border-right-color: var(--border); }
+html.dark .nav-item:hover { background: var(--surface-container); }
+html.dark .nav-item.active { background: var(--primary-subtle); color: var(--primary); }
+html.dark .topnav { background: var(--surface); border-bottom-color: var(--border); }
+html.dark .badge { opacity: 0.9; }
+html.dark .empty-state { color: var(--text-secondary); }
+html.dark .explorer-item:hover { background: var(--surface-container); }
+html.dark ::selection { background: rgba(107,125,255,0.3); }
+html.dark ::-webkit-scrollbar { width: 8px; }
+html.dark ::-webkit-scrollbar-track { background: var(--surface); }
+html.dark ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: var(--outline-variant); }
+html.dark .toast { background: var(--surface-high); color: var(--text-primary); border-color: var(--border); }
+html.dark .login-card { background: var(--surface); border-color: var(--border); }
+html.dark code { background: var(--surface-container); color: var(--primary); }
+html.dark .status-active, html.dark .badge-success { background: var(--success-light); color: var(--success); }
+html.dark .status-inactive, html.dark .badge-danger { background: var(--danger-light); color: var(--danger); }
+html.dark .badge-warning { background: var(--warning-light); color: var(--warning); }
+html.dark .badge-info { background: var(--info-light); color: var(--info); }
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body { font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.5; color: var(--on-surface); background: var(--background); -webkit-font-smoothing: antialiased; }
+input, button, select, textarea { font-family: inherit; font-size: inherit; }
+a { text-decoration: none; color: inherit; }
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; display: inline-block; vertical-align: middle; font-size: 20px; }
+
+.app-layout { display: flex; flex-direction: column; height: 100vh; }
+.app-body { display: flex; flex: 1; overflow: hidden; }
+
+/* ====== TOP NAV ====== */
+.topnav {
+  height: var(--topnav-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 20;
+}
+.topnav-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.topnav-right { display: flex; align-items: center; gap: 8px; }
+.btn-sidebar-toggle { display: none; background: none; border: none; cursor: pointer; padding: 6px; border-radius: var(--radius-md); color: var(--text-muted); }
+.btn-sidebar-toggle:hover { background: var(--surface-low); }
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; }
+.breadcrumb a, .breadcrumb span { cursor: pointer; transition: color var(--transition); }
+.breadcrumb a:hover, .breadcrumb .breadcrumb-current { color: var(--primary); }
+.breadcrumb .breadcrumb-current { font-weight: 600; }
+.breadcrumb-sep { color: var(--text-muted); }
+
+.user-profile { display: flex; align-items: center; gap: 12px; }
+.user-avatar { width: 34px; height: 34px; border-radius: var(--radius-full); background: var(--primary); color: var(--on-primary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.user-info { display: flex; flex-direction: column; }
+.user-name { font-size: 13px; font-weight: 600; color: var(--on-surface); line-height: 1.2; }
+.user-role { font-size: 11px; color: var(--text-secondary); line-height: 1.2; }
+
+/* ====== SIDEBAR ====== */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+  z-index: 15;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary);
+  border-bottom: 1px solid var(--border);
+  min-height: 64px;
+  flex-shrink: 0;
+}
+.sidebar-brand svg { color: var(--primary); width: 24px; height: 24px; }
+.sidebar-nav { padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.nav-section { font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 16px 12px 8px; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--on-surface-variant);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all var(--transition);
+  user-select: none;
+}
+.nav-item:hover { background: var(--surface-low); color: var(--on-surface); }
+.nav-item.active { background: var(--primary-subtle); color: var(--primary); font-weight: 600; }
+.nav-item.active span { color: var(--primary); }
+.nav-item.disabled { opacity: 0.4; cursor: not-allowed; }
+.nav-item.disabled:hover { background: transparent; color: var(--on-surface-variant); }
+.nav-item .nav-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-badge { font-size: 10px; background: var(--primary-subtle); color: var(--primary); padding: 2px 6px; border-radius: var(--radius-full); font-weight: 600; }
+.sidebar-sep { height: 1px; background: var(--border); margin: 8px 0; }
+
+/* ====== MAIN CONTENT ====== */
+.main-content { flex: 1; overflow-y: auto; padding: 28px 32px; display: flex; flex-direction: column; gap: 24px; background: var(--background); }
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.page-title { font-size: 22px; font-weight: 700; color: var(--on-surface); line-height: 1.2; }
+.page-subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+
+/* ====== MANAGEMENT BAR ====== */
+.management-bar { display: flex; align-items: center; gap: 10px; padding: 0; flex-wrap: wrap; }
+.search-bar { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0 12px; height: 40px; flex: 1; min-width: 180px; max-width: 320px; transition: border-color var(--transition); }
+.search-bar:focus-within { border-color: var(--primary); }
+.search-bar input { border: none; outline: none; background: transparent; width: 100%; font-size: 13px; color: var(--on-surface); }
+.search-bar input::placeholder { color: var(--text-muted); }
+
+/* ====== BUTTONS ====== */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 18px; border-radius: var(--radius-md); font-size: 13px; font-weight: 600; line-height: 1; cursor: pointer; transition: all var(--transition); border: none; white-space: nowrap; user-select: none; height: 40px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--primary); color: var(--on-primary); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn-secondary { background: var(--surface); color: var(--on-surface); border: 1px solid var(--border); }
+.btn-secondary:hover:not(:disabled) { background: var(--surface-low); }
+.btn-danger { background: var(--danger); color: white; }
+.btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.btn-ghost { background: transparent; color: var(--on-surface-variant); }
+.btn-ghost:hover:not(:disabled) { background: var(--surface-low); color: var(--on-surface); }
+.btn-danger-ghost { color: var(--danger); }
+.btn-danger-ghost:hover:not(:disabled) { background: var(--danger-light); color: var(--danger); }
+.btn-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--radius-md); cursor: pointer; transition: all var(--transition); border: none; background: transparent; color: var(--on-surface-variant); }
+.btn-icon:hover { background: var(--surface-low); color: var(--on-surface); }
+.btn-sm { padding: 5px 12px; font-size: 12px; height: 32px; }
+.btn-full { width: 100%; }
+
+/* ====== CARDS ====== */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 24px; box-shadow: var(--shadow-sm); }
+.card-hover:hover { box-shadow: var(--shadow-md); }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.card-title { font-size: 15px; font-weight: 600; color: var(--on-surface); }
+
+.metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 20px; display: flex; align-items: center; gap: 16px; box-shadow: var(--shadow-sm); }
+.metric-card:hover { box-shadow: var(--shadow-md); }
+.metric-icon { width: 44px; height: 44px; border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.metric-icon-blue { background: var(--primary-subtle); color: var(--primary); }
+.metric-icon-green { background: var(--success-light); color: var(--success); }
+.metric-icon-purple { background: #f3e8ff; color: #8b5cf6; }
+.metric-icon-orange { background: var(--warning-light); color: var(--warning); }
+.metric-icon span { font-size: 22px; }
+.metric-info h2 { font-size: 24px; font-weight: 700; color: var(--on-surface); line-height: 1.1; }
+.metric-info p { font-size: 12px; color: var(--text-secondary); font-weight: 500; margin-top: 2px; }
+
+/* ====== SCHOOL CARDS ====== */
+.schools-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.school-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 20px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 14px; }
+.school-card:hover { box-shadow: var(--shadow-md); }
+.school-card-top { display: flex; align-items: flex-start; gap: 14px; }
+.school-logo { width: 44px; height: 44px; border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; flex-shrink: 0; }
+.school-logo-default { background: var(--primary-subtle); color: var(--primary); }
+.school-logo-suspended { background: var(--danger-light); color: var(--danger); }
+.school-info { flex: 1; min-width: 0; }
+.school-name { font-size: 15px; font-weight: 600; color: var(--on-surface); }
+.school-code { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.school-admin { font-size: 12px; color: var(--text-secondary); margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+.school-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.school-stat { text-align: center; }
+.school-stat-value { font-size: 16px; font-weight: 700; color: var(--on-surface); }
+.school-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+
+/* ====== EXPLORER LAYOUT ====== */
+.explorer-layout { display: flex; gap: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; flex: 1; min-height: 400px; }
+.explorer-panel { width: 240px; flex-shrink: 0; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--surface-low); }
+.explorer-content { flex: 1; padding: 20px; overflow-y: auto; }
+.explorer-header { padding: 14px 16px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.explorer-tree { padding: 8px; overflow-y: auto; flex: 1; }
+.explorer-item { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: var(--radius-md); cursor: pointer; font-size: 13px; color: var(--on-surface-variant); transition: all var(--transition); }
+.explorer-item:hover { background: var(--border); color: var(--on-surface); }
+.explorer-item.active { background: var(--primary-subtle); color: var(--primary); font-weight: 600; }
+
+/* ====== TABLES ====== */
+.table-container { width: 100%; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 10px 16px; font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); white-space: nowrap; user-select: none; background: var(--surface-low); }
+td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--on-surface); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--surface-low); }
+.td-actions { width: 40px; text-align: right; }
+
+/* ====== STATUS BADGES ====== */
+.status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; }
+.status-active { background: var(--success-light); color: #166534; }
+.status-suspended { background: var(--danger-light); color: #991b1b; }
+.status-pending { background: var(--warning-light); color: #92400e; }
+
+/* ====== FORMS ====== */
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 12px; font-weight: 600; color: var(--on-surface); margin-bottom: 5px; }
+.form-input, .form-select { width: 100%; height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 13px; color: var(--on-surface); background: var(--surface); outline: none; transition: border-color var(--transition); }
+.form-input:focus, .form-select:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(20,44,174,0.1); }
+.form-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 36px; cursor: pointer; }
+.form-error { font-size: 11px; color: var(--danger); margin-top: 4px; display: none; }
+.form-error.visible { display: block; }
+
+/* ====== MODALS ====== */
+.modal-overlay { position: fixed; inset: 0; background: rgba(21,27,41,0.4); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity var(--transition); }
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
+.modal { background: var(--surface); border-radius: var(--radius-xl); width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 0; }
+.modal-title { font-size: 17px; font-weight: 600; color: var(--on-surface); }
+.modal-body { padding: 20px 24px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 0 24px 20px; }
+.modal-close { width: 32px; height: 32px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; transition: all var(--transition); }
+.modal-close:hover { background: var(--surface-low); color: var(--on-surface); }
+
+.confirm-modal { text-align: center; max-width: 400px; }
+
+/* ====== TOASTS ====== */
+.toast-container { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 200; pointer-events: none; }
+.toast { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: var(--radius-lg); padding: 12px 16px; display: flex; align-items: center; gap: 10px; box-shadow: var(--shadow-lg); pointer-events: auto; animation: toast-in 300ms ease forwards; max-width: 360px; font-size: 13px; }
+.toast-success { border-left-color: var(--success); }
+.toast-error { border-left-color: var(--danger); }
+.toast-info { border-left-color: var(--info); }
+@keyframes toast-in { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+@keyframes toast-out { to { opacity: 0; transform: translateX(100%); } }
+.toast-out { animation: toast-out 300ms ease forwards; }
+
+/* ====== EMPTY STATE ====== */
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 56px 24px; text-align: center; color: var(--text-secondary); }
+.empty-state span { color: var(--text-muted); margin-bottom: 12px; font-size: 40px; }
+.empty-state h3 { font-size: 15px; font-weight: 600; color: var(--on-surface); margin-bottom: 6px; }
+.empty-state p { font-size: 13px; margin-bottom: 16px; max-width: 320px; }
+
+/* ====== ANIMATIONS ====== */
+@keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fade-in 200ms ease forwards; }
+
+/* ====== RESPONSIVE ====== */
+/* ====== DARK SIDEBAR (HQ / Company) ====== */
+.sidebar-hq { background: #111827; border-right-color: #1f2937; }
+.sidebar-hq .sidebar-brand { color: #f9fafb; border-bottom-color: #1f2937; }
+.sidebar-hq .sidebar-brand svg { color: #3b82f6; }
+.sidebar-hq .nav-item { color: #d1d5db; }
+.sidebar-hq .nav-item:hover { background: #1f2937; color: #f9fafb; }
+.sidebar-hq .nav-item.active { background: rgba(37,99,235,0.15); color: #60a5fa; }
+.sidebar-hq .nav-item.active span { color: #60a5fa; }
+.sidebar-hq .sidebar-sep { background: #1f2937; }
+.sidebar-hq .nav-badge { background: rgba(37,99,235,0.2); color: #60a5fa; }
+
+@media (max-width: 1200px) { .metrics-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 1024px) {
+  .sidebar { width: 64px; }
+  .sidebar .sidebar-brand span, .sidebar .nav-label, .sidebar .nav-badge, .sidebar .nav-section { display: none; }
+  .sidebar .sidebar-brand { justify-content: center; padding: 16px 0; }
+  .sidebar .nav-item { justify-content: center; padding: 9px; }
+  .main-content { padding: 24px; }
+}
+@media (max-width: 768px) {
+  .topnav { padding: 0 16px; }
+  .btn-sidebar-toggle { display: flex; }
+  .sidebar { position: fixed; left: -260px; top: var(--topnav-height); bottom: 0; z-index: 30; width: var(--sidebar-width); transition: left var(--transition); }
+  .sidebar.open { left: 0; box-shadow: var(--shadow-lg); }
+  .sidebar .sidebar-brand span, .sidebar .nav-label, .sidebar .nav-badge, .sidebar .nav-section { display: block; }
+  .sidebar .sidebar-brand { justify-content: flex-start; padding: 16px 20px; }
+  .sidebar .nav-item { justify-content: flex-start; padding: 9px 12px; }
+  .main-content { padding: 16px; }
+  .metrics-grid { grid-template-columns: 1fr; }
+  .user-info { display: none; }
+  .page-title { font-size: 20px; }
+}
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(21,27,41,0.3); z-index: 25; }
+.sidebar-overlay.active { display: block; }
+.main-content::-webkit-scrollbar, .sidebar::-webkit-scrollbar { width: 4px; }
+.main-content::-webkit-scrollbar-track, .sidebar::-webkit-scrollbar-track { background: transparent; }
+.main-content::-webkit-scrollbar-thumb, .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius-full); }
+.hidden { display: none !important; }
+.flex-1 { flex: 1; }
+.text-center { text-align: center; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.mt-8 { margin-top: 8px; }
+.mt-16 { margin-top: 16px; }
+.font-semibold { font-weight: 600; }
+.icon-18 { font-size: 18px; }
+.icon-20 { font-size: 20px; }
+.icon-26 { font-size: 26px; }
+</style>
+</head>
+<body>
+
+<!-- ====== LOGIN SCREEN ====== -->
+<div id="app-login" class="login-screen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--background);padding:24px;">
+  <div style="width:100%;max-width:440px;">
+    <div style="text-align:center;margin-bottom:32px;">
+      <span class="material-symbols-outlined" style="font-size:40px;color:var(--primary);margin-bottom:8px;">layers</span>
+      <h1 style="font-size:22px;font-weight:700;color:var(--on-surface);">LANXGROW</h1>
+      <p style="font-size:13px;color:var(--text-secondary);margin-top:4px;">Content Operating System</p>
+    </div>
+    <div class="card" style="padding:32px;">
+      <h2 style="font-size:18px;font-weight:600;margin-bottom:24px;color:var(--on-surface);text-align:center;">Sign in to your account</h2>
+      <form id="login-form" autocomplete="off">
+        <div id="login-form-container">
+          <div style="margin-bottom:16px;">
+            <label class="form-label" for="login-email">Email</label>
+            <input class="form-input" type="email" id="login-email" placeholder="Enter your email" required autocomplete="email">
+          </div>
+          <div style="margin-bottom:16px;">
+            <label class="form-label" for="login-password">Password</label>
+            <input class="form-input" type="password" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
+          </div>
+          <div style="text-align:right;margin-bottom:4px;">
+            <button type="button" id="btn-forgot-password" style="background:none;border:none;font-size:12px;color:var(--primary);cursor:pointer;font-weight:500;">Forgot Password?</button>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full" style="margin-top:4px;">Sign In</button>
+        </div>
+        <div id="forgot-password-container" style="display:none;">
+          <div style="margin-bottom:12px;">
+            <label class="form-label" for="forgot-email">Email Address</label>
+            <input class="form-input" type="email" id="forgot-email" placeholder="Enter your registered email">
+          </div>
+          <button type="button" class="btn btn-primary btn-full" id="btn-send-reset-link" style="margin-bottom:12px;">Send Reset Link</button>
+          <div id="forgot-success" style="display:none;text-align:center;font-size:13px;color:var(--success);margin-bottom:12px;padding:12px;background:var(--success-light);border-radius:var(--radius-md);">Reset link sent! Check your email.</div>
+          <div id="forgot-error" style="display:none;text-align:center;font-size:13px;color:var(--danger);margin-bottom:12px;"></div>
+          <button type="button" class="btn btn-ghost btn-full" id="btn-back-to-login" style="font-size:12px;">Back to Sign In</button>
+        </div>
+        <div id="reset-password-container" style="display:none;">
+          <div style="margin-bottom:12px;">
+            <label class="form-label" for="reset-new-password">New Password</label>
+            <input class="form-input" type="password" id="reset-new-password" placeholder="At least 6 characters" minlength="6">
+          </div>
+          <div style="margin-bottom:12px;">
+            <label class="form-label" for="reset-confirm-password">Confirm New Password</label>
+            <input class="form-input" type="password" id="reset-confirm-password" placeholder="Re-enter new password">
+          </div>
+          <button type="button" class="btn btn-primary btn-full" id="btn-update-password" style="margin-bottom:12px;">Update Password</button>
+          <div id="reset-success" style="display:none;text-align:center;font-size:13px;color:var(--success);margin-bottom:12px;padding:12px;background:var(--success-light);border-radius:var(--radius-md);">Password updated successfully! Sign in with your new password.</div>
+          <div id="reset-error" style="display:none;text-align:center;font-size:13px;color:var(--danger);margin-bottom:12px;"></div>
+        </div>
+        <div style="position:relative;text-align:center;margin:16px 0;">
+          <span style="background:var(--surface);padding:0 10px;font-size:12px;color:var(--text-muted);position:relative;z-index:1;">or continue with</span>
+          <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:var(--border);"></div>
+        </div>
+        <button type="button" class="btn btn-secondary btn-full" id="btn-google-login" style="gap:8px;">
+          <svg viewBox="0 0 24 24" style="width:16px;height:16px;"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Sign in with Google
+        </button>
+
+        <!-- Development Access Mode -->
+        <div id="dev-access-container" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:none;">
+          <button type="button" class="btn btn-secondary btn-full" id="btn-dev-access" style="gap:8px;">
+            <span class="material-symbols-outlined" style="font-size:18px;">code</span>
+            <span>Enter Development Mode</span>
+          </button>
+          <p style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:8px;">Auto-login as Development Super Admin</p>
+        </div>
+
+        <p class="login-error" id="login-error" style="text-align:center;font-size:13px;color:var(--danger);margin-top:16px;min-height:20px;"></p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ====== FIRST-TIME ONBOARDING ====== -->
+<div id="app-onboarding" class="login-screen" style="min-height:100vh;display:none;align-items:center;justify-content:center;background:var(--background);padding:24px;">
+  <div style="width:100%;max-width:720px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <span class="material-symbols-outlined" style="font-size:40px;color:var(--primary);margin-bottom:8px;">waving_hand</span>
+      <h1 style="font-size:24px;font-weight:700;color:var(--on-surface);">Welcome to LANXGROW</h1>
+      <p style="font-size:13px;color:var(--text-secondary);margin-top:6px;">Tell us how you plan to use the platform.</p>
+    </div>
+
+    <div class="card" style="padding:28px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;">
+        <div id="onboarding-step-one-dot" style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--primary);color:white;font-size:12px;font-weight:700;">1</div>
+        <div style="height:2px;flex:1;background:var(--border);"><div id="onboarding-progress" style="height:100%;width:0;background:var(--primary);transition:width 200ms ease;"></div></div>
+        <div id="onboarding-step-two-dot" style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--surface-container);color:var(--text-secondary);font-size:12px;font-weight:700;">2</div>
+      </div>
+
+      <section id="onboarding-role-step">
+        <h2 style="font-size:18px;font-weight:700;color:var(--on-surface);margin-bottom:4px;">Choose your role</h2>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:18px;">Your selection will be reviewed before organization access is granted.</p>
+        <div id="onboarding-role-options" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
+          <button type="button" class="card onboarding-role-option" data-onboarding-role="school" style="text-align:left;padding:18px;cursor:pointer;background:var(--surface);">
+            <span class="material-symbols-outlined" style="font-size:26px;color:var(--primary);">apartment</span>
+            <strong style="display:block;margin-top:8px;color:var(--on-surface);">School</strong>
+            <span style="display:block;font-size:12px;color:var(--text-secondary);margin-top:3px;">Register or represent a school</span>
+          </button>
+          <button type="button" class="card onboarding-role-option" data-onboarding-role="teacher_counselor" style="text-align:left;padding:18px;cursor:pointer;background:var(--surface);">
+            <span class="material-symbols-outlined" style="font-size:26px;color:var(--primary);">supervisor_account</span>
+            <strong style="display:block;margin-top:8px;color:var(--on-surface);">Teacher / Counselor</strong>
+            <span style="display:block;font-size:12px;color:var(--text-secondary);margin-top:3px;">Join an existing school team</span>
+          </button>
+          <button type="button" class="card onboarding-role-option" data-onboarding-role="student" style="text-align:left;padding:18px;cursor:pointer;background:var(--surface);">
+            <span class="material-symbols-outlined" style="font-size:26px;color:var(--primary);">school</span>
+            <strong style="display:block;margin-top:8px;color:var(--on-surface);">Student</strong>
+            <span style="display:block;font-size:12px;color:var(--text-secondary);margin-top:3px;">Access your school's learning content</span>
+          </button>
+          <button type="button" class="card onboarding-role-option" data-onboarding-role="other" style="text-align:left;padding:18px;cursor:pointer;background:var(--surface);">
+            <span class="material-symbols-outlined" style="font-size:26px;color:var(--primary);">person</span>
+            <strong style="display:block;margin-top:8px;color:var(--on-surface);">Others</strong>
+            <span style="display:block;font-size:12px;color:var(--text-secondary);margin-top:3px;">Explore another collaboration path</span>
+          </button>
+        </div>
+        <p id="onboarding-role-error" style="min-height:18px;margin-top:10px;font-size:12px;color:var(--danger);"></p>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+          <button type="button" class="btn btn-ghost" id="btn-onboarding-signout">Sign out</button>
+          <button type="button" class="btn btn-primary" id="btn-onboarding-next">Continue</button>
+        </div>
+      </section>
+
+      <section id="onboarding-details-step" style="display:none;">
+        <h2 style="font-size:18px;font-weight:700;color:var(--on-surface);margin-bottom:4px;">Complete your profile</h2>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:18px;">We use these details to connect you to the right workspace.</p>
+        <form id="onboarding-form">
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" for="onboarding-full-name">Full Name</label>
+              <input class="form-input" id="onboarding-full-name" type="text" maxlength="120" required autocomplete="name">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" for="onboarding-phone">Phone</label>
+              <input class="form-input" id="onboarding-phone" type="tel" maxlength="20" required autocomplete="tel" placeholder="+91 98765 43210">
+            </div>
+            <div class="form-group" id="onboarding-school-name-group" style="display:none;margin:0;grid-column:1/-1;">
+              <label class="form-label" for="onboarding-school-name">School Name</label>
+              <input class="form-input" id="onboarding-school-name" type="text" maxlength="160" placeholder="Enter your school name">
+            </div>
+            <div class="form-group" id="onboarding-school-code-group" style="display:none;margin:0;grid-column:1/-1;">
+              <label class="form-label" for="onboarding-school-code">School Code</label>
+              <input class="form-input" id="onboarding-school-code" type="text" maxlength="40" placeholder="Code provided by your school">
+            </div>
+            <div class="form-group" id="onboarding-class-group" style="display:none;margin:0;grid-column:1/-1;">
+              <label class="form-label" for="onboarding-class">Class</label>
+              <input class="form-input" id="onboarding-class" type="text" maxlength="40" placeholder="For example: Class 7">
+            </div>
+          </div>
+          <div style="margin-top:16px;padding:12px;border-radius:var(--radius-md);background:var(--primary-subtle);font-size:12px;color:var(--text-secondary);">
+            Selecting a role does not automatically grant access. School access is activated after invitation or administrator verification.
+          </div>
+          <p id="onboarding-submit-error" style="min-height:18px;margin-top:10px;font-size:12px;color:var(--danger);"></p>
+          <div style="display:flex;justify-content:space-between;margin-top:8px;">
+            <button type="button" class="btn btn-secondary" id="btn-onboarding-back">Back</button>
+            <button type="submit" class="btn btn-primary" id="btn-onboarding-submit">Finish Setup</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ====== APP LAYOUT ====== -->
+<div id="app-layout" class="app-layout hidden">
+  <header class="topnav">
+    <div class="topnav-left">
+      <button class="btn-sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+      <nav class="breadcrumb" id="breadcrumb"></nav>
+    </div>
+    <div class="topnav-right">
+      <button class="btn-icon topnav-search-btn" id="btn-topnav-search" aria-label="Search" title="Search">
+        <span class="material-symbols-outlined">search</span>
+      </button>
+      <button class="btn-icon" id="btn-notifications" aria-label="Notifications" title="Notifications">
+        <span class="material-symbols-outlined">notifications</span>
+        <span class="badge-dot" style="position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--danger);border:2px solid var(--surface);"></span>
+      </button>
+      <button class="btn-icon" id="btn-theme-toggle" aria-label="Toggle theme" title="Toggle theme">
+        <span class="material-symbols-outlined">dark_mode</span>
+      </button>
+      <div class="user-profile" style="margin-left:4px;">
+        <div class="user-avatar" id="user-avatar">AC</div>
+        <div class="user-info">
+          <span class="user-name" id="user-name">User</span>
+          <span class="user-role" id="user-role">Role</span>
+        </div>
+        <button class="btn-icon" id="btn-logout" aria-label="Sign out" title="Sign out">
+          <span class="material-symbols-outlined">logout</span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="app-body">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <span class="material-symbols-outlined" style="font-size:24px;">layers</span>
+        <span>LANXGROW</span>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    </aside>
+    <main class="main-content" id="main-content"></main>
+  </div>
+</div>
+
+<!-- ====== ENTITY MODAL ====== -->
+<div class="modal-overlay" id="modal-entity" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modal-entity-title">Add School</h3>
+      <button class="modal-close" data-close-modal="modal-entity"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="modal-body">
+      <form id="form-entity" novalidate>
+        <input type="hidden" id="entity-type" value="school">
+        <input type="hidden" id="entity-id" value="">
+
+        <div id="entity-fields-school" class="entity-fields">
+          <div class="form-group">
+            <label class="form-label" for="input-name">School Name</label>
+            <input class="form-input" type="text" id="input-name" placeholder="Enter school name">
+            <div class="form-error">School name is required.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-code">School Code</label>
+            <input class="form-input" type="text" id="input-code" placeholder="e.g. SPR001">
+            <div class="form-error">School code is required.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-principal-name">Principal Name</label>
+            <input class="form-input" type="text" id="input-principal-name" placeholder="Full name of school principal">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-status">Status</label>
+            <select class="form-select" id="input-status">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="suspended">Suspended</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="entity-fields-category" class="entity-fields" style="display:none;">
+          <input type="hidden" id="entity-parent-id" value="">
+          <div class="form-group">
+            <label class="form-label" for="input-name-cat">Category Name</label>
+            <input class="form-input" type="text" id="input-name-cat" placeholder="e.g. Class 11">
+            <div class="form-error">Category name is required.</div>
+          </div>
+        </div>
+
+        <div id="entity-fields-subject" class="entity-fields" style="display:none;">
+          <div class="form-group">
+            <label class="form-label" for="input-subject-name">Subject Name</label>
+            <input class="form-input" type="text" id="input-subject-name" placeholder="e.g. Physics">
+            <div class="form-error">Subject name is required.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-subject-category">Category</label>
+            <select class="form-select" id="input-subject-category"></select>
+            <div class="form-error">Category is required.</div>
+          </div>
+        </div>
+
+        <div id="entity-fields-section" class="entity-fields" style="display:none;">
+          <div class="form-group">
+            <label class="form-label" for="input-section-name">Section Name</label>
+            <input class="form-input" type="text" id="input-section-name" placeholder="e.g. Electromagnetic Induction">
+            <div class="form-error">Section name is required.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-section-subject">Subject</label>
+            <select class="form-select" id="input-section-subject"></select>
+            <div class="form-error">Subject is required.</div>
+          </div>
+        </div>
+
+        <div id="entity-fields-content" class="entity-fields" style="display:none;">
+          <div class="form-group">
+            <label class="form-label" for="input-content-name">Content Name</label>
+            <input class="form-input" type="text" id="input-content-name" placeholder="e.g. Faraday's Law Explained">
+            <div class="form-error">Content name is required.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-content-type">Type</label>
+            <select class="form-select" id="input-content-type">
+              <option value="">Choose...</option>
+              <option value="Video">Video</option>
+              <option value="PDF">PDF</option>
+              <option value="Image">Image</option>
+              <option value="Document">Document</option>
+              <option value="Other">Other</option>
+            </select>
+            <div class="form-error">Type is required.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-content-url">URL / File Link</label>
+            <div style="display:flex;gap:8px;">
+              <input class="form-input" type="url" id="input-content-url" placeholder="https://youtube.com/watch?v=... or Drive link" style="flex:1;">
+              <button class="btn btn-secondary btn-sm" type="button" id="btn-content-upload" data-action="content-upload-file" style="height:44px;white-space:nowrap;"><span class="material-symbols-outlined" style="font-size:16px;">upload</span> Upload</button>
+            </div>
+            <div class="form-error">Valid URL is required for published content.</div>
+            <input type="file" id="input-content-file" style="display:none" accept="video/*,image/*,application/pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-content-school">School</label>
+            <select class="form-select" id="input-content-school"></select>
+            <div class="form-error">School is required.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-content-section">Section</label>
+            <select class="form-select" id="input-content-section"></select>
+            <div class="form-error">Section is required.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-content-size">Size</label>
+            <input class="form-input" type="text" id="input-content-size" placeholder="e.g. 145 MB">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-content-description">Description</label>
+            <textarea class="form-input" id="input-content-description" placeholder="Brief description of this content..." rows="2" style="resize:vertical;min-height:60px;"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-content-tags">Tags <span style="font-weight:400;color:var(--text-muted);">(comma-separated)</span></label>
+            <input class="form-input" type="text" id="input-content-tags" placeholder="e.g. physics, electromagnetism, chapter-4">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-content-status">Status</label>
+            <select class="form-select" id="input-content-status">
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+              <option value="review">In Review</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="modal-entity">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-entity">Save School</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== SCHOOL MODAL (multi-section form) ====== -->
+<div class="modal-overlay" id="modal-school" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modal-school-title">Add School</h3>
+      <button class="modal-close" data-close-modal="modal-school"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="modal-body" style="max-height:68vh;overflow-y:auto;">
+      <input type="hidden" id="school-entity-id" value="">
+      <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
+        <button class="school-tab-btn active" data-tab="general" style="flex:1;padding:10px 8px;background:none;border:none;border-bottom:2px solid var(--primary);font-size:12px;font-weight:600;color:var(--primary);cursor:pointer;">General</button>
+        <button class="school-tab-btn" data-tab="address" style="flex:1;padding:10px 8px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer;">Address</button>
+        <button class="school-tab-btn" data-tab="academic" style="flex:1;padding:10px 8px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer;">Academic</button>
+        <button class="school-tab-btn" data-tab="subscription" style="flex:1;padding:10px 8px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer;">Subscription</button>
+        <button class="school-tab-btn" data-tab="location" style="flex:1;padding:10px 8px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:500;color:var(--text-muted);cursor:pointer;">Location & Access</button>
+      </div>
+
+      <div id="school-tab-general" class="school-tab-panel">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">General Information</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-name">School Name <span style="color:var(--danger);">*</span></label>
+            <input class="form-input" type="text" id="school-input-name" placeholder="e.g. Green Valley Public School">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-code">School Code <span style="color:var(--danger);">*</span></label>
+            <input class="form-input" type="text" id="school-input-code" placeholder="e.g. GVPS">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-type">School Type</label>
+            <select class="form-select" id="school-input-type">
+              <option value="">Select...</option>
+              <option value="Private">Private</option>
+              <option value="Public">Public</option>
+              <option value="Government">Government</option>
+              <option value="International">International</option>
+              <option value="Trust">Trust</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-principal">Principal Name</label>
+            <input class="form-input" type="text" id="school-input-principal" placeholder="Full name of principal">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-contact">Contact Person</label>
+            <input class="form-input" type="text" id="school-input-contact" placeholder="Primary contact person">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-phone">Phone</label>
+            <input class="form-input" type="tel" id="school-input-phone" placeholder="+91-98765-43210">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-email">Email</label>
+            <input class="form-input" type="email" id="school-input-email" placeholder="contact@school.edu">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-website">Website</label>
+            <input class="form-input" type="url" id="school-input-website" placeholder="https://school.edu">
+          </div>
+        </div>
+      </div>
+
+      <div id="school-tab-address" class="school-tab-panel" style="display:none;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">Address</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <label class="form-label" for="school-input-addr1">Address Line 1</label>
+            <input class="form-input" type="text" id="school-input-addr1" placeholder="Street address, building, area">
+          </div>
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <label class="form-label" for="school-input-addr2">Address Line 2</label>
+            <input class="form-input" type="text" id="school-input-addr2" placeholder="Locality, landmark (optional)">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-city">City</label>
+            <input class="form-input" type="text" id="school-input-city" placeholder="e.g. New Delhi">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-state">State</label>
+            <input class="form-input" type="text" id="school-input-state" placeholder="e.g. Delhi">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-country">Country</label>
+            <input class="form-input" type="text" id="school-input-country" value="India">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-postal">Postal Code</label>
+            <input class="form-input" type="text" id="school-input-postal" placeholder="e.g. 110001">
+          </div>
+        </div>
+      </div>
+
+      <div id="school-tab-academic" class="school-tab-panel" style="display:none;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">Academic Information</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-academic-year">Academic Year</label>
+            <input class="form-input" type="text" id="school-input-academic-year" placeholder="e.g. 2025-2026">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-board">Board</label>
+            <select class="form-select" id="school-input-board">
+              <option value="">Select...</option>
+              <option value="CBSE">CBSE</option>
+              <option value="ICSE">ICSE</option>
+              <option value="IB">IB</option>
+              <option value="State Board">State Board</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-medium">Medium</label>
+            <select class="form-select" id="school-input-medium">
+              <option value="">Select...</option>
+              <option value="English">English</option>
+              <option value="Hindi">Hindi</option>
+              <option value="Regional">Regional</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-timezone">Time Zone</label>
+            <select class="form-select" id="school-input-timezone">
+              <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+              <option value="Asia/Dubai">Asia/Dubai</option>
+              <option value="America/New_York">America/New_York</option>
+              <option value="Europe/London">Europe/London</option>
+              <option value="Asia/Singapore">Asia/Singapore</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="school-tab-subscription" class="school-tab-panel" style="display:none;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">Subscription & Limits</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-plan">Plan</label>
+            <select class="form-select" id="school-input-plan">
+              <option value="basic">Basic</option>
+              <option value="standard">Standard</option>
+              <option value="premium">Premium</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-student-limit">Student Limit</label>
+            <input class="form-input" type="number" id="school-input-student-limit" placeholder="e.g. 500" min="0">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-teacher-limit">Teacher Limit</label>
+            <input class="form-input" type="number" id="school-input-teacher-limit" placeholder="e.g. 30" min="0">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-counselor-limit">Counselor Limit</label>
+            <input class="form-input" type="number" id="school-input-counselor-limit" placeholder="e.g. 5" min="0">
+          </div>
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <label class="form-label" for="school-input-storage-limit">Storage Limit</label>
+            <input class="form-input" type="text" id="school-input-storage-limit" placeholder="e.g. 100GB">
+          </div>
+        </div>
+        <div style="margin-top:16px;padding:12px;background:var(--surface-low);border-radius:var(--radius-md);display:flex;align-items:center;gap:10px;">
+          <span class="material-symbols-outlined" style="font-size:18px;color:var(--text-muted);">info</span>
+          <span style="font-size:12px;color:var(--text-secondary);">All limits can be adjusted later from School Settings.</span>
+        </div>
+      </div>
+
+      <!-- Location & Access Tab -->
+      <div id="school-tab-location" class="school-tab-panel" style="display:none;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">GPS Location (for attendance verification)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-latitude">Latitude</label>
+            <input class="form-input" type="number" step="any" id="school-input-latitude" placeholder="e.g. 28.6139">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-longitude">Longitude</label>
+            <input class="form-input" type="number" step="any" id="school-input-longitude" placeholder="e.g. 77.2090">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-attendance-radius">Radius (meters)</label>
+            <input class="form-input" type="number" id="school-input-attendance-radius" placeholder="200" min="50" value="200">
+          </div>
+        </div>
+        <div style="margin-top:8px;padding:10px;background:var(--surface-low);border-radius:var(--radius-md);display:flex;align-items:center;gap:10px;">
+          <span class="material-symbols-outlined" style="font-size:16px;color:var(--text-muted);">location_on</span>
+          <span style="font-size:12px;color:var(--text-secondary);">Teachers and counselors must log in within this radius to be marked as "attended." Outside this radius they can still use the portal but attendance shows as "unattended."</span>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" id="btn-get-location">
+          <span class="material-symbols-outlined" style="font-size:16px;">my_location</span> Auto-detect Location
+        </button>
+
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin:20px 0 12px;">School Admin Password</div>
+        <div style="display:grid;grid-template-columns:1fr;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-admin-password">Admin Password</label>
+            <div style="position:relative;">
+              <input class="form-input" type="text" id="school-input-admin-password" placeholder="Set a simple password for school admin login">
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:8px;padding:10px;background:var(--surface-low);border-radius:var(--radius-md);display:flex;align-items:center;gap:10px;">
+          <span class="material-symbols-outlined" style="font-size:16px;color:var(--text-muted);">lock</span>
+          <span style="font-size:12px;color:var(--text-secondary);">Super admin can view and reset this password at any time from the school settings.</span>
+        </div>
+
+        <div id="school-tracking-sheet-group">
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin:20px 0 12px;">Vehicle Tracking Google Sheet</div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-tracking-sheet-id">Google Sheet ID</label>
+            <input class="form-input" type="text" id="school-input-tracking-sheet-id" maxlength="200" placeholder="Paste the value between /d/ and /edit from the Sheet URL">
+          </div>
+          <div style="margin-top:8px;padding:10px;background:var(--surface-low);border-radius:var(--radius-md);display:flex;align-items:center;gap:10px;">
+            <span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">table_view</span>
+            <span style="font-size:12px;color:var(--text-secondary);">Only Super Admin can configure this. Share the Google Sheet with the tracking service account as Editor.</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" for="school-input-status">Status</label>
+          <select class="form-select" id="school-input-status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="suspended">Suspended</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:4px;">
+          <div style="font-size:11px;color:var(--text-muted);">
+            <div style="font-size:10px;font-weight:600;text-transform:uppercase;">School ID</div>
+            <div id="school-display-id" style="font-size:13px;font-weight:600;color:var(--text-secondary);">Auto-generated</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-end;padding-bottom:4px;">
+          <div style="font-size:11px;color:var(--text-muted);">
+            <div style="font-size:10px;font-weight:600;text-transform:uppercase;">Created</div>
+            <div id="school-display-created" style="font-size:13px;font-weight:600;color:var(--text-secondary);">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="modal-school">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-school">Save School</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== CONFIRM MODAL ====== -->
+<div class="modal-overlay" id="modal-confirm" role="dialog" aria-modal="true">
+  <div class="modal confirm-modal">
+    <div class="modal-body" style="text-align:center;">
+      <span class="material-symbols-outlined" style="font-size:40px;color:var(--danger);margin-bottom:12px;">warning</span>
+      <h3 class="confirm-title" style="font-size:17px;font-weight:600;margin-bottom:6px;color:var(--on-surface);">Are you sure?</h3>
+      <p class="confirm-text" id="confirm-text" style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;">This action cannot be undone.</p>
+      <div class="confirm-actions" style="display:flex;justify-content:center;gap:10px;">
+        <button class="btn btn-secondary" data-close-modal="modal-confirm">Cancel</button>
+        <button class="btn btn-danger" id="btn-confirm-action">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== VIDEO PLAYER + REVIEW MODAL ====== -->
+<div class="modal-overlay" id="modal-video" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:920px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="video-modal-title">Video Player</h3>
+      <button class="modal-close" data-close-modal="modal-video"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="modal-body" style="padding:0;display:flex;flex-direction:row;">
+      <div style="flex:1;display:flex;flex-direction:column;">
+        <div id="video-player-container" style="background:#0a0d14;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;">
+          <div id="video-placeholder" style="text-align:center;color:#94a3b8;">
+            <span class="material-symbols-outlined" style="font-size:56px;margin-bottom:12px;opacity:0.5;">videocam</span>
+            <p style="font-size:13px;font-weight:500;">Video playback requires a streaming source.</p>
+            <p style="font-size:12px;margin-top:4px;" id="video-placeholder-name"></p>
+          </div>
+          <video id="video-player" style="width:100%;height:100%;display:none;" controls playsinline></video>
+        </div>
+        <div id="video-metadata-bar" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px;">
+          <span id="video-meta-type" class="status-badge status-active" style="background:var(--primary-subtle);color:var(--primary);">Video</span>
+          <span id="video-meta-duration" style="color:var(--text-secondary);"></span>
+          <span id="video-meta-size" style="color:var(--text-secondary);"></span>
+          <span id="video-meta-status" style="font-weight:500;margin-left:auto;padding:2px 8px;border-radius:var(--radius-full);font-size:11px;"></span>
+        </div>
+        <div id="video-description" style="padding:10px 16px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border);display:none;"></div>
+      </div>
+      <div id="video-review-panel" style="width:280px;border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;">
+        <div style="padding:10px 16px;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;">
+          <span class="material-symbols-outlined" style="font-size:16px;">description</span> Review Notes
+        </div>
+        <div style="flex:1;padding:10px 16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;">
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-primary btn-sm" id="btn-review-approve" style="flex:1;font-size:11px;" data-action="review-approve"><span class="material-symbols-outlined" style="font-size:14px;">check</span> Approve</button>
+            <button class="btn btn-secondary btn-sm" id="btn-review-request" style="flex:1;font-size:11px;" data-action="review-request"><span class="material-symbols-outlined" style="font-size:14px;">undo</span> Revise</button>
+            <button class="btn btn-ghost btn-sm btn-danger-ghost" id="btn-review-reject" style="width:32px;padding:0;" data-action="review-reject"><span class="material-symbols-outlined" style="font-size:14px;">close</span></button>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:11px;">Review Notes</label>
+            <textarea class="form-input" id="review-notes" placeholder="Add timestamped review notes..." style="height:100px;resize:vertical;font-size:12px;padding:8px 10px;height:auto;min-height:80px;"></textarea>
+          </div>
+          <div id="review-timestamps" style="display:flex;flex-direction:column;gap:4px;">
+            <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;">Timestamps</div>
+            <button class="btn btn-ghost btn-sm" id="btn-add-timestamp" style="font-size:10px;justify-content:flex-start;gap:4px;padding:0 8px;height:26px;" data-action="add-timestamp"><span class="material-symbols-outlined" style="font-size:12px;">schedule</span> Mark current time</button>
+            <div id="timestamp-list" style="font-size:12px;color:var(--text-muted);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <span id="video-content-id" style="display:none;"></span>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary btn-sm" data-close-modal="modal-video">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== TOAST CONTAINER ====== -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>function initIcons() {} // Material Symbols don't need initialization</script>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
