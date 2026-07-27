@@ -9,16 +9,11 @@
 import { supabase } from './lib/supabase.js';
 import {
   SchoolService as SupabaseSchoolService,
-  CategoryService as SupabaseCategoryService,
-  SubjectService as SupabaseSubjectService,
-  SectionService as SupabaseSectionService,
   ContentService as SupabaseContentService,
   AuthService,
   AuditLogService,
   DriveService,
   StudentService,
-  CourseService,
-  EnrollmentService,
   NotificationService,
   SettingsService,
   PermissionsService,
@@ -37,16 +32,11 @@ import {
 
 // Attach services to window — these override the old localStorage stubs
 window.SchoolService = SupabaseSchoolService;
-window.CategoryService = SupabaseCategoryService;
-window.SubjectService = SupabaseSubjectService;
-window.SectionService = SupabaseSectionService;
 window.ContentService = SupabaseContentService;
 window.AuthService = AuthService;
 window.AuditLogService = AuditLogService;
 window.DriveService = DriveService;
 window.StudentService = StudentService;
-window.CourseService = CourseService;
-window.EnrollmentService = EnrollmentService;
 window.NotificationService = NotificationService;
 window.CounselorService = CounselorService;
 window.SettingsService = SettingsService;
@@ -91,15 +81,10 @@ window.AppStorage = {
     return result;
   },
 
-  // Core data needed by almost every page (schools, categories, subjects, sections)
+  // Core data needed by almost every page.
   async loadCore() {
-    const [schools, categories, subjects, sections] = await Promise.all([
-      this._fetchTable('schools', supabase.from('schools').select('*').order('name')),
-      this._fetchTable('categories', supabase.from('categories').select('*').order('name')),
-      this._fetchTable('subjects', supabase.from('subjects').select('*').order('name')),
-      this._fetchTable('sections', supabase.from('sections').select('*').order('name')),
-    ]);
-    return { schools, categories, subjects, sections };
+    const schools = await this._fetchTable('schools', supabase.from('schools').select('*').order('name'));
+    return { schools, categories: [], subjects: [], sections: [] };
   },
 
   // Full load — kept for backward compatibility but with smarter caching
@@ -139,12 +124,12 @@ window.AppStorage = {
       users,
       counselors: counselorsRes || [],
       notifications: notificationsRes || [],
+      courses: [],
+      enrollments: [],
+      courseSections: [],
       // Lazy-loaded tables — will be populated on demand
       auditLog: this._partialCache.auditLog?.data || [],
       students: this._partialCache.students?.data || [],
-      courses: this._partialCache.courses?.data || [],
-      enrollments: this._partialCache.enrollments?.data || [],
-      courseSections: this._partialCache.courseSections?.data || [],
     };
     this._cacheTime = Date.now();
     return this._cache;
@@ -439,8 +424,6 @@ window.AppSidebar = {
     { id: 'company-dashboard', label: 'Dashboard', icon: 'layout-dashboard', route: 'company-dashboard' },
     { id: 'schools', label: 'Schools', icon: 'building-2', route: 'schools' },
     { id: 'sep1', separator: true },
-    { id: 'content-manager', label: 'Content Manager', icon: 'folder-kanban', route: 'content-manager' },
-    { id: 'drive-manager', label: 'Drive Manager', icon: 'hard-drive', route: 'drive-manager' },
     { id: 'media-library', label: 'Media Library', icon: 'image', route: 'media-library' },
     { id: 'sep2', separator: true },
     { id: 'school-admins', label: 'School Admins', icon: 'user-cog', route: 'school-admins' },
@@ -456,8 +439,6 @@ window.AppSidebar = {
     { id: 'company-dashboard', label: 'Dashboard', icon: 'layout-dashboard', route: 'company-dashboard' },
     { id: 'schools', label: 'Schools', icon: 'building-2', route: 'schools' },
     { id: 'sep1', separator: true },
-    { id: 'content-manager', label: 'Content Manager', icon: 'folder-kanban', route: 'content-manager' },
-    { id: 'drive-manager', label: 'Drive Manager', icon: 'hard-drive', route: 'drive-manager' },
     { id: 'media-library', label: 'Media Library', icon: 'image', route: 'media-library' },
     { id: 'sep2', separator: true },
     { id: 'school-admins', label: 'School Admins', icon: 'user-cog', route: 'school-admins' },
@@ -472,9 +453,6 @@ window.AppSidebar = {
     { id: 'school-students', label: 'Students', icon: 'groups', route: 'school-students' },
     { id: 'school-counselors', label: 'Counselors', icon: 'badge', route: 'school-counselors' },
     { id: 'sep-s2', separator: true },
-    { id: 'school-categories', label: 'Classes', icon: 'folder-tree', route: 'school-categories' },
-    { id: 'sep-s3', separator: true },
-    { id: 'school-drive', label: 'Drive', icon: 'cloud', route: 'school-drive' },
     { id: 'school-videos', label: 'Video Library', icon: 'video-library', route: 'school-videos' },
     { id: 'sep-s4', separator: true },
     { id: 'school-attendance', label: 'Attendance', icon: 'how_to_reg', route: 'school-attendance' },
@@ -589,14 +567,14 @@ window.AppRouter = {
   _selectedCategoryId: null,
   _selectedSubjectId: null,
   _currentProfile: null,
-  SCHOOL_ROUTES: ['school-dashboard','school-categories','school-subjects','school-sections',
-    'school-students','school-counselors','school-courses','school-videos',
-    'school-drive','school-assignments','school-reports','school-notifications',
+  SCHOOL_ROUTES: ['school-dashboard',
+    'school-students','school-counselors','school-videos',
+    'school-reports','school-notifications',
     'school-settings','school-profile','school-gps','school-orbit','school-attendance'],
-  COMPANY_ROUTES: ['company-dashboard','schools','content-manager','drive-manager',
+  COMPANY_ROUTES: ['company-dashboard','schools',
     'media-library','school-admins','roles-permissions','company-settings','api-keys','audit-log','invitations'],
 
-  COMPANY_ADMIN_ROUTES: ['company-dashboard','schools','content-manager','drive-manager',
+  COMPANY_ADMIN_ROUTES: ['company-dashboard','schools',
     'media-library','school-admins','roles-permissions','company-settings','audit-log','invitations'],
 
   async _getProfile() {
@@ -776,6 +754,9 @@ window.AppRouter = {
 
   // --- SCHOOL WORKSPACE (dispatcher) ---
   async renderSchoolWorkspace(main, user, school, data) {
+    if (['school-categories', 'school-subjects', 'school-sections', 'school-courses', 'school-assignments', 'school-drive'].includes(this.currentRoute)) {
+      this.currentRoute = 'school-videos';
+    }
     const profile = await AuthService.getProfile();
     const isSuperAdmin = profile && profile.role === 'super_admin';
     const schoolName = AppUtils.escapeHtml(school?.name || 'School');
@@ -838,8 +819,6 @@ window.AppRouter = {
           <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-green" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">trending_up</span></div><div class="metric-info"><h2 style="font-size:22px;">${studentsStarted}</h2><p>Active Students</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-purple" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">people</span></div><div class="metric-info"><h2 style="font-size:22px;">${teachersCount || 0}</h2><p>Teachers</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#fef2f2;color:#ef4444;"><span class="material-symbols-outlined" style="font-size:20px;">badge</span></div><div class="metric-info"><h2 style="font-size:22px;">${schoolCounselors.length}</h2><p>Counselors</p></div></div>
-          <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#f0fdf4;color:#10b981;"><span class="material-symbols-outlined" style="font-size:20px;">folder</span></div><div class="metric-info"><h2 style="font-size:22px;">${cats.length}</h2><p>Classes</p></div></div>
-          <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#f5f3ff;color:#8b5cf6;"><span class="material-symbols-outlined" style="font-size:20px;">auto_stories</span></div><div class="metric-info"><h2 style="font-size:22px;">${subjects.length}</h2><p>Subjects</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#ecfdf5;color:#059669;"><span class="material-symbols-outlined" style="font-size:20px;">how_to_reg</span></div><div class="metric-info"><h2 style="font-size:22px;">${teachersCount || 0}</h2><p>Attendance Teacher</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-blue" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">video_library</span></div><div class="metric-info"><h2 style="font-size:22px;">${content.length}</h2><p>Videos</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#fffbeb;color:#f59e0b;"><span class="material-symbols-outlined" style="font-size:20px;">storage</span></div><div class="metric-info"><h2 style="font-size:22px;">${storageLabel}</h2><p>Storage Used</p></div></div>
@@ -854,8 +833,6 @@ window.AppRouter = {
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-students"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">person_add</span> Add Student</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-counselors"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">support_agent</span> Add Counselor</button>
-            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-categories"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">folder</span> Classes</button>
-            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-subjects"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">auto_stories</span> Subjects</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-reports"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">bar_chart</span> Reports</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-videos"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">video_library</span> Videos</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-notifications"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">notifications</span> Notifications${schoolNotifications.filter(n => !n.is_read).length ? `<span style="background:var(--danger);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;">${schoolNotifications.filter(n => !n.is_read).length}</span>` : ''}</button>
@@ -2466,15 +2443,6 @@ window.AppGlobalSearch = {
     const ql = q.toLowerCase();
     const matches = [];
     data.schools.forEach(s => { if (s.name.toLowerCase().includes(ql) || s.code.toLowerCase().includes(ql)) matches.push({ type: 'School', label: s.name, sub: s.code, route: 'school-dashboard', id: s.id }); });
-    data.categories.forEach(c => {
-      if (c.name.toLowerCase().includes(ql)) { const school = data.schools.find(s => s.id === c.school_id); matches.push({ type: 'Category', label: c.name, sub: school ? `in ${school.name}` : '', route: 'school-categories', schoolId: c.school_id }); }
-    });
-    data.subjects.forEach(sub => {
-      if (sub.name.toLowerCase().includes(ql)) { const school = data.schools.find(s => s.id === sub.school_id); matches.push({ type: 'Subject', label: sub.name, sub: school ? `in ${school.name}` : '', route: 'school-subjects', schoolId: sub.school_id, catId: sub.category_id }); }
-    });
-    data.sections.forEach(sec => {
-      if (sec.name.toLowerCase().includes(ql)) { const school = data.schools.find(s => s.id === sec.school_id); matches.push({ type: 'Section', label: sec.name, sub: school ? `in ${school.name}` : '', route: 'school-sections', schoolId: sec.school_id }); }
-    });
     (data.courses || []).forEach(c => {
       if (c.name.toLowerCase().includes(ql)) { const school = data.schools.find(s => s.id === c.school_id); matches.push({ type: 'Course', label: c.name, sub: school ? `in ${school.name}` : `${c.difficulty || ''}`, route: 'school-courses', schoolId: c.school_id }); }
     });
@@ -5150,7 +5118,7 @@ window.AppInvitations = {
       const approveBtn = e.target.closest('[data-action="approve-access-request"]');
       if (approveBtn) {
         const request = pendingRequests.find(item => item.id === approveBtn.dataset.id);
-        if (request) this._showApprovalModal(request, data.schools, data.categories);
+        if (request) this._showApprovalModal(request, data.schools);
         return;
       }
       const rejectBtn = e.target.closest('[data-action="reject-access-request"]');
@@ -5254,7 +5222,7 @@ window.AppInvitations = {
     });
   },
 
-  _showApprovalModal(request, schools, classes) {
+  _showApprovalModal(request, schools) {
     document.getElementById('modal-access-approval')?.remove();
     const html = `<div class="modal-overlay active" id="modal-access-approval" role="dialog" aria-modal="true">
       <div class="modal" style="max-width:520px;">
@@ -5269,33 +5237,22 @@ window.AppInvitations = {
               ${schools.map(s => `<option value="${s.id}">${AppUtils.escapeHtml(s.name)}</option>`).join('')}
             </select>
           </div>
-          ${request.requestedRole === 'student' ? `<div class="form-group"><label class="form-label">Assign Class</label>
-            <select class="form-select" id="approval-class"><option value="">Select a school first...</option></select>
-          </div>` : ''}
-          <p style="font-size:11px;color:var(--text-muted);">Requested: ${AppUtils.escapeHtml(request.requestedSchoolName || request.requestedSchoolCode || '—')} ${request.requestedClass ? `· ${AppUtils.escapeHtml(request.requestedClass)}` : ''}</p>
+          <p style="font-size:11px;color:var(--text-muted);">Requested: ${AppUtils.escapeHtml(request.requestedSchoolName || request.requestedSchoolCode || '—')}</p>
+          ${request.requestedRole === 'student' ? '<p style="font-size:11px;color:var(--text-muted);">After approval, edit the student and add their Google Drive class folder ID.</p>' : ''}
           <button class="btn btn-primary" id="btn-confirm-access-approval" style="width:100%;margin-top:12px;">Approve Access</button>
         </div>
       </div>
     </div>`;
     document.body.insertAdjacentHTML('beforeend', html);
     const schoolSelect = document.getElementById('approval-school');
-    const classSelect = document.getElementById('approval-class');
-    const syncClasses = () => {
-      if (!classSelect) return;
-      const matches = classes.filter(item => item.school_id === schoolSelect.value);
-      classSelect.innerHTML = `<option value="">Select a class...</option>${matches.map(item => `<option value="${item.id}">${AppUtils.escapeHtml(item.name)}</option>`).join('')}`;
-    };
-    schoolSelect.addEventListener('change', syncClasses);
     document.getElementById('btn-confirm-access-approval').addEventListener('click', async () => {
       const schoolId = schoolSelect.value;
-      const classId = classSelect?.value || null;
       if (!schoolId) { AppToast.show('Please select a school', 'error'); return; }
-      if (request.requestedRole === 'student' && !classId) { AppToast.show('Please select a class', 'error'); return; }
       try {
         const { error } = await supabase.rpc('approve_access_request', {
           p_profile_id: request.id,
           p_school_id: schoolId,
-          p_class_id: classId
+          p_class_id: null
         });
         if (error) throw error;
         AppStorage.invalidate();
@@ -5844,13 +5801,10 @@ async function initApp() {
     }
     const needsSchoolName = selectedOnboardingRole === 'school';
     const needsSchoolCode = selectedOnboardingRole === 'student';
-    const needsClass = selectedOnboardingRole === 'student';
     document.getElementById('onboarding-school-name-group').style.display = needsSchoolName ? '' : 'none';
     document.getElementById('onboarding-school-code-group').style.display = needsSchoolCode ? '' : 'none';
-    document.getElementById('onboarding-class-group').style.display = needsClass ? '' : 'none';
     document.getElementById('onboarding-school-name').required = needsSchoolName;
     document.getElementById('onboarding-school-code').required = needsSchoolCode;
-    document.getElementById('onboarding-class').required = needsClass;
     document.getElementById('onboarding-role-step').style.display = 'none';
     document.getElementById('onboarding-details-step').style.display = '';
     document.getElementById('onboarding-progress').style.width = '100%';
@@ -5885,7 +5839,7 @@ async function initApp() {
       role: selectedOnboardingRole,
       schoolName: document.getElementById('onboarding-school-name').value.trim(),
       schoolCode: document.getElementById('onboarding-school-code').value.trim(),
-      studentClass: document.getElementById('onboarding-class').value.trim()
+      studentClass: null
     });
 
     submit.disabled = false;
