@@ -12,6 +12,7 @@ export { CourseService } from './course-service.js';
 export { EnrollmentService } from './enrollment-service.js';
 export { NotificationService } from './notification-service.js';
 export { AccountService } from './account-service.js';
+export { AdminAccessService } from './admin-access-service.js';
 export { SettingsService } from './settings-service.js';
 export { PermissionsService } from './permissions-service.js';
 export { ModuleService } from './lms-module-service.js';
