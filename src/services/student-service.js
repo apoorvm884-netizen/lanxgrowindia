@@ -42,6 +42,7 @@ export const StudentService = {
         school_id: item.schoolId,
         counselor_id: item.counselorId || null,
         status: item.status || 'active',
+        class_id: item.classId || null,
         class: item.class || null,
         section: item.section || null,
         dob: item.dob || null,
@@ -68,6 +69,7 @@ export const StudentService = {
     if (updates.email !== undefined) payload.email = updates.email;
     if (updates.counselorId !== undefined) payload.counselor_id = updates.counselorId;
     if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.classId !== undefined) payload.class_id = updates.classId;
     if (updates.class !== undefined) payload.class = updates.class;
     if (updates.section !== undefined) payload.section = updates.section;
     if (updates.dob !== undefined) payload.dob = updates.dob;
