@@ -1,3 +1,4 @@
+[README.md](https://github.com/user-attachments/files/30404961/README.md)
 # Google Sheets Tracking Connector
 
 This is an independent Node.js service. It does not import, edit, or replace the
@@ -8,12 +9,11 @@ Deleting this directory removes the connector without affecting the old app.
 
 Create a Google Spreadsheet (or let the service create missing tabs). It uses:
 
-- `Raw_Pings`: `Timestamp, Device_ID, Latitude, Longitude, Speed`
-- `Trip_Summary`: `Date, Event_Type, Time_Triggered, Duration_Minutes, Google_Maps_Link`
+- `Raw_Pings`: `Timestamp, Device_ID, Latitude, Longitude, Speed_KMH, Ping_ID`
+- `Trip_Summary`: `Date, Device_ID, Event_Type, Time_Triggered, Duration_Minutes, Google_Maps_Link, Event_ID`
 
-The summary schema requested does not contain `Device_ID`. For one shared sheet
-with multiple tracked phones, adding `Device_ID` to `Trip_Summary` is strongly
-recommended in a later schema version so events can be attributed unambiguously.
+`Ping_ID` prevents duplicate raw rows after webhook retries. `Device_ID` and
+`Event_ID` make multi-device summaries attributable and retry-safe.
 
 ## Google Cloud setup
 
@@ -24,11 +24,36 @@ recommended in a later schema version so events can be attributed unambiguously.
 4. Open the target Google Sheet and share it with the JSON key's
    `client_email` as **Editor**. Do not give the service account broad project
    roles; Sheet sharing is the required data permission.
-5. Copy `.env.example` to `.env`. Set `GOOGLE_SHEET_ID` from the URL segment
-   between `/d/` and `/edit`, then copy `client_email` and `private_key` from
-   the JSON into the matching variables.
+5. Copy `.env.example` to `.env`, then copy `client_email` and `private_key`
+   from the JSON into the matching variables.
 6. Never commit `.env` or the downloaded JSON key. Store the same values as
    encrypted secrets in the deployment platform.
+
+## LANXGROW UI connection
+
+The connector also writes each accepted ping to the existing Supabase
+`vehicle_locations` table. Existing database triggers update
+`vehicle_current_location`, `vehicle_events`, and `gps_devices.last_seen_at`.
+The existing LANXGROW GPS screen therefore shows the live map location,
+moving/stopped state, speed, and recent events without replacing frontend code.
+
+Before sending pings:
+
+1. In LANXGROW, open the relevant school's **GPS Tracking** screen.
+2. Create a vehicle.
+3. Create a GPS device and set **Device UID** to exactly the mobile app's
+   `deviceId`.
+4. Assign that GPS device to the vehicle and keep it active.
+5. As Super Admin, open **Schools**, click **Add Sheet/Change Sheet** on that
+   school, and paste the Sheet ID from the URL segment between `/d/` and
+   `/edit`.
+
+Each school can use a different Google Sheet. The connector resolves the
+incoming device to its school and writes only to that school's configured
+spreadsheet.
+
+Set `SUPABASE_URL` and a backend-only Supabase secret key in the connector's
+deployment environment. Never use or expose this secret in the Vite frontend.
 
 ## Run
 
@@ -59,6 +84,10 @@ The normalizer also accepts common Traccar-like aliases:
 Configure Traccar/custom mobile middleware to POST each position to this URL
 and include `x-telemetry-secret`.
 
+Set `INPUT_SPEED_UNIT=knots` for standard Traccar speed values. Supported values
+are `kmh`, `knots`, `mph`, and `mps`; all stored/output speeds are normalized to
+km/h.
+
 ## Processing rules
 
 - Moving: speed above `STOP_SPEED_KMH`, or movement outside the configured
@@ -69,8 +98,9 @@ and include `x-telemetry-secret`.
 - Journey start: the first moving ping after startup or a completed journey.
 - Journey end: the first ping confirming stationary time has reached
   `JOURNEY_END_MINUTES` (default 10).
-- Pings are serialized before sheet writes. Out-of-order pings do not mutate
-  journey state. On restart, state is rebuilt from `Raw_Pings`.
+- Pings are serialized before writes and receive a stable `Ping_ID`.
+  Out-of-order pings do not mutate journey state. On restart, state is rebuilt
+  from `Raw_Pings`.
 
 ## Safe integration
 
