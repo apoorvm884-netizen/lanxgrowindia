@@ -23,18 +23,21 @@ export const NotificationService = {
     return count || 0;
   },
 
-  async create(title, message, userId) {
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert({
-        user_id: userId,
+  async create(title, message, userId, schoolId) {
+    const { data, error } = await supabase.functions.invoke('send-notification', {
+      body: {
         title,
-        message: message || null
-      })
-      .select()
-      .single();
-    if (error) throw error;
+        message: message || null,
+        user_ids: userId ? [userId] : [],
+        school_id: schoolId || null
+      }
+    });
+    if (error || data?.error) throw new Error(data?.error || error?.message || 'Notification failed');
     return data;
+  },
+
+  async broadcast(title, message, schoolId) {
+    return this.create(title, message, null, schoolId);
   },
 
   async markAsRead(id) {
