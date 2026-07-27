@@ -33,6 +33,16 @@ export const StudentService = {
     return data;
   },
 
+  async getByUserId(userId) {
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
   async create(item) {
     const { data, error } = await supabase
       .from('students')
