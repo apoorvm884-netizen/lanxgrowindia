@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/30406290/README.md)
+[README.md](https://github.com/user-attachments/files/30419087/README.md)
 # Google Sheets Tracking Connector
 
 > Supabase-first deployment: production now uses
