@@ -465,12 +465,9 @@ window.AppSidebar = {
     { id: 'school-counselors', label: 'Counselors', icon: 'badge', route: 'school-counselors' },
     { id: 'sep-s2', separator: true },
     { id: 'school-categories', label: 'Classes', icon: 'folder-tree', route: 'school-categories' },
-    { id: 'school-subjects', label: 'Subjects', icon: 'auto_stories', route: 'school-subjects' },
-    { id: 'school-courses', label: 'Courses', icon: 'book-open', route: 'school-courses' },
     { id: 'sep-s3', separator: true },
     { id: 'school-drive', label: 'Drive', icon: 'cloud', route: 'school-drive' },
     { id: 'school-videos', label: 'Video Library', icon: 'video-library', route: 'school-videos' },
-    { id: 'school-assignments', label: 'Assignments', icon: 'assignment', route: 'school-assignments' },
     { id: 'sep-s4', separator: true },
     { id: 'school-attendance', label: 'Attendance', icon: 'how_to_reg', route: 'school-attendance' },
     { id: 'school-gps', label: 'GPS Tracking', icon: 'location_on', route: 'school-gps' },
@@ -487,8 +484,7 @@ window.AppSidebar = {
     { id: 'sep-s1', separator: true },
     { id: 'school-students', label: 'Students', icon: 'groups', route: 'school-students' },
     { id: 'sep-s2', separator: true },
-    { id: 'school-courses', label: 'Courses', icon: 'school', route: 'school-courses' },
-    { id: 'school-assignments', label: 'Assignments', icon: 'assignment', route: 'school-assignments' },
+    { id: 'school-videos', label: 'Class Videos', icon: 'video-library', route: 'school-videos' },
     { id: 'sep-s3', separator: true },
     { id: 'school-reports', label: 'Reports', icon: 'bar-chart-3', route: 'school-reports' },
     { id: 'school-notifications', label: 'Notifications', icon: 'notifications', route: 'school-notifications' },
@@ -510,9 +506,7 @@ window.AppSidebar = {
   STUDENT_ITEMS: [
     { id: 'school-dashboard', label: 'My Dashboard', icon: 'layout-dashboard', route: 'school-dashboard' },
     { id: 'sep-s1', separator: true },
-    { id: 'school-courses', label: 'My Courses', icon: 'school', route: 'school-courses' },
-    { id: 'school-assignments', label: 'Assignments', icon: 'assignment', route: 'school-assignments' },
-    { id: 'school-videos', label: 'Video Library', icon: 'video-library', route: 'school-videos' },
+    { id: 'school-videos', label: 'My Class Videos', icon: 'video-library', route: 'school-videos' },
     { id: 'sep-s2', separator: true },
     { id: 'school-reports', label: 'My Progress', icon: 'bar-chart-3', route: 'school-reports' },
     { id: 'school-notifications', label: 'Notifications', icon: 'notifications', route: 'school-notifications' },
@@ -836,7 +830,6 @@ window.AppRouter = {
           <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-green" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">trending_up</span></div><div class="metric-info"><h2 style="font-size:22px;">${studentsStarted}</h2><p>Active Students</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-purple" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">people</span></div><div class="metric-info"><h2 style="font-size:22px;">${teachersCount || 0}</h2><p>Teachers</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#fef2f2;color:#ef4444;"><span class="material-symbols-outlined" style="font-size:20px;">badge</span></div><div class="metric-info"><h2 style="font-size:22px;">${schoolCounselors.length}</h2><p>Counselors</p></div></div>
-          <div class="metric-card" style="padding:16px;"><div class="metric-icon metric-icon-orange" style="width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">school</span></div><div class="metric-info"><h2 style="font-size:22px;">${schoolCourses.length}</h2><p>Courses</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#f0fdf4;color:#10b981;"><span class="material-symbols-outlined" style="font-size:20px;">folder</span></div><div class="metric-info"><h2 style="font-size:22px;">${cats.length}</h2><p>Classes</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#f5f3ff;color:#8b5cf6;"><span class="material-symbols-outlined" style="font-size:20px;">auto_stories</span></div><div class="metric-info"><h2 style="font-size:22px;">${subjects.length}</h2><p>Subjects</p></div></div>
           <div class="metric-card" style="padding:16px;"><div class="metric-icon" style="width:38px;height:38px;background:#ecfdf5;color:#059669;"><span class="material-symbols-outlined" style="font-size:20px;">how_to_reg</span></div><div class="metric-info"><h2 style="font-size:22px;">${teachersCount || 0}</h2><p>Attendance Teacher</p></div></div>
@@ -853,9 +846,8 @@ window.AppRouter = {
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-students"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">person_add</span> Add Student</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-counselors"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">support_agent</span> Add Counselor</button>
-            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-courses"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">playlist_add</span> Create Course</button>
-            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-assignments"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">assignment</span> Assign Course</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-categories"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">folder</span> Classes</button>
+            <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-subjects"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">auto_stories</span> Subjects</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-reports"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">bar_chart</span> Reports</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-videos"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">video_library</span> Videos</button>
             <button class="btn btn-secondary" style="height:38px;font-size:12px;justify-content:flex-start;gap:6px;padding:0 12px;" data-action="navigate" data-route="school-notifications"><span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">notifications</span> Notifications${schoolNotifications.filter(n => !n.is_read).length ? `<span style="background:var(--danger);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;">${schoolNotifications.filter(n => !n.is_read).length}</span>` : ''}</button>
@@ -924,25 +916,6 @@ window.AppRouter = {
           }).join('')}</div>
         </div>` : ''}
 
-        ${schoolCourses.slice(0, 5).length > 0 ? `<div class="card" style="padding:20px;margin-top:16px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-            <h3 style="margin:0;font-size:14px;font-weight:600;">Recent Courses</h3>
-            <button class="btn btn-ghost btn-sm" style="font-size:11px;" data-action="navigate" data-route="school-courses">View All</button>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:4px;">${schoolCourses.slice(0, 5).map(c => {
-            const cat = data.categories.find(cat => cat.id === c.category_id);
-            const sub = data.subjects.find(sub => sub.id === c.subject_id);
-            return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);">
-              <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--primary),#6366f1);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;">${AppUtils.getInitials(c.name)}</div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:500;">${AppUtils.escapeHtml(c.name)}</div>
-                <div style="font-size:11px;color:var(--text-secondary);">${cat ? AppUtils.escapeHtml(cat.name) : ''}${sub ? ' · ' + AppUtils.escapeHtml(sub.name) : ''}</div>
-              </div>
-              <span style="font-size:11px;padding:2px 6px;border-radius:4px;background:${c.difficulty === 'beginner' ? '#f0fdf4' : c.difficulty === 'advanced' ? '#fef2f2' : '#fffbeb'};color:${c.difficulty === 'beginner' ? '#16a34a' : c.difficulty === 'advanced' ? '#dc2626' : '#d97706'};">${AppUtils.escapeHtml(c.difficulty || 'intermediate')}</span>
-              <span class="status-badge ${c.publish_status === 'published' ? 'status-active' : 'status-pending'}">${AppUtils.escapeHtml(c.publish_status || 'draft')}</span>
-            </div>`;
-          }).join('')}</div>
-        </div>` : ''}
       </div>`;
       initIcons();
       return;
@@ -1048,7 +1021,7 @@ window.AppRouter = {
         <div class="management-bar" style="margin-bottom:16px;">
           <div class="search-bar" style="max-width:280px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="subject-search" placeholder="Search subjects..." data-action="subject-search-input"></div>
           <select class="form-select" id="subject-category-filter" style="width:160px;height:40px;font-size:13px;">
-            <option value="">All Categories</option>
+            <option value="">All Classes</option>
             ${cats.map(c => `<option value="${c.id}" ${c.id === catId ? 'selected' : ''}>${AppUtils.escapeHtml(c.name)}</option>`).join('')}
           </select>
         </div>
@@ -1058,7 +1031,7 @@ window.AppRouter = {
             : subjects.map(s => {
               const cat = cats.find(c => c.id === s.category_id);
               const secCount = data.sections.filter(sec => sec.subject_id === s.id).length;
-              return `<tr><td><div class="font-semibold">${AppUtils.escapeHtml(s.name)}</div></td><td style="font-size:13px;">${AppUtils.escapeHtml(cat?.name || '—')}</td><td>${secCount}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(s.created_at)}</td>
+              return `<tr><td><div class="font-semibold">${AppUtils.escapeHtml(s.name)}</div></td><td style="font-size:13px;">${AppUtils.escapeHtml(cat?.name || '—')}</td><td>${data.content.filter(item => item.subject_id === s.id).length}</td><td style="font-size:13px;color:var(--text-secondary);">${AppUtils.formatDate(s.created_at)}</td>
                 <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
                   <button class="btn btn-ghost btn-sm" data-action="open-subject" data-id="${s.id}" title="Open"><span class="material-symbols-outlined" style="font-size:16px;">open_in_new</span></button>
                   <button class="btn btn-ghost btn-sm" data-action="edit-subject" data-id="${s.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
@@ -2046,11 +2019,12 @@ window.AppCategories = {
   async openCreate(parentCategoryId) {
     document.getElementById('entity-type').value = 'category';
     document.getElementById('entity-id').value = '';
-    document.getElementById('entity-parent-id').value = parentCategoryId || '';
+    document.getElementById('entity-parent-id').value = '';
     document.querySelectorAll('.entity-fields').forEach(el => el.style.display = 'none');
     document.getElementById('entity-fields-category').style.display = 'block';
     document.getElementById('input-name-cat').value = '';
-    document.getElementById('modal-title').textContent = parentCategoryId ? 'Add Sub-category' : 'Add Category';
+    document.getElementById('input-class-drive-folder').value = '';
+    document.getElementById('modal-title').textContent = 'Add Class';
     AppModal.open('modal-entity');
   },
   async edit(id) {
@@ -2062,7 +2036,8 @@ window.AppCategories = {
     document.querySelectorAll('.entity-fields').forEach(el => el.style.display = 'none');
     document.getElementById('entity-fields-category').style.display = 'block';
     document.getElementById('input-name-cat').value = cat.name;
-    document.getElementById('modal-title').textContent = 'Edit Category';
+    document.getElementById('input-class-drive-folder').value = cat.drive_folder_id || '';
+    document.getElementById('modal-title').textContent = 'Edit Class';
     AppModal.open('modal-entity');
   },
   async confirmDelete(id) {
@@ -2252,11 +2227,11 @@ window.AppContent = {
     schoolSelect.innerHTML = `<option value="">Choose...</option>${data.schools.map(s => `<option value="${s.id}">${AppUtils.escapeHtml(s.name)}</option>`).join('')}`;
     document.getElementById('input-content-section').innerHTML = '<option value="">Choose a school first</option>';
     if (sectionId) {
-      const sec = data.sections.find(s => s.id === sectionId);
-      if (sec) { schoolSelect.value = sec.school_id; this.populateSections(sec.school_id, sectionId); }
+      const classItem = data.categories.find(c => c.id === sectionId);
+      if (classItem) { schoolSelect.value = classItem.school_id; this.populateSections(classItem.school_id, sectionId); }
     } else if (AppRouter.currentSchoolId) {
       schoolSelect.value = AppRouter.currentSchoolId;
-      this.populateSections(AppRouter.currentSchoolId, null);
+      this.populateSections(AppRouter.currentSchoolId, AppRouter._selectedCategoryId || null);
     }
     document.getElementById('modal-title').textContent = 'Add Content';
     AppModal.open('modal-entity');
@@ -2279,7 +2254,7 @@ window.AppContent = {
     const schoolSelect = document.getElementById('input-content-school');
     schoolSelect.innerHTML = `<option value="">Choose...</option>${data.schools.map(s => `<option value="${s.id}">${AppUtils.escapeHtml(s.name)}</option>`).join('')}`;
     schoolSelect.value = item.school_id;
-    this.populateSections(item.school_id, item.section_id);
+    this.populateSections(item.school_id, item.category_id);
     document.getElementById('modal-title').textContent = 'Edit Content';
     AppModal.open('modal-entity');
   },
@@ -2312,9 +2287,9 @@ window.AppContent = {
   },
   async populateSections(schoolId, selectedId) {
     const data = await AppStorage.load();
-    const sections = data.sections.filter(s => s.school_id === schoolId);
+    const sections = data.categories.filter(s => s.school_id === schoolId && !s.parent_id);
     const select = document.getElementById('input-content-section');
-    select.innerHTML = `<option value="">Choose...</option>${sections.map(s => `<option value="${s.id}" ${s.id === selectedId ? 'selected' : ''}>${AppUtils.escapeHtml(s.name)}</option>`).join('')}`;
+    select.innerHTML = `<option value="">Choose class...</option>${sections.map(s => `<option value="${s.id}" ${s.id === selectedId ? 'selected' : ''}>${AppUtils.escapeHtml(s.name)}</option>`).join('')}`;
   },
   async render() {
     const q = (document.getElementById('content-search')?.value || '').toLowerCase();
@@ -2893,13 +2868,18 @@ async function handleEntitySubmit() {
     } else if (type === 'category') {
       const name = document.getElementById('input-name-cat').value.trim();
       if (!name) { AppToast.show('Name is required.', 'error'); return; }
-      const parentId = document.getElementById('entity-parent-id')?.value || null;
+      const driveInput = document.getElementById('input-class-drive-folder')?.value.trim() || '';
+      const driveFolderId = driveInput ? DriveService.parseDriveLink(driveInput) : null;
+      if (driveInput && !driveFolderId) {
+        AppToast.show('Enter a valid Google Drive folder URL or Folder ID.', 'error');
+        return;
+      }
       if (isEdit) {
-        await CategoryService.update(id, { name, parentId });
-        AppToast.show('Category updated.', 'success');
+        await CategoryService.update(id, { name, driveFolderId });
+        AppToast.show('Class updated.', 'success');
       } else {
-        await CategoryService.create({ name, schoolId: AppRouter.currentSchoolId, parentId });
-        AppToast.show('Category created.', 'success');
+        await CategoryService.create({ name, schoolId: AppRouter.currentSchoolId, driveFolderId });
+        AppToast.show('Class created.', 'success');
       }
     } else if (type === 'subject') {
       const name = document.getElementById('input-subject-name').value.trim();
@@ -2943,7 +2923,8 @@ async function handleEntitySubmit() {
         url: rawUrl,
         size: document.getElementById('input-content-size').value.trim() || null,
         schoolId: document.getElementById('input-content-school').value,
-        sectionId: document.getElementById('input-content-section').value || null,
+        categoryId: document.getElementById('input-content-section').value || null,
+        sectionId: null,
         description: document.getElementById('input-content-description').value.trim() || null,
         tags: (document.getElementById('input-content-tags').value || '').split(',').map(t => t.trim()).filter(Boolean),
         status: rawStatus
@@ -3031,13 +3012,7 @@ document.addEventListener('click', async function (e) {
   if (action === 'edit-category') { AppCategories.edit(id); return; }
   if (action === 'delete-category') { AppCategories.confirmDelete(id); return; }
   if (action === 'open-category') {
-    const data = await AppStorage.load();
-    const cat = data.categories.find(c => c.id === id);
-    if (cat && data.categories.some(c => c.parent_id === id)) {
-      AppRouter.navigate('school-categories', { schoolId: AppRouter.currentSchoolId, categoryId: id });
-    } else {
-      AppRouter.navigate('school-subjects', { schoolId: AppRouter.currentSchoolId, categoryId: id });
-    }
+    AppRouter.navigate('school-videos', { schoolId: AppRouter.currentSchoolId, categoryId: id });
     return;
   }
 
@@ -3045,7 +3020,7 @@ document.addEventListener('click', async function (e) {
   if (action === 'add-subject') { AppSubjects.openCreate(AppRouter._selectedCategoryId); return; }
   if (action === 'edit-subject') { AppSubjects.edit(id); return; }
   if (action === 'delete-subject') { AppSubjects.confirmDelete(id); return; }
-  if (action === 'open-subject') { AppRouter.navigate('school-sections', { schoolId: AppRouter.currentSchoolId, subjectId: id }); return; }
+  if (action === 'open-subject') { AppRouter.navigate('school-videos', { schoolId: AppRouter.currentSchoolId, subjectId: id }); return; }
 
   // API Keys
   if (action === 'delete-api-key') {
