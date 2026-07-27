@@ -22,3 +22,4 @@ export { CertificateService } from './lms-certificate-service.js';
 export { GpsService } from './gps-service.js';
 export { InvitationService } from './invitation-service.js';
 export { AiService } from './ai-service.js';
+export { TrackingConfigService } from './tracking-config-service.js';
