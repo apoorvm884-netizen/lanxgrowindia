@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JourneyProcessor } from '../src/journey-processor.js';
+import { normalizePing, TelemetryService } from '../src/telemetry-service.js';
 
 const processor = () => new JourneyProcessor({
   stopSpeedKmh: 2,
@@ -46,4 +47,44 @@ test('ignores out-of-order pings', () => {
   const engine = processor();
   engine.process(ping(5, 20));
   assert.deepEqual(engine.process(ping(4, 20)), []);
+});
+
+test('normalizes Traccar knots to km/h and creates a stable ping ID', () => {
+  const input = {
+    deviceId: 'phone-1',
+    latitude: 28.6139,
+    longitude: 77.209,
+    timestamp: '2026-07-27T08:00:00Z',
+    speed: 10,
+    ignition: 'false'
+  };
+  const first = normalizePing(input, 'knots');
+  const second = normalizePing(input, 'knots');
+  assert.equal(first.speed, 18.52);
+  assert.equal(first.ignition, false);
+  assert.equal(first.pingId, second.pingId);
+});
+
+test('writes a ping to Supabase and Sheets through the isolated pipeline', async () => {
+  const calls = [];
+  const sheets = {
+    ensureSchema: async sheetId => calls.push(['schema', sheetId]),
+    readPings: async () => [],
+    appendTelemetry: async (sheetId, location, events) => calls.push(['sheet', sheetId, location, events])
+  };
+  const store = {
+    resolveDevice: async () => ({
+      id: 'device-db-id',
+      school_id: 'school-id',
+      vehicle_id: 'vehicle-id',
+      tracking_sheet_id: 'school-sheet-id'
+    }),
+    appendLocation: async (device, location) => calls.push(['supabase', device, location])
+  };
+  const service = new TelemetryService(sheets, processor(), store);
+  await service.initialize();
+  const result = await service.ingest(ping(0, 15));
+  assert.equal(result.device.vehicle_id, 'vehicle-id');
+  assert.deepEqual(calls.map(call => call[0]), ['schema', 'supabase', 'sheet']);
+  assert.equal(result.events[0].eventType, 'Journey Start');
 });
