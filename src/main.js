@@ -1398,49 +1398,45 @@ window.AppRouter = {
       { role: 'company_admin', title: 'Company Admin', icon: 'business', description: 'Manages their own company and schools', disabled: false,
         perms: [
           { label: 'Manage Schools', key: 'manage_schools', checked: true },
-          { label: 'Manage Categories', key: 'manage_categories', checked: true },
-          { label: 'Manage Subjects', key: 'manage_subjects', checked: true },
-          { label: 'Manage Sections', key: 'manage_sections', checked: true },
-          { label: 'Manage Content', key: 'manage_content', checked: true },
+          { label: 'Manage Classes', key: 'manage_categories', checked: true },
+          { label: 'Manage Videos', key: 'manage_content', checked: true },
           { label: 'Manage Users', key: 'manage_users', checked: true },
           { label: 'View Analytics', key: 'view_analytics', checked: true },
           { label: 'Access Settings', key: 'access_settings', checked: true },
-          { label: 'Manage Own Profile', key: 'company_profile', checked: true }
+          { label: 'Manage Own Profile', key: 'manage_own_profile', checked: true }
         ]},
       { role: 'school_admin', title: 'School Admin', icon: 'manage_accounts', description: 'Restricted to own school', disabled: false,
         perms: [
-          { label: 'Manage School Settings', key: 'school_settings', checked: true },
-          { label: 'Manage Categories', key: 'school_categories', checked: true },
-          { label: 'Manage Subjects', key: 'school_subjects', checked: true },
-          { label: 'Manage Sections', key: 'school_sections', checked: true },
-          { label: 'Manage Content', key: 'school_content', checked: true },
-          { label: 'View Analytics', key: 'school_analytics', checked: false },
-          { label: 'Manage Own Profile', key: 'school_profile', checked: true },
-          { label: 'Upload Drive Files', key: 'school_drive_upload', checked: false }
+          { label: 'Manage School Settings', key: 'manage_school_settings', checked: true },
+          { label: 'Manage Classes', key: 'manage_categories', checked: true },
+          { label: 'Manage Videos', key: 'manage_content', checked: true },
+          { label: 'View Analytics', key: 'view_analytics', checked: false },
+          { label: 'Manage Own Profile', key: 'manage_own_profile', checked: true },
+          { label: 'Upload Drive Files', key: 'manage_drive_upload', checked: false }
         ]},
       { role: 'teacher', title: 'Teacher', icon: 'school', description: 'Manage assigned courses and students', disabled: false,
         perms: [
-          { label: 'View Assigned Courses', key: 'teacher_courses', checked: true },
-          { label: 'View Assigned Students', key: 'teacher_students', checked: true },
-          { label: 'Grade Assignments', key: 'teacher_grade_assignments', checked: true },
-          { label: 'Grade Quizzes', key: 'teacher_grade_quizzes', checked: true },
-          { label: 'View Reports', key: 'teacher_reports', checked: true },
-          { label: 'View Own Profile', key: 'teacher_profile', checked: true }
+          { label: 'View Class Videos', key: 'view_assigned_courses', checked: true },
+          { label: 'View Assigned Students', key: 'view_assigned_students', checked: true },
+          { label: 'Grade Assignments', key: 'grade_assignments', checked: true },
+          { label: 'Grade Quizzes', key: 'grade_quizzes', checked: true },
+          { label: 'View Reports', key: 'view_analytics', checked: true },
+          { label: 'View Own Profile', key: 'manage_own_profile', checked: true }
         ]},
       { role: 'counselor', title: 'Counselor', icon: 'badge', description: 'Manage assigned students and counseling records', disabled: false,
         perms: [
-          { label: 'View Assigned Students', key: 'counselor_students', checked: true },
-          { label: 'Manage Student Progress', key: 'counselor_progress', checked: true },
-          { label: 'View Analytics', key: 'counselor_analytics', checked: true },
-          { label: 'Send Notifications', key: 'counselor_notifications', checked: true },
-          { label: 'Manage Own Profile', key: 'counselor_profile', checked: true }
+          { label: 'View Assigned Students', key: 'view_assigned_students', checked: true },
+          { label: 'Manage Student Progress', key: 'manage_student_progress', checked: true },
+          { label: 'View Analytics', key: 'view_analytics', checked: true },
+          { label: 'Send Notifications', key: 'send_notifications', checked: true },
+          { label: 'Manage Own Profile', key: 'manage_own_profile', checked: true }
         ]},
       { role: 'student', title: 'Student', icon: 'person', description: 'View own courses, progress, and certificates', disabled: false,
         perms: [
-          { label: 'View Own Courses', key: 'student_courses', checked: true },
-          { label: 'Track Own Progress', key: 'student_progress', checked: true },
-          { label: 'View Own Notifications', key: 'student_notifications', checked: true },
-          { label: 'Manage Own Profile', key: 'student_profile', checked: true }
+          { label: 'View Class Videos', key: 'view_own_courses', checked: true },
+          { label: 'Track Own Progress', key: 'track_own_progress', checked: true },
+          { label: 'View Own Notifications', key: 'view_own_notifications', checked: true },
+          { label: 'Manage Own Profile', key: 'manage_own_profile', checked: true }
         ]}
     ];
 
