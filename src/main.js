@@ -5396,6 +5396,82 @@ window.AppVideoPlayer = {
 // ==============================================================
 // INIT APP
 // ==============================================================
+let selectedOnboardingRole = null;
+
+function setAuthScreen(screen) {
+  const login = document.getElementById('app-login');
+  const onboarding = document.getElementById('app-onboarding');
+  const layout = document.getElementById('app-layout');
+  login.style.display = screen === 'login' ? '' : 'none';
+  onboarding.style.display = screen === 'onboarding' ? 'flex' : 'none';
+  layout.classList.toggle('hidden', screen !== 'app');
+}
+
+function configureOnboardingForm(profile) {
+  selectedOnboardingRole = null;
+  document.getElementById('onboarding-role-step').style.display = '';
+  document.getElementById('onboarding-details-step').style.display = 'none';
+  document.getElementById('onboarding-progress').style.width = '0';
+  document.getElementById('onboarding-step-two-dot').style.background = 'var(--surface-container)';
+  document.getElementById('onboarding-step-two-dot').style.color = 'var(--text-secondary)';
+  document.getElementById('onboarding-full-name').value = profile?.full_name || profile?.name || '';
+  document.querySelectorAll('.onboarding-role-option').forEach(option => {
+    option.style.borderColor = 'var(--border)';
+    option.style.boxShadow = 'var(--shadow-sm)';
+  });
+}
+
+function renderPendingAccess(profile) {
+  setAuthScreen('app');
+  document.getElementById('sidebar').style.display = 'none';
+  document.getElementById('sidebar-toggle').style.display = 'none';
+  const main = document.getElementById('main-content');
+  main.innerHTML = `<div class="fade-in" style="max-width:680px;margin:auto;text-align:center;">
+    <div class="card" style="padding:42px 32px;">
+      <div style="width:64px;height:64px;border-radius:50%;margin:0 auto 18px;background:var(--warning-light);color:var(--warning);display:flex;align-items:center;justify-content:center;">
+        <span class="material-symbols-outlined" style="font-size:32px;">hourglass_top</span>
+      </div>
+      <h1 style="font-size:22px;color:var(--on-surface);">Your access request is under review</h1>
+      <p style="font-size:13px;color:var(--text-secondary);margin:10px auto 20px;max-width:500px;">
+        Thanks, ${AppUtils.escapeHtml(profile.full_name || profile.name)}. Your profile is complete.
+        An administrator will verify your ${AppUtils.escapeHtml((profile.requested_role || 'platform').replace('_', ' '))} request before workspace access is enabled.
+      </p>
+      <div style="padding:12px;border-radius:var(--radius-md);background:var(--surface-low);font-size:12px;color:var(--text-secondary);">
+        Signed in as ${AppUtils.escapeHtml(profile.email || '')}
+      </div>
+    </div>
+  </div>`;
+}
+
+async function handleAuthenticatedSession() {
+  const profile = await AuthService.getProfile(true);
+  if (!profile) {
+    await AuthService.signOut();
+    setAuthScreen('login');
+    document.getElementById('login-error').textContent = 'Your profile could not be created. Please try signing in again.';
+    return;
+  }
+
+  if (!profile.onboarding_completed) {
+    configureOnboardingForm(profile);
+    setAuthScreen('onboarding');
+    return;
+  }
+
+  if (profile.role === 'pending') {
+    renderPendingAccess(profile);
+    return;
+  }
+
+  document.getElementById('sidebar').style.display = '';
+  document.getElementById('sidebar-toggle').style.display = '';
+  setAuthScreen('app');
+  AppRouter._clearProfile();
+  await AppRouter.init();
+  initIcons();
+  recordAttendance();
+}
+
 async function initApp() {
   AppStorage.init();
   AppModal.init();
@@ -5501,12 +5577,7 @@ async function initApp() {
     }
 
     errorEl.textContent = '';
-    document.getElementById('app-login').style.display = 'none';
-    document.getElementById('app-layout').classList.remove('hidden');
-    AppRouter.init();
-    initIcons();
-    // Record attendance after login
-    recordAttendance();
+    await handleAuthenticatedSession();
   });
 
   // Google OAuth
@@ -5521,27 +5592,86 @@ async function initApp() {
     });
   }
 
+  document.querySelectorAll('.onboarding-role-option').forEach(option => {
+    option.addEventListener('click', () => {
+      selectedOnboardingRole = option.dataset.onboardingRole;
+      document.querySelectorAll('.onboarding-role-option').forEach(item => {
+        const active = item === option;
+        item.style.borderColor = active ? 'var(--primary)' : 'var(--border)';
+        item.style.boxShadow = active ? '0 0 0 2px var(--primary-subtle)' : 'var(--shadow-sm)';
+      });
+      document.getElementById('onboarding-role-error').textContent = '';
+    });
+  });
+
+  document.getElementById('btn-onboarding-next').addEventListener('click', () => {
+    if (!selectedOnboardingRole) {
+      document.getElementById('onboarding-role-error').textContent = 'Please select a role to continue.';
+      return;
+    }
+    const needsSchoolName = selectedOnboardingRole === 'school';
+    const needsSchoolCode = selectedOnboardingRole === 'teacher_counselor' || selectedOnboardingRole === 'student';
+    const needsClass = selectedOnboardingRole === 'student';
+    document.getElementById('onboarding-school-name-group').style.display = needsSchoolName ? '' : 'none';
+    document.getElementById('onboarding-school-code-group').style.display = needsSchoolCode ? '' : 'none';
+    document.getElementById('onboarding-class-group').style.display = needsClass ? '' : 'none';
+    document.getElementById('onboarding-school-name').required = needsSchoolName;
+    document.getElementById('onboarding-school-code').required = needsSchoolCode;
+    document.getElementById('onboarding-class').required = needsClass;
+    document.getElementById('onboarding-role-step').style.display = 'none';
+    document.getElementById('onboarding-details-step').style.display = '';
+    document.getElementById('onboarding-progress').style.width = '100%';
+    document.getElementById('onboarding-step-two-dot').style.background = 'var(--primary)';
+    document.getElementById('onboarding-step-two-dot').style.color = 'white';
+  });
+
+  document.getElementById('btn-onboarding-back').addEventListener('click', () => {
+    document.getElementById('onboarding-details-step').style.display = 'none';
+    document.getElementById('onboarding-role-step').style.display = '';
+    document.getElementById('onboarding-progress').style.width = '0';
+    document.getElementById('onboarding-step-two-dot').style.background = 'var(--surface-container)';
+    document.getElementById('onboarding-step-two-dot').style.color = 'var(--text-secondary)';
+  });
+
+  document.getElementById('btn-onboarding-signout').addEventListener('click', async () => {
+    await AuthService.signOut();
+    setAuthScreen('login');
+  });
+
+  document.getElementById('onboarding-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const submit = document.getElementById('btn-onboarding-submit');
+    const errorEl = document.getElementById('onboarding-submit-error');
+    errorEl.textContent = '';
+    submit.disabled = true;
+    submit.textContent = 'Saving...';
+
+    const result = await AuthService.completeOnboarding({
+      fullName: document.getElementById('onboarding-full-name').value.trim(),
+      phone: document.getElementById('onboarding-phone').value.trim(),
+      role: selectedOnboardingRole,
+      schoolName: document.getElementById('onboarding-school-name').value.trim(),
+      schoolCode: document.getElementById('onboarding-school-code').value.trim(),
+      studentClass: document.getElementById('onboarding-class').value.trim()
+    });
+
+    submit.disabled = false;
+    submit.textContent = 'Finish Setup';
+    if (!result.success) {
+      errorEl.textContent = result.error;
+      return;
+    }
+    await handleAuthenticatedSession();
+  });
+
   // Development Access Mode
   const devAccessContainer = document.getElementById('dev-access-container');
   const devBtn = document.getElementById('btn-dev-access');
   if (devAccessContainer && import.meta.env.VITE_DEV_ACCESS === 'true') {
-    devAccessContainer.style.display = '';
+    console.warn('VITE_DEV_ACCESS is ignored because automatic credential login is disabled.');
   }
   if (devBtn) {
-    devBtn.addEventListener('click', async () => {
-      const email = 'dev@lanxgro.com';
-      const password = 'DevAccess2026!';
-      const result = await AuthService.signInWithEmail(email, password);
-      if (!result.success) {
-        document.getElementById('login-error').textContent = result.error;
-        return;
-      }
-      document.getElementById('login-error').textContent = '';
-      document.getElementById('app-login').style.display = 'none';
-      document.getElementById('app-layout').classList.remove('hidden');
-      AppRouter.init();
-      initIcons();
-    });
+    devBtn.remove();
   }
 
   // Top nav
@@ -5571,8 +5701,8 @@ async function initApp() {
   // Logout
   document.getElementById('btn-logout').addEventListener('click', async () => {
     await AuthService.signOut();
-    document.getElementById('app-layout').classList.add('hidden');
-    document.getElementById('app-login').style.display = '';
+    document.getElementById('sidebar').style.display = '';
+    setAuthScreen('login');
     document.getElementById('login-form').reset();
     document.getElementById('login-error').textContent = '';
   });
@@ -5622,10 +5752,7 @@ async function initApp() {
   // Auto-login if session exists
   const session = await AuthService.getSession();
   if (session.authenticated) {
-    document.getElementById('app-login').style.display = 'none';
-    document.getElementById('app-layout').classList.remove('hidden');
-    AppRouter.init();
-    initIcons();
+    await handleAuthenticatedSession();
   }
 }
 
