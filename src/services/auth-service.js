@@ -79,5 +79,21 @@ export const AuthService = {
     this._profileCache = error ? null : data;
     this._profileCacheTime = Date.now();
     return error ? null : data;
+  },
+
+  async completeOnboarding(details) {
+    const { data, error } = await supabase.rpc('complete_my_onboarding', {
+      p_full_name: details.fullName,
+      p_phone: details.phone,
+      p_requested_role: details.role,
+      p_school_name: details.schoolName || null,
+      p_school_code: details.schoolCode || null,
+      p_class: details.studentClass || null
+    });
+    if (error) return { success: false, error: error.message };
+
+    this._profileCache = data;
+    this._profileCacheTime = Date.now();
+    return { success: true, profile: data };
   }
 };
