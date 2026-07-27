@@ -151,20 +151,12 @@ window.SchoolStudents = {
           <select class="form-select" id="sp-input-student-counselor"><option value="">None</option>${counselors.filter(c => c.profileId).map(c => `<option value="${c.profileId}">${eh(c.displayName)}</option>`).join('')}</select>
         </div>
 
-        <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Status & Credentials</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Status & Login</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group"><label class="form-label">Enrollment Status</label>
             <select class="form-select" id="sp-input-student-status"><option value="active">Active</option><option value="inactive">Inactive</option></select>
           </div>
-          <div class="form-group" style="display:flex;align-items:flex-end;gap:8px;">
-            <div style="flex:1;">
-              <label class="form-label">Login Credentials</label>
-              <div style="display:flex;gap:4px;align-items:center;">
-                <input type="text" class="form-input" id="sp-input-student-username" placeholder="Auto-generated" readonly style="flex:1;font-size:12px;background:var(--border-light);">
-                <button class="btn btn-secondary btn-sm" data-action="sp-generate-creds" style="white-space:nowrap;font-size:11px;"><span class="material-symbols-outlined" style="font-size:14px;">autorenew</span> Generate</button>
-              </div>
-            </div>
-          </div>
+          <div class="form-group"><label class="form-label">Login Password</label><input type="password" class="form-input" id="sp-input-student-password" minlength="8" autocomplete="new-password" placeholder="Minimum 8 characters"></div>
         </div>
         <div class="form-group" style="margin-top:4px;"><label class="form-label">Notes</label><textarea class="form-input" id="sp-input-student-notes" placeholder="Optional notes..." style="height:50px;resize:vertical;"></textarea></div>
       </div>
@@ -246,6 +238,8 @@ window.SchoolStudents = {
     const name = document.getElementById('sp-input-student-name')?.value?.trim();
     if (!name) { AppToast.show('Name is required.', 'error'); return; }
     const email = document.getElementById('sp-input-student-email')?.value?.trim() || null;
+    const password = document.getElementById('sp-input-student-password')?.value || '';
+    if (!isUpdate && (!email || password.length < 8)) { AppToast.show('Student login email and password (minimum 8 characters) are required.', 'error'); return; }
     const dob = document.getElementById('sp-input-student-dob')?.value || null;
     const gender = document.getElementById('sp-input-student-gender')?.value || null;
     const admissionNo = document.getElementById('sp-input-student-admission')?.value?.trim() || null;
@@ -271,6 +265,19 @@ window.SchoolStudents = {
         const student = await window.StudentService?.create({ ...updates, schoolId });
         savedStudent = student;
         if (student) {
+          try {
+            await window.AccountService?.provision({
+              email,
+              password,
+              fullName: name,
+              role: 'student',
+              schoolId,
+              studentId: student.id
+            });
+          } catch (accountError) {
+            await window.StudentService?.delete(student.id).catch(() => undefined);
+            throw accountError;
+          }
           if (counselorId) {
             try { await window.NotificationService?.create('Student Created', `New student "${name}" has been assigned to you.`, counselorId); } catch (e) { console.warn('Failed to send notification:', e); }
           }
@@ -606,6 +613,10 @@ window.SchoolCounselors = {
         <div class="form-group" style="margin-top:12px;"><label class="form-label">Status</label>
           <select class="form-select" id="sp-input-counselor-status"><option value="active" selected>Active</option><option value="inactive">Inactive</option></select>
         </div>
+        <div class="form-group" style="margin-top:12px;"><label class="form-label">Login Password</label>
+          <input type="password" class="form-input" id="sp-input-counselor-password" minlength="8" autocomplete="new-password" placeholder="Minimum 8 characters">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">The email above will be the counselor's login ID.</div>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" data-close-modal="modal-counselor">Cancel</button>
@@ -685,6 +696,8 @@ window.SchoolCounselors = {
     const name = document.getElementById('sp-input-counselor-name')?.value?.trim();
     if (!name) { AppToast.show('Name is required.', 'error'); return; }
     const email = document.getElementById('sp-input-counselor-email')?.value?.trim() || null;
+    const password = document.getElementById('sp-input-counselor-password')?.value || '';
+    if (!isUpdate && (!email || password.length < 8)) { AppToast.show('Counselor login email and password (minimum 8 characters) are required.', 'error'); return; }
     const employeeId = document.getElementById('sp-input-counselor-empid')?.value?.trim() || null;
     const phone = document.getElementById('sp-input-counselor-phone')?.value?.trim() || null;
     const gender = document.getElementById('sp-input-counselor-gender')?.value || null;
@@ -704,8 +717,21 @@ window.SchoolCounselors = {
         await window.CounselorService?.update(counselorId, updates);
         AppToast.show('Counselor updated.', 'success');
       } else {
-        await window.CounselorService?.create({ ...updates, schoolId });
-        AppToast.show('Counselor created.', 'success');
+        const counselor = await window.CounselorService?.create({ ...updates, schoolId });
+        try {
+          await window.AccountService?.provision({
+            email,
+            password,
+            fullName: name,
+            role: 'counselor',
+            schoolId,
+            counselorId: counselor.id
+          });
+        } catch (accountError) {
+          await window.CounselorService?.delete(counselor.id).catch(() => undefined);
+          throw accountError;
+        }
+        AppToast.show('Counselor and login account created.', 'success');
       }
       AppModal.close('modal-counselor');
       AppStorage.invalidate();
@@ -1659,7 +1685,7 @@ window.SchoolNotifications = {
   async openSend(schoolId) {
     const data = await AppStorage.load();
     const recipients = [
-      ...(data.counselors || []).filter(c => c.school_id === schoolId).map(c => ({ id: c.id, name: c.name, role: 'counselor' })),
+      ...(data.counselors || []).filter(c => c.school_id === schoolId && c.user_id).map(c => ({ id: c.user_id, name: c.name, role: 'counselor' })),
       ...(data.users || []).filter(u => u.schoolId === schoolId && u.role === 'school_admin').map(u => ({ id: u.id, name: u.name, role: 'admin' })),
     ];
     const existing = document.getElementById('modal-send-notification');
@@ -1698,16 +1724,9 @@ window.SchoolNotifications = {
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Sending...'; }
     try {
       if (recipientId) {
-        await window.NotificationService?.create(title, message, recipientId);
+        await window.NotificationService?.create(title, message, recipientId, AppRouter.currentSchoolId);
       } else {
-        const data = await AppStorage.load();
-        const schoolId = AppRouter.currentSchoolId;
-        const schoolUsers = (data.counselors || []).filter(c => c.school_id === schoolId).map(c => c.id);
-        const adminUsers = (data.users || []).filter(u => u.schoolId === schoolId && u.role === 'school_admin').map(u => u.id);
-        const allRecipients = [...new Set([...schoolUsers, ...adminUsers])];
-        for (const uid of allRecipients) {
-          await window.NotificationService?.create(title, `${message || ''} [System broadcast]`, uid);
-        }
+        await window.NotificationService?.broadcast(title, message, AppRouter.currentSchoolId);
       }
       AppToast.show('Notification sent.', 'success');
       AppModal.close('modal-send-notification');
