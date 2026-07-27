@@ -16,6 +16,7 @@ import {
   StudentService,
   NotificationService,
   AccountService,
+  AdminAccessService,
   SettingsService,
   PermissionsService,
   ModuleService,
@@ -40,6 +41,7 @@ window.DriveService = DriveService;
 window.StudentService = StudentService;
 window.NotificationService = NotificationService;
 window.AccountService = AccountService;
+window.AdminAccessService = AdminAccessService;
 window.CounselorService = CounselorService;
 window.SettingsService = SettingsService;
 window.PermissionsService = PermissionsService;
@@ -1820,6 +1822,7 @@ window.AppUserManagement = {
 
   async render(main) {
     const data = await AppStorage.load();
+    const currentProfile = await AuthService.getProfile();
     const q = this.searchQuery.toLowerCase();
 
     let users = data.users.map(u => {
@@ -1892,7 +1895,9 @@ window.AppUserManagement = {
                 <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
                   <button class="btn btn-ghost btn-sm" data-action="edit-user" data-id="${u.id}" title="Edit user"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
                   <button class="btn btn-ghost btn-sm ${isActive ? 'btn-danger-ghost' : ''}" data-action="${isActive ? 'deactivate-user' : 'activate-user'}" data-id="${u.id}" title="${isActive ? 'Deactivate' : 'Activate'}"><span class="material-symbols-outlined" style="font-size:16px;">${isActive ? 'block' : 'check_circle'}</span></button>
-                  <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-user" data-id="${u.id}" title="Delete user"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
+                  ${['super_admin', 'company_admin'].includes(currentProfile?.role) && u.role === 'school_admin'
+                    ? `<button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-user" data-id="${u.id}" title="Delete School Admin"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>`
+                    : ''}
                 </td>
               </tr>`;
             }).join('')}</tbody></table></div>`
@@ -1991,7 +1996,21 @@ window.AppUserManagement = {
   },
 
   async confirmDelete(userId) {
-    AppToast.show('User account deletion requires the invite-admin Edge Function (planned).', 'info');
+    const data = await AppStorage.load();
+    const user = data.users.find(item => item.id === userId);
+    if (!user || user.role !== 'school_admin') {
+      AppToast.show('Only School Admin accounts can be deleted here.', 'error');
+      return;
+    }
+    if (!confirm(`Delete School Admin "${user.name}" and revoke their login access? This cannot be undone.`)) return;
+    try {
+      await AdminAccessService.deleteSchoolAdmin(userId);
+      AppToast.show('School Admin and login access deleted.', 'success');
+      AppStorage.invalidate();
+      AppRouter.render();
+    } catch (err) {
+      AppToast.show(err.message || 'School Admin deletion failed.', 'error');
+    }
   }
 };
 
@@ -2994,6 +3013,7 @@ document.addEventListener('click', async function (e) {
   // Schools
   if (action === 'add-school') { openSchoolForm(); return; }
   if (action === 'edit-school') { AppSchools.edit(id); return; }
+  if (action === 'delete-school') { AppSchools.confirmDelete(id); return; }
   if (action === 'configure-tracking-sheet') {
     const data = await AppStorage.load();
     const school = data.schools.find(item => item.id === id);
@@ -5131,8 +5151,8 @@ window.AppInvitations = {
               <td style="font-size:12px;color:var(--text-muted);">${AppUtils.formatDate(inv.created_at)}</td>
               <td style="font-size:12px;color:var(--text-muted);">${AppUtils.formatDate(inv.expires_at)}</td>
               <td style="white-space:nowrap;">
-                ${inv.status === 'pending' ? `<button class="btn btn-ghost btn-sm" data-action="resend-invite" data-id="${inv.id}" title="Resend"><span class="material-symbols-outlined" style="font-size:16px;">refresh</span></button>
-                <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="revoke-invite" data-id="${inv.id}" title="Revoke"><span class="material-symbols-outlined" style="font-size:16px;">block</span></button>` : ''}
+                ${inv.status === 'pending' ? `<button class="btn btn-ghost btn-sm" data-action="resend-invite" data-id="${inv.id}" title="Resend"><span class="material-symbols-outlined" style="font-size:16px;">refresh</span></button>` : ''}
+                ${['super_admin', 'company_admin'].includes(profile?.role) ? `<button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="delete-invite-access" data-id="${inv.id}" title="Delete invitation and revoke access"><span class="material-symbols-outlined" style="font-size:16px;">delete_forever</span></button>` : ''}
               </td>
             </tr>`;
           }).join('')}</tbody></table></div>`}
@@ -5183,6 +5203,17 @@ window.AppInvitations = {
           AppToast.show('Invitation revoked');
           await this.render(document.getElementById('main-content'));
         } catch (err) { AppToast.show(err.message, 'error'); }
+      }
+      const deleteBtn = e.target.closest('[data-action="delete-invite-access"]');
+      if (deleteBtn) {
+        if (!confirm('Delete this invitation? If it was accepted, the invited user login access will also be revoked.')) return;
+        try {
+          const result = await InvitationService.delete(deleteBtn.dataset.id);
+          AppToast.show(result?.access_revoked ? 'Invitation deleted and user access revoked.' : 'Invitation deleted.', 'success');
+          AppStorage.invalidate();
+          await this.render(document.getElementById('main-content'));
+        } catch (err) { AppToast.show(err.message || 'Delete failed.', 'error'); }
+        return;
       }
     });
   },
