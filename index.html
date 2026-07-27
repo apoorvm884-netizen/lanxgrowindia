@@ -986,6 +986,15 @@ tr:hover td { background: var(--surface-low); }
             <span class="material-symbols-outlined" style="font-size:16px;color:var(--primary);">table_view</span>
             <span style="font-size:12px;color:var(--text-secondary);">Only Super Admin can configure this. Share the Google Sheet with the tracking service account as Editor.</span>
           </div>
+          <div style="margin-top:10px;padding:12px;border:1px solid var(--border);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <div>
+              <div style="font-size:12px;font-weight:600;color:var(--on-surface);">Secure Tracking Backend</div>
+              <div id="tracking-backend-inline-status" style="font-size:11px;color:var(--text-muted);margin-top:2px;">Check encrypted credentials and processing settings.</div>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" data-action="manage-tracking-backend">
+              <span class="material-symbols-outlined" style="font-size:16px;">encrypted</span> Manage Keys
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1016,6 +1025,89 @@ tr:hover td { background: var(--surface-low); }
     <div class="modal-footer">
       <button class="btn btn-secondary" data-close-modal="modal-school">Cancel</button>
       <button class="btn btn-primary" id="btn-save-school">Save School</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== SECURE TRACKING CONFIGURATION MODAL ====== -->
+<div class="modal-overlay" id="modal-tracking-config" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">Secure Tracking Backend</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:3px;">Secrets are encrypted in Supabase Vault and are never displayed again.</p>
+      </div>
+      <button class="modal-close" data-close-modal="modal-tracking-config"><span class="material-symbols-outlined">close</span></button>
+    </div>
+    <div class="modal-body">
+      <div id="tracking-config-loading" style="padding:24px;text-align:center;color:var(--text-muted);">Loading secure configuration...</div>
+      <div id="tracking-config-form" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <label class="form-label" for="tracking-service-account-email">Google Service Account Email</label>
+            <input class="form-input" type="email" id="tracking-service-account-email" placeholder="tracker-writer@project.iam.gserviceaccount.com">
+          </div>
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+              <label class="form-label" for="tracking-private-key">Google Private Key</label>
+              <span id="tracking-private-key-status" class="status-badge status-suspended">Not configured</span>
+            </div>
+            <textarea class="form-input" id="tracking-private-key" rows="5" placeholder="Paste -----BEGIN PRIVATE KEY----- ... only when adding or replacing it"></textarea>
+            <div style="display:flex;justify-content:flex-end;margin-top:6px;">
+              <button type="button" class="btn btn-danger btn-sm" id="btn-remove-tracking-private-key">Remove saved private key</button>
+            </div>
+          </div>
+          <div class="form-group" style="margin:0;grid-column:1/-1;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+              <label class="form-label" for="tracking-webhook-secret">Telemetry Webhook Secret</label>
+              <span id="tracking-webhook-secret-status" class="status-badge status-suspended">Not configured</span>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <input class="form-input" type="password" id="tracking-webhook-secret" minlength="24" autocomplete="new-password" placeholder="Enter a new secret only when adding or replacing it">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-generate-tracking-secret">Generate</button>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:6px;">
+              <button type="button" class="btn btn-danger btn-sm" id="btn-remove-tracking-webhook-secret">Remove saved webhook secret</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin:20px 0 12px;">Processing Settings</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="tracking-input-speed-unit">Incoming Speed Unit</label>
+            <select class="form-select" id="tracking-input-speed-unit">
+              <option value="knots">Knots (Traccar default)</option>
+              <option value="kmh">KM/H</option>
+              <option value="mph">MPH</option>
+              <option value="mps">Meters/second</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="tracking-stop-speed">Near-zero Speed (KM/H)</label>
+            <input class="form-input" type="number" id="tracking-stop-speed" min="0.1" step="0.1" value="2">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="tracking-stop-radius">Stop Radius (meters)</label>
+            <input class="form-input" type="number" id="tracking-stop-radius" min="1" step="1" value="20">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="tracking-stop-minutes">Stop Duration (minutes)</label>
+            <input class="form-input" type="number" id="tracking-stop-minutes" min="0.1" step="0.1" value="3">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="tracking-journey-end-minutes">Journey End (minutes)</label>
+            <input class="form-input" type="number" id="tracking-journey-end-minutes" min="0.2" step="0.1" value="10">
+          </div>
+        </div>
+        <div style="margin-top:14px;padding:10px;background:var(--surface-low);border-radius:var(--radius-md);font-size:12px;color:var(--text-secondary);">
+          Telemetry URL: <code id="tracking-telemetry-url">Loading...</code>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="modal-tracking-config">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-tracking-config">Save Secure Configuration</button>
     </div>
   </div>
 </div>
