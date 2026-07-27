@@ -1,5 +1,10 @@
-[README.md](https://github.com/user-attachments/files/30404961/README.md)
+[README.md](https://github.com/user-attachments/files/30406290/README.md)
 # Google Sheets Tracking Connector
+
+> Supabase-first deployment: production now uses
+> `supabase/functions/tracking-telemetry`. Do not run both implementations
+> against the same devices because that can duplicate Google Sheet writes.
+> This directory remains as a removable fallback/reference only.
 
 This is an independent Node.js service. It does not import, edit, or replace the
 LANXGROW frontend, Supabase services, authentication, routing, or database.
