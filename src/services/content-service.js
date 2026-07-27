@@ -22,31 +22,11 @@ export const ContentService = {
     return data || [];
   },
 
-  async getBySection(sectionId) {
+  async getByDriveFolder(driveFolderId) {
     const { data, error } = await supabase
       .from('content')
       .select('*')
-      .eq('section_id', sectionId)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
-  },
-
-  async getByCategory(categoryId) {
-    const { data, error } = await supabase
-      .from('content')
-      .select('*')
-      .eq('category_id', categoryId)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
-  },
-
-  async getBySubject(subjectId) {
-    const { data, error } = await supabase
-      .from('content')
-      .select('*')
-      .eq('subject_id', subjectId)
+      .eq('drive_folder_id', driveFolderId)
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
@@ -71,9 +51,7 @@ export const ContentService = {
         url: item.url || null,
         size: item.size || null,
         school_id: item.schoolId,
-        section_id: item.sectionId || null,
-        category_id: item.categoryId || null,
-        subject_id: item.subjectId || null,
+        drive_folder_id: item.driveFolderId || null,
         description: item.description || null,
         tags: item.tags || [],
         status: item.status || 'draft',
@@ -96,9 +74,7 @@ export const ContentService = {
     if (updates.type !== undefined) payload.type = updates.type;
     if (updates.url !== undefined) payload.url = updates.url;
     if (updates.size !== undefined) payload.size = updates.size;
-    if (updates.sectionId !== undefined) payload.section_id = updates.sectionId;
-    if (updates.categoryId !== undefined) payload.category_id = updates.categoryId;
-    if (updates.subjectId !== undefined) payload.subject_id = updates.subjectId;
+    if (updates.driveFolderId !== undefined) payload.drive_folder_id = updates.driveFolderId;
     if (updates.description !== undefined) payload.description = updates.description;
     if (updates.tags !== undefined) payload.tags = updates.tags;
     if (updates.status !== undefined) payload.status = updates.status;
