@@ -71,11 +71,19 @@ export const AuthService = {
       this._profileCache = null;
       return null;
     }
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userData.user.id)
       .single();
+
+    // Recover accounts created while the auth profile trigger was unavailable.
+    if (error?.code === 'PGRST116') {
+      const repairResult = await supabase.rpc('ensure_my_profile');
+      data = repairResult.data;
+      error = repairResult.error;
+    }
+
     this._profileCache = error ? null : data;
     this._profileCacheTime = Date.now();
     return error ? null : data;
