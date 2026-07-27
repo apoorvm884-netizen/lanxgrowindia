@@ -118,11 +118,19 @@ window.AppStorage = {
     const profiles = profilesRes || [];
     const users = profiles.map(p => ({
       id: p.id,
-      name: p.name,
-      email: '',
+      name: p.full_name || p.name,
+      email: p.email || '',
+      phone: p.phone || '',
       password: '',
       role: p.role,
-      schoolId: p.school_id
+      schoolId: p.school_id,
+      companyId: p.company_id,
+      status: p.status,
+      requestedRole: p.requested_role,
+      requestedSchoolName: p.requested_school_name,
+      requestedSchoolCode: p.requested_school_code,
+      requestedClass: p.requested_class,
+      onboardingCompleted: p.onboarding_completed
     }));
 
     this._cache = {
@@ -5063,12 +5071,40 @@ window.AppInvitations = {
     const profile = await AuthService.getProfile();
     const invitations = await InvitationService.getAll();
     const data = await AppStorage.load();
+    const pendingRequests = profile?.role === 'super_admin'
+      ? data.users.filter(user => user.role === 'pending' && user.onboardingCompleted && user.status === 'pending')
+      : [];
+    const { data: companies = [] } = profile?.role === 'super_admin'
+      ? await supabase.from('companies').select('id, name').order('name')
+      : { data: [] };
 
     main.innerHTML = `<div class="fade-in">
       <div class="page-header">
-        <div class="page-header-left"><h1 class="page-title">Invitations</h1><p class="page-subtitle">Invite school admins, counselors, and teachers to join the platform.</p></div>
+        <div class="page-header-left"><h1 class="page-title">Invitations & Access Requests</h1><p class="page-subtitle">Invite users and review Google sign-up requests.</p></div>
         <button class="btn btn-primary" id="btn-new-invitation"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span> New Invitation</button>
       </div>
+
+      ${profile?.role === 'super_admin' ? `<div class="card" style="padding:0;margin-bottom:20px;overflow:hidden;">
+        <div style="padding:18px 20px;border-bottom:1px solid var(--border);">
+          <h2 style="font-size:16px;margin:0;">Google Sign-up Requests</h2>
+          <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0;">Name, phone, requested role, school and class submitted during onboarding.</p>
+        </div>
+        ${pendingRequests.length === 0
+          ? '<div class="empty-state" style="padding:32px;"><span class="material-symbols-outlined">task_alt</span><h3>No pending requests</h3></div>'
+          : `<div class="table-container"><table><thead><tr><th>Name</th><th>Phone</th><th>Requested Role</th><th>School / Code</th><th>Class</th><th></th></tr></thead><tbody>
+            ${pendingRequests.map(request => `<tr>
+              <td><div class="font-semibold">${AppUtils.escapeHtml(request.name || '—')}</div><div style="font-size:11px;color:var(--text-muted);">${AppUtils.escapeHtml(request.email || '—')}</div></td>
+              <td>${AppUtils.escapeHtml(request.phone || '—')}</td>
+              <td><span class="status-badge">${request.requestedRole === 'school' ? 'School' : 'Student'}</span></td>
+              <td>${AppUtils.escapeHtml(request.requestedSchoolName || request.requestedSchoolCode || '—')}</td>
+              <td>${AppUtils.escapeHtml(request.requestedClass || '—')}</td>
+              <td style="white-space:nowrap;">
+                <button class="btn btn-primary btn-sm" data-action="approve-access-request" data-id="${request.id}">Review</button>
+                <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="reject-access-request" data-id="${request.id}">Reject</button>
+              </td>
+            </tr>`).join('')}
+          </tbody></table></div>`}
+      </div>` : ''}
 
       <div class="management-bar" style="margin-bottom:16px;">
         <div class="search-bar" style="max-width:300px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="inv-search" placeholder="Search by email..."></div>
@@ -5102,15 +5138,33 @@ window.AppInvitations = {
       </div>
     </div>`;
     initIcons();
-    this._bindEvents(data, profile);
+    this._bindEvents(data, profile, companies, pendingRequests);
   },
 
-  _bindEvents(data, profile) {
+  _bindEvents(data, profile, companies, pendingRequests) {
     document.getElementById('btn-new-invitation')?.addEventListener('click', () => {
-      this._showInviteModal(data.schools, profile);
+      this._showInviteModal(data.schools, companies, profile);
     });
 
     document.addEventListener('click', async (e) => {
+      const approveBtn = e.target.closest('[data-action="approve-access-request"]');
+      if (approveBtn) {
+        const request = pendingRequests.find(item => item.id === approveBtn.dataset.id);
+        if (request) this._showApprovalModal(request, data.schools, data.categories);
+        return;
+      }
+      const rejectBtn = e.target.closest('[data-action="reject-access-request"]');
+      if (rejectBtn) {
+        if (!confirm('Reject this access request?')) return;
+        try {
+          const { error } = await supabase.rpc('reject_access_request', { p_profile_id: rejectBtn.dataset.id });
+          if (error) throw error;
+          AppStorage.invalidate();
+          AppToast.show('Access request rejected');
+          await this.render(document.getElementById('main-content'));
+        } catch (err) { AppToast.show(err.message, 'error'); }
+        return;
+      }
       const resendBtn = e.target.closest('[data-action="resend-invite"]');
       if (resendBtn) {
         try {
@@ -5132,7 +5186,7 @@ window.AppInvitations = {
     });
   },
 
-  _showInviteModal(schools, profile) {
+  _showInviteModal(schools, companies, profile) {
     let overlay = document.getElementById('modal-invitation');
     if (overlay) overlay.remove();
 
@@ -5143,16 +5197,24 @@ window.AppInvitations = {
           <div class="form-group"><label class="form-label">Email Address</label><input type="email" class="form-input" id="inv-email" placeholder="person@example.com" required></div>
           <div class="form-group"><label class="form-label">Role</label>
             <select class="form-select" id="inv-role">
-              <option value="school_admin">School Admin</option>
-              <option value="counselor">Counselor</option>
-              <option value="teacher">Teacher</option>
-              <option value="company_admin">Company Admin</option>
+              ${profile?.role === 'super_admin' ? '<option value="company_admin">Company Admin</option>' : ''}
+              ${['super_admin', 'company_admin'].includes(profile?.role) ? '<option value="school_admin">School Admin</option>' : ''}
+              ${profile?.role !== 'counselor' ? '<option value="counselor">Counselor</option><option value="teacher">Teacher</option>' : ''}
+              <option value="student">Student</option>
+            </select>
+          </div>
+          <div class="form-group" id="inv-company-group" style="display:none;"><label class="form-label">Company</label>
+            <select class="form-select" id="inv-company">
+              <option value="">Select a company...</option>
+              ${companies.map(company => `<option value="${company.id}">${AppUtils.escapeHtml(company.name)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group" id="inv-school-group"><label class="form-label">School</label>
             <select class="form-select" id="inv-school">
               <option value="">Select a school...</option>
-              ${schools.map(s => `<option value="${s.id}">${AppUtils.escapeHtml(s.name)}</option>`).join('')}
+              ${schools
+                .filter(s => profile?.role === 'super_admin' || profile?.role === 'company_admin' || s.id === profile?.school_id)
+                .map(s => `<option value="${s.id}">${AppUtils.escapeHtml(s.name)}</option>`).join('')}
             </select>
           </div>
           <button class="btn btn-primary" id="btn-send-invite" style="width:100%;margin-top:16px;"><span class="material-symbols-outlined" style="font-size:18px;">send</span> Send Invitation</button>
@@ -5162,25 +5224,83 @@ window.AppInvitations = {
     document.body.insertAdjacentHTML('beforeend', html);
     initIcons();
 
-    // Hide school selector for company admin role
-    document.getElementById('inv-role')?.addEventListener('change', (e) => {
-      document.getElementById('inv-school-group').style.display = e.target.value === 'company_admin' ? 'none' : '';
-    });
+    const syncScopeFields = () => {
+      const isCompanyAdmin = document.getElementById('inv-role').value === 'company_admin';
+      document.getElementById('inv-company-group').style.display = isCompanyAdmin ? '' : 'none';
+      document.getElementById('inv-school-group').style.display = isCompanyAdmin ? 'none' : '';
+    };
+    document.getElementById('inv-role')?.addEventListener('change', syncScopeFields);
+    syncScopeFields();
 
     document.getElementById('btn-send-invite')?.addEventListener('click', async () => {
       const email = document.getElementById('inv-email').value.trim();
       const role = document.getElementById('inv-role').value;
       const schoolId = document.getElementById('inv-school').value;
+      const companyId = document.getElementById('inv-company').value;
       if (!email) { AppToast.show('Email is required', 'error'); return; }
       if (role !== 'company_admin' && !schoolId) { AppToast.show('Please select a school', 'error'); return; }
+      if (role === 'company_admin' && !companyId) { AppToast.show('Please select a company', 'error'); return; }
       try {
         await InvitationService.create({
           email, role,
           school_id: role !== 'company_admin' ? schoolId : null,
+          company_id: role === 'company_admin' ? companyId : null,
           invited_by: profile?.id
         });
         AppToast.show(`Invitation sent to ${email}`);
         document.getElementById('modal-invitation').classList.remove('active');
+        await this.render(document.getElementById('main-content'));
+      } catch (err) { AppToast.show(err.message, 'error'); }
+    });
+  },
+
+  _showApprovalModal(request, schools, classes) {
+    document.getElementById('modal-access-approval')?.remove();
+    const html = `<div class="modal-overlay active" id="modal-access-approval" role="dialog" aria-modal="true">
+      <div class="modal" style="max-width:520px;">
+        <div class="modal-header"><h2 class="modal-title">Approve ${request.requestedRole === 'school' ? 'School' : 'Student'} Request</h2><button class="modal-close" data-close-modal="modal-access-approval">&times;</button></div>
+        <div class="modal-body">
+          <div style="padding:12px;background:var(--surface-low);border-radius:var(--radius-md);margin-bottom:16px;font-size:13px;">
+            <strong>${AppUtils.escapeHtml(request.name || '')}</strong><br>
+            ${AppUtils.escapeHtml(request.email || '')} · ${AppUtils.escapeHtml(request.phone || 'No phone')}
+          </div>
+          <div class="form-group"><label class="form-label">Assign School</label>
+            <select class="form-select" id="approval-school"><option value="">Select a school...</option>
+              ${schools.map(s => `<option value="${s.id}">${AppUtils.escapeHtml(s.name)}</option>`).join('')}
+            </select>
+          </div>
+          ${request.requestedRole === 'student' ? `<div class="form-group"><label class="form-label">Assign Class</label>
+            <select class="form-select" id="approval-class"><option value="">Select a school first...</option></select>
+          </div>` : ''}
+          <p style="font-size:11px;color:var(--text-muted);">Requested: ${AppUtils.escapeHtml(request.requestedSchoolName || request.requestedSchoolCode || '—')} ${request.requestedClass ? `· ${AppUtils.escapeHtml(request.requestedClass)}` : ''}</p>
+          <button class="btn btn-primary" id="btn-confirm-access-approval" style="width:100%;margin-top:12px;">Approve Access</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    const schoolSelect = document.getElementById('approval-school');
+    const classSelect = document.getElementById('approval-class');
+    const syncClasses = () => {
+      if (!classSelect) return;
+      const matches = classes.filter(item => item.school_id === schoolSelect.value);
+      classSelect.innerHTML = `<option value="">Select a class...</option>${matches.map(item => `<option value="${item.id}">${AppUtils.escapeHtml(item.name)}</option>`).join('')}`;
+    };
+    schoolSelect.addEventListener('change', syncClasses);
+    document.getElementById('btn-confirm-access-approval').addEventListener('click', async () => {
+      const schoolId = schoolSelect.value;
+      const classId = classSelect?.value || null;
+      if (!schoolId) { AppToast.show('Please select a school', 'error'); return; }
+      if (request.requestedRole === 'student' && !classId) { AppToast.show('Please select a class', 'error'); return; }
+      try {
+        const { error } = await supabase.rpc('approve_access_request', {
+          p_profile_id: request.id,
+          p_school_id: schoolId,
+          p_class_id: classId
+        });
+        if (error) throw error;
+        AppStorage.invalidate();
+        document.getElementById('modal-access-approval').remove();
+        AppToast.show('Access request approved');
         await this.render(document.getElementById('main-content'));
       } catch (err) { AppToast.show(err.message, 'error'); }
     });
@@ -5723,7 +5843,7 @@ async function initApp() {
       return;
     }
     const needsSchoolName = selectedOnboardingRole === 'school';
-    const needsSchoolCode = selectedOnboardingRole === 'teacher_counselor' || selectedOnboardingRole === 'student';
+    const needsSchoolCode = selectedOnboardingRole === 'student';
     const needsClass = selectedOnboardingRole === 'student';
     document.getElementById('onboarding-school-name-group').style.display = needsSchoolName ? '' : 'none';
     document.getElementById('onboarding-school-code-group').style.display = needsSchoolCode ? '' : 'none';
