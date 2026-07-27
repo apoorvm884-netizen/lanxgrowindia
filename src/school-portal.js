@@ -7,6 +7,20 @@
 
 const eh = AppUtils.escapeHtml;
 
+function schoolCounselorProfiles(data, schoolId) {
+  const profilesById = new Map((data.users || []).map(user => [user.id, user]));
+  return (data.counselors || [])
+    .filter(counselor => counselor.school_id === schoolId && counselor.status !== 'inactive')
+    .map(counselor => {
+      const profile = counselor.user_id ? profilesById.get(counselor.user_id) : null;
+      return {
+        ...counselor,
+        profileId: counselor.user_id || null,
+        displayName: counselor.name || profile?.name || 'Counselor'
+      };
+    });
+}
+
 // ==============================================================
 // STUDENTS MANAGEMENT
 // ==============================================================
@@ -23,7 +37,7 @@ window.SchoolStudents = {
 
     let students = [];
     try { students = await window.StudentService?.getBySchool(schoolId) || []; } catch { students = []; }
-    const counselors = data.users.filter(u => u.schoolId === schoolId && u.role === 'counselor');
+    const counselors = schoolCounselorProfiles(data, schoolId);
 
     if (q) students = students.filter(s => s.name.toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q));
     if (counselorFilter) students = students.filter(s => s.counselor_id === counselorFilter);
@@ -57,7 +71,7 @@ window.SchoolStudents = {
         </select>
         <select class="form-select" id="sp-student-counselor" style="width:160px;height:40px;font-size:13px;">
           <option value="">All Counselors</option>
-          ${counselors.map(c => `<option value="${c.id}" ${counselorFilter === c.id ? 'selected' : ''}>${eh(c.name)}</option>`).join('')}
+          ${counselors.filter(c => c.profileId).map(c => `<option value="${c.profileId}" ${counselorFilter === c.profileId ? 'selected' : ''}>${eh(c.displayName)}</option>`).join('')}
         </select>
         <select class="form-select" id="sp-student-status" style="width:130px;height:40px;font-size:13px;">
           <option value="">All Status</option>
@@ -71,7 +85,7 @@ window.SchoolStudents = {
         ${students.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">groups</span><h3>${q ? 'No students match your search' : 'No students enrolled yet'}</h3><p>${q ? 'Try adjusting your filters.' : 'Enroll students to get started with your school.'}</p>${q ? '' : `<button class="btn btn-primary" data-action="sp-add-student" style="margin-top:12px;"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span> Add Student</button>`}</div>`
         : `<div class="table-container"><table><thead><tr><th>Name</th><th>Email</th><th>Class</th><th>Counselor</th><th>Status</th><th>Courses</th><th style="width:140px;"></th></tr></thead><tbody>
           ${pageItems.map(s => {
-            const counselor = counselors.find(c => c.id === s.counselor_id);
+            const counselor = counselors.find(c => c.profileId === s.counselor_id);
             const courses = data.enrollments?.filter(e => e.student_id === s.id) || [];
             const safeName = eh(s.name);
             const nameHtml = q ? safeName.replace(new RegExp(eh(q), 'gi'), m => `<mark style="background:#fef08a;padding:0 2px;border-radius:2px;">${m}</mark>`) : safeName;
@@ -79,7 +93,7 @@ window.SchoolStudents = {
               <td><div style="display:flex;align-items:center;gap:8px;"><div class="user-avatar" style="width:28px;height:28px;font-size:10px;">${AppUtils.getInitials(safeName)}</div><span class="font-semibold">${nameHtml}</span></div></td>
               <td style="font-size:13px;">${eh(s.email || '—')}</td>
               <td style="font-size:13px;">${eh(s.class || '—')}</td>
-              <td style="font-size:13px;">${eh(counselor?.name || '—')}</td>
+              <td style="font-size:13px;">${eh(counselor?.displayName || '—')}</td>
               <td><span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-suspended'}">${eh(s.status)}</span></td>
               <td style="font-size:13px;">${courses.length}</td>
               <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
@@ -104,11 +118,8 @@ window.SchoolStudents = {
   },
 
   async openAdd(data, school) {
-    const counselors = (data.counselors || data.users || []).filter(u => u.schoolId === school.id && u.role === 'counselor');
-    const cats = (data.categories || []).filter(c => c.school_id === school.id);
-    const subjects = (data.subjects || []).filter(s => s.school_id === school.id);
-    const courses = (data.courses || []).filter(c => c.school_id === school.id);
-    const classes = [...new Set((data.students || []).filter(s => s.school_id === school.id).map(s => s.class).filter(Boolean))];
+    const counselors = schoolCounselorProfiles(data, school.id);
+    const classes = (data.categories || []).filter(c => c.school_id === school.id);
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'modal-student';
@@ -137,7 +148,7 @@ window.SchoolStudents = {
         <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">School Details</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
           <div class="form-group"><label class="form-label">Class</label>
-            <select class="form-select" id="sp-input-student-class"><option value="">Select...</option>${classes.map(c => `<option value="${c}">${eh(c)}</option>`).join('')}<option value="Class 11">Class 11</option><option value="Class 12">Class 12</option></select>
+            <select class="form-select" id="sp-input-student-class"><option value="">Select class...</option>${classes.map(c => `<option value="${c.id}">${eh(c.name)}</option>`).join('')}</select>
           </div>
           <div class="form-group"><label class="form-label">Section</label><input type="text" class="form-input" id="sp-input-student-section" placeholder="e.g. A"></div>
           <div class="form-group"><label class="form-label">Academic Year</label>
@@ -147,23 +158,7 @@ window.SchoolStudents = {
 
         <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Assignments</div>
         <div class="form-group"><label class="form-label">Assigned Counselor</label>
-          <select class="form-select" id="sp-input-student-counselor"><option value="">None</option>${counselors.map(c => `<option value="${c.id}">${eh(c.name)}</option>`).join('')}</select>
-        </div>
-        <div style="margin-top:8px;">
-          <div style="display:flex;gap:20px;">
-            <div style="flex:1;">
-              <label class="form-label">Assigned Categories</label>
-              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;max-height:100px;overflow-y:auto;">${cats.map(c => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-student-cat" value="${c.id}"> ${eh(c.name)}</label>`).join('')}</div>
-            </div>
-            <div style="flex:1;">
-              <label class="form-label">Assigned Subjects</label>
-              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;max-height:100px;overflow-y:auto;">${subjects.map(s => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-student-sub" value="${s.id}"> ${eh(s.name)}</label>`).join('')}</div>
-            </div>
-          </div>
-        </div>
-        <div style="margin-top:8px;">
-          <label class="form-label">Assigned Courses (enroll on create)</label>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;max-height:100px;overflow-y:auto;">${courses.map(c => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-student-course" value="${c.id}"> ${eh(c.name)}</label>`).join('')}</div>
+          <select class="form-select" id="sp-input-student-counselor"><option value="">None</option>${counselors.filter(c => c.profileId).map(c => `<option value="${c.profileId}">${eh(c.displayName)}</option>`).join('')}</select>
         </div>
 
         <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Status & Credentials</div>
@@ -199,9 +194,8 @@ window.SchoolStudents = {
       if (!student) return;
       const data = await AppStorage.load();
       const school = data.schools.find(s => s.id === student.school_id);
-      const counselors = (data.counselors || data.users || []).filter(u => u.schoolId === student.school_id && u.role === 'counselor');
+      const counselors = schoolCounselorProfiles(data, student.school_id);
       const cats = (data.categories || []).filter(c => c.school_id === student.school_id);
-      const subjects = (data.subjects || []).filter(s => s.school_id === student.school_id);
       const existing = document.getElementById('modal-student');
       if (existing) existing.remove();
       const overlay = document.createElement('div');
@@ -230,7 +224,7 @@ window.SchoolStudents = {
           <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">School Details</div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
             <div class="form-group"><label class="form-label">Class</label>
-              <select class="form-select" id="sp-input-student-class"><option value="">Select...</option>${[...new Set((data.students || []).filter(s => s.school_id === student.school_id).map(s => s.class).filter(Boolean)), 'Class 11', 'Class 12'].map(c => `<option value="${c}" ${student.class === c ? 'selected' : ''}>${eh(c)}</option>`).join('')}</select>
+              <select class="form-select" id="sp-input-student-class"><option value="">Select class...</option>${cats.map(c => `<option value="${c.id}" ${(student.class_id === c.id || (!student.class_id && student.class === c.name)) ? 'selected' : ''}>${eh(c.name)}</option>`).join('')}</select>
             </div>
             <div class="form-group"><label class="form-label">Section</label><input type="text" class="form-input" id="sp-input-student-section" value="${eh(student.section || '')}"></div>
             <div class="form-group"><label class="form-label">Academic Year</label>
@@ -239,19 +233,7 @@ window.SchoolStudents = {
           </div>
           <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Assignment</div>
           <div class="form-group"><label class="form-label">Assigned Counselor</label>
-            <select class="form-select" id="sp-input-student-counselor"><option value="">None</option>${counselors.map(c => `<option value="${c.id}" ${c.id === student.counselor_id ? 'selected' : ''}>${eh(c.name)}</option>`).join('')}</select>
-          </div>
-          <div style="margin-top:8px;">
-            <div style="display:flex;gap:20px;">
-              <div style="flex:1;">
-                <label class="form-label">Assigned Categories</label>
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;max-height:100px;overflow-y:auto;">${cats.map(c => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-student-cat" value="${c.id}" ${(student.assigned_categories || []).includes(c.id) ? 'checked' : ''}> ${eh(c.name)}</label>`).join('')}</div>
-              </div>
-              <div style="flex:1;">
-                <label class="form-label">Assigned Subjects</label>
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;max-height:100px;overflow-y:auto;">${subjects.map(s => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-student-sub" value="${s.id}" ${(student.assigned_subjects || []).includes(s.id) ? 'checked' : ''}> ${eh(s.name)}</label>`).join('')}</div>
-              </div>
-            </div>
+            <select class="form-select" id="sp-input-student-counselor"><option value="">None</option>${counselors.filter(c => c.profileId).map(c => `<option value="${c.profileId}" ${c.profileId === student.counselor_id ? 'selected' : ''}>${eh(c.displayName)}</option>`).join('')}</select>
           </div>
           <div class="form-group" style="margin-top:12px;"><label class="form-label">Status</label>
             <select class="form-select" id="sp-input-student-status"><option value="active" ${student.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${student.status === 'inactive' ? 'selected' : ''}>Inactive</option><option value="suspended" ${student.status === 'suspended' ? 'selected' : ''}>Suspended</option></select>
@@ -280,7 +262,9 @@ window.SchoolStudents = {
     const admissionNo = document.getElementById('sp-input-student-admission')?.value?.trim() || null;
     const parentName = document.getElementById('sp-input-student-parent')?.value?.trim() || null;
     const parentContact = document.getElementById('sp-input-student-parent-contact')?.value?.trim() || null;
-    const studentClass = document.getElementById('sp-input-student-class')?.value || null;
+    const classId = document.getElementById('sp-input-student-class')?.value || null;
+    const appData = await AppStorage.load();
+    const studentClass = appData.categories?.find(c => c.id === classId)?.name || null;
     const section = document.getElementById('sp-input-student-section')?.value?.trim() || null;
     const academicYear = document.getElementById('sp-input-student-academic-year')?.value || null;
     const counselorId = document.getElementById('sp-input-student-counselor')?.value || null;
@@ -293,7 +277,7 @@ window.SchoolStudents = {
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...'; }
     try {
       const schoolId = AppRouter.currentSchoolId;
-      const updates = { name, email, dob, gender, admissionNo, parentName, parentContact, class: studentClass, section, academicYear, counselorId, notes, status, assignedCategories, assignedSubjects };
+      const updates = { name, email, dob, gender, admissionNo, parentName, parentContact, classId, class: studentClass, section, academicYear, counselorId, notes, status, assignedCategories: classId ? [classId] : [], assignedSubjects };
       if (isUpdate) {
         await window.StudentService?.update(studentId, updates);
         AppToast.show('Student updated.', 'success');
