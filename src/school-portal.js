@@ -33,7 +33,6 @@ window.SchoolStudents = {
     const q = (document.getElementById('sp-student-search')?.value || '').toLowerCase();
     const counselorFilter = document.getElementById('sp-student-counselor')?.value || '';
     const statusFilter = document.getElementById('sp-student-status')?.value || '';
-    const classFilter = document.getElementById('sp-student-class')?.value || '';
 
     let students = [];
     try { students = await window.StudentService?.getBySchool(schoolId) || []; } catch { students = []; }
@@ -42,12 +41,10 @@ window.SchoolStudents = {
     if (q) students = students.filter(s => s.name.toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q));
     if (counselorFilter) students = students.filter(s => s.counselor_id === counselorFilter);
     if (statusFilter) students = students.filter(s => s.status === statusFilter);
-    if (classFilter) students = students.filter(s => s.class === classFilter);
 
     const startIdx = (this.currentPage - 1) * this.perPage;
     const pageItems = students.slice(startIdx, startIdx + this.perPage);
     const totalPages = Math.max(1, Math.ceil(students.length / this.perPage));
-    const classes = [...new Set(students.map(s => s.class).filter(Boolean))];
 
     main.innerHTML = `<div class="fade-in">
       <div class="page-header">
@@ -65,10 +62,6 @@ window.SchoolStudents = {
       </div>
       <div class="management-bar" style="margin-bottom:16px;">
         <div class="search-bar" style="max-width:250px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="sp-student-search" placeholder="Search students..." value="${eh(q)}"></div>
-        <select class="form-select" id="sp-student-class" style="width:130px;height:40px;font-size:13px;">
-          <option value="">All Classes</option>
-          ${classes.map(c => `<option value="${eh(c)}" ${classFilter === c ? 'selected' : ''}>${eh(c)}</option>`).join('')}
-        </select>
         <select class="form-select" id="sp-student-counselor" style="width:160px;height:40px;font-size:13px;">
           <option value="">All Counselors</option>
           ${counselors.filter(c => c.profileId).map(c => `<option value="${c.profileId}" ${counselorFilter === c.profileId ? 'selected' : ''}>${eh(c.displayName)}</option>`).join('')}
@@ -83,7 +76,7 @@ window.SchoolStudents = {
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
         ${students.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">groups</span><h3>${q ? 'No students match your search' : 'No students enrolled yet'}</h3><p>${q ? 'Try adjusting your filters.' : 'Enroll students to get started with your school.'}</p>${q ? '' : `<button class="btn btn-primary" data-action="sp-add-student" style="margin-top:12px;"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span> Add Student</button>`}</div>`
-        : `<div class="table-container"><table><thead><tr><th>Name</th><th>Email</th><th>Class</th><th>Counselor</th><th>Status</th><th style="width:120px;"></th></tr></thead><tbody>
+        : `<div class="table-container"><table><thead><tr><th>Name</th><th>Email</th><th>Drive Class Folder</th><th>Counselor</th><th>Status</th><th style="width:120px;"></th></tr></thead><tbody>
           ${pageItems.map(s => {
             const counselor = counselors.find(c => c.profileId === s.counselor_id);
             const courses = data.enrollments?.filter(e => e.student_id === s.id) || [];
@@ -92,7 +85,7 @@ window.SchoolStudents = {
             return `<tr>
               <td><div style="display:flex;align-items:center;gap:8px;"><div class="user-avatar" style="width:28px;height:28px;font-size:10px;">${AppUtils.getInitials(safeName)}</div><span class="font-semibold">${nameHtml}</span></div></td>
               <td style="font-size:13px;">${eh(s.email || '—')}</td>
-              <td style="font-size:13px;">${eh(s.class || '—')}</td>
+              <td style="font-size:13px;">${eh(s.drive_folder_name || s.drive_folder_id || '—')}</td>
               <td style="font-size:13px;">${eh(counselor?.displayName || '—')}</td>
               <td><span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-suspended'}">${eh(s.status)}</span></td>
               <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
@@ -117,7 +110,6 @@ window.SchoolStudents = {
 
   async openAdd(data, school) {
     const counselors = schoolCounselorProfiles(data, school.id);
-    const classes = (data.categories || []).filter(c => c.school_id === school.id);
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'modal-student';
@@ -143,12 +135,12 @@ window.SchoolStudents = {
           <div class="form-group"><label class="form-label">Parent Contact</label><input type="text" class="form-input" id="sp-input-student-parent-contact" placeholder="+91-98765-43210"></div>
         </div>
 
-        <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">School Details</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-          <div class="form-group"><label class="form-label">Class</label>
-            <select class="form-select" id="sp-input-student-class"><option value="">Select class...</option>${classes.map(c => `<option value="${c.id}">${eh(c.name)}</option>`).join('')}</select>
+        <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Learning Folder</div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;">
+          <div class="form-group"><label class="form-label">Google Drive Class Folder ID or URL</label>
+            <input type="text" class="form-input" id="sp-input-student-drive-folder" placeholder="Paste folder ID or https://drive.google.com/drive/folders/...">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Videos directly inside this Drive folder will sync automatically.</div>
           </div>
-          <div class="form-group"><label class="form-label">Section</label><input type="text" class="form-input" id="sp-input-student-section" placeholder="e.g. A"></div>
           <div class="form-group"><label class="form-label">Academic Year</label>
             <select class="form-select" id="sp-input-student-academic-year"><option value="2025-2026">2025-2026</option><option value="2026-2027">2026-2027</option></select>
           </div>
@@ -193,7 +185,6 @@ window.SchoolStudents = {
       const data = await AppStorage.load();
       const school = data.schools.find(s => s.id === student.school_id);
       const counselors = schoolCounselorProfiles(data, student.school_id);
-      const cats = (data.categories || []).filter(c => c.school_id === student.school_id);
       const existing = document.getElementById('modal-student');
       if (existing) existing.remove();
       const overlay = document.createElement('div');
@@ -219,12 +210,12 @@ window.SchoolStudents = {
             <div class="form-group"><label class="form-label">Parent/Guardian Name</label><input type="text" class="form-input" id="sp-input-student-parent" value="${eh(student.parent_name || '')}"></div>
             <div class="form-group"><label class="form-label">Parent Contact</label><input type="text" class="form-input" id="sp-input-student-parent-contact" value="${eh(student.parent_contact || '')}"></div>
           </div>
-          <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">School Details</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-            <div class="form-group"><label class="form-label">Class</label>
-              <select class="form-select" id="sp-input-student-class"><option value="">Select class...</option>${cats.map(c => `<option value="${c.id}" ${(student.class_id === c.id || (!student.class_id && student.class === c.name)) ? 'selected' : ''}>${eh(c.name)}</option>`).join('')}</select>
+          <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Learning Folder</div>
+          <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;">
+            <div class="form-group"><label class="form-label">Google Drive Class Folder ID or URL</label>
+              <input type="text" class="form-input" id="sp-input-student-drive-folder" value="${eh(student.drive_folder_id || '')}">
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Changing this will sync videos from the new folder.</div>
             </div>
-            <div class="form-group"><label class="form-label">Section</label><input type="text" class="form-input" id="sp-input-student-section" value="${eh(student.section || '')}"></div>
             <div class="form-group"><label class="form-label">Academic Year</label>
               <select class="form-select" id="sp-input-student-academic-year"><option value="2025-2026" ${student.academic_year === '2025-2026' ? 'selected' : ''}>2025-2026</option><option value="2026-2027" ${student.academic_year === '2026-2027' ? 'selected' : ''}>2026-2027</option></select>
             </div>
@@ -260,40 +251,41 @@ window.SchoolStudents = {
     const admissionNo = document.getElementById('sp-input-student-admission')?.value?.trim() || null;
     const parentName = document.getElementById('sp-input-student-parent')?.value?.trim() || null;
     const parentContact = document.getElementById('sp-input-student-parent-contact')?.value?.trim() || null;
-    const classId = document.getElementById('sp-input-student-class')?.value || null;
-    const appData = await AppStorage.load();
-    const studentClass = appData.categories?.find(c => c.id === classId)?.name || null;
-    const section = document.getElementById('sp-input-student-section')?.value?.trim() || null;
+    const driveFolderInput = document.getElementById('sp-input-student-drive-folder')?.value?.trim() || '';
+    const driveFolderId = window.DriveService?.parseDriveLink(driveFolderInput);
+    if (!driveFolderId) { AppToast.show('A valid Google Drive class folder ID or URL is required.', 'error'); return; }
     const academicYear = document.getElementById('sp-input-student-academic-year')?.value || null;
     const counselorId = document.getElementById('sp-input-student-counselor')?.value || null;
     const notes = document.getElementById('sp-input-student-notes')?.value?.trim() || null;
     const status = document.getElementById('sp-input-student-status')?.value || 'active';
-    const assignedCategories = [...document.querySelectorAll('.sp-student-cat:checked')].map(el => el.value);
-    const assignedSubjects = [...document.querySelectorAll('.sp-student-sub:checked')].map(el => el.value);
-    const assignedCourses = [...document.querySelectorAll('.sp-student-course:checked')].map(el => el.value);
     const btn = document.getElementById('sp-btn-save-student');
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...'; }
     try {
       const schoolId = AppRouter.currentSchoolId;
-      const updates = { name, email, dob, gender, admissionNo, parentName, parentContact, classId, class: studentClass, section, academicYear, counselorId, notes, status, assignedCategories: classId ? [classId] : [], assignedSubjects };
+      const updates = { name, email, dob, gender, admissionNo, parentName, parentContact, driveFolderId, academicYear, counselorId, notes, status };
+      let savedStudent;
       if (isUpdate) {
-        await window.StudentService?.update(studentId, updates);
+        savedStudent = await window.StudentService?.update(studentId, updates);
         AppToast.show('Student updated.', 'success');
       } else {
         const student = await window.StudentService?.create({ ...updates, schoolId });
+        savedStudent = student;
         if (student) {
           if (counselorId) {
             try { await window.NotificationService?.create('Student Created', `New student "${name}" has been assigned to you.`, counselorId); } catch (e) { console.warn('Failed to send notification:', e); }
           }
-          if (assignedCourses.length > 0) {
-            const profile = await AuthService.getProfile();
-            for (const courseId of assignedCourses) {
-              try { await window.EnrollmentService?.create(student.id, courseId, profile?.id || null); } catch (e) { console.warn('Failed to enroll student in course:', e); AppToast.show(`Failed to enroll in "${courseId}"`, 'warn'); }
-            }
-            AppToast.show(`${assignedCourses.length} course(s) assigned.`, 'success');
-          }
         }
         AppToast.show(`Student "${name}" created.`, 'success');
+      }
+      if (savedStudent?.id) {
+        const { data: syncData, error: syncError } = await window.supabase.functions.invoke('drive-sync', {
+          body: { student_id: savedStudent.id }
+        });
+        if (syncError || syncData?.error) {
+          AppToast.show(syncData?.error || syncError?.message || 'Student saved, but Drive sync failed.', 'warn');
+        } else {
+          AppToast.show(`${syncData.videos || 0} Drive video(s) synced.`, 'success');
+        }
       }
       AppModal.close('modal-student');
       AppStorage.invalidate();
@@ -1834,18 +1826,13 @@ window.SchoolVideos = {
   async render(main, data, school) {
     const schoolId = school.id;
     const profile = AppRouter._currentProfile;
-    const selectedClassId = AppRouter._selectedCategoryId;
     let content = data.content.filter(c => c.school_id === schoolId);
     if (profile?.role === 'student') {
       const student = await window.StudentService?.getByUserId(profile.id);
-      content = student?.class_id
-        ? content.filter(item => item.category_id === student.class_id)
+      content = student?.drive_folder_id
+        ? content.filter(item => item.drive_folder_id === student.drive_folder_id)
         : [];
     }
-    if (selectedClassId) content = content.filter(item => item.category_id === selectedClassId);
-    const selectedClass = selectedClassId
-      ? data.categories.find(classItem => classItem.id === selectedClassId)
-      : null;
     const q = (document.getElementById('sp-video-search')?.value || '').toLowerCase();
     const typeFilter = document.getElementById('sp-video-type')?.value || '';
     let items = content;
@@ -1859,7 +1846,7 @@ window.SchoolVideos = {
             <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
             <span style="font-size:12px;color:var(--text-secondary);">${eh(school.name)}</span>
           </div>
-          <h1 class="page-title">${selectedClass ? eh(selectedClass.name) + ' Videos' : 'Video Library'}</h1><p class="page-subtitle">${selectedClass ? 'Videos available inside this class.' : `Manage class videos for ${eh(school.name)}.`}</p>
+          <h1 class="page-title">Video Library</h1><p class="page-subtitle">Google Drive videos available for ${eh(school.name)}.</p>
         </div>
         <div style="display:flex;gap:8px;">
           <span style="font-size:11px;color:var(--text-muted);align-self:center;">${items.length} items</span>
