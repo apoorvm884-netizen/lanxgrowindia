@@ -122,7 +122,9 @@ Deno.serve(async request => {
       if (error) throw error;
     } else {
       if (userId) {
-        return json({ error: 'This email already has a login account. Use Reset Password instead.' }, 409);
+        return json({
+          error: 'This email is already registered for another account. Every login needs a unique email; use a different email address.'
+        }, 409);
       }
       const { data: created, error } = await admin.auth.admin.createUser({
         email,
