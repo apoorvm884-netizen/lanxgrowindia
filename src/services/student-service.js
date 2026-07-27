@@ -52,9 +52,8 @@ export const StudentService = {
         school_id: item.schoolId,
         counselor_id: item.counselorId || null,
         status: item.status || 'active',
-        class_id: item.classId || null,
-        class: item.class || null,
-        section: item.section || null,
+        drive_folder_id: item.driveFolderId,
+        drive_folder_name: item.driveFolderName || null,
         dob: item.dob || null,
         gender: item.gender || null,
         admission_no: item.admissionNo || null,
@@ -62,8 +61,7 @@ export const StudentService = {
         parent_contact: item.parentContact || null,
         academic_year: item.academicYear || null,
         notes: item.notes || null,
-        assigned_categories: item.assignedCategories || [],
-        assigned_subjects: item.assignedSubjects || []
+        last_drive_sync_error: null
       })
       .select()
       .single();
@@ -79,9 +77,8 @@ export const StudentService = {
     if (updates.email !== undefined) payload.email = updates.email;
     if (updates.counselorId !== undefined) payload.counselor_id = updates.counselorId;
     if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.classId !== undefined) payload.class_id = updates.classId;
-    if (updates.class !== undefined) payload.class = updates.class;
-    if (updates.section !== undefined) payload.section = updates.section;
+    if (updates.driveFolderId !== undefined) payload.drive_folder_id = updates.driveFolderId;
+    if (updates.driveFolderName !== undefined) payload.drive_folder_name = updates.driveFolderName;
     if (updates.dob !== undefined) payload.dob = updates.dob;
     if (updates.gender !== undefined) payload.gender = updates.gender;
     if (updates.admissionNo !== undefined) payload.admission_no = updates.admissionNo;
@@ -89,8 +86,6 @@ export const StudentService = {
     if (updates.parentContact !== undefined) payload.parent_contact = updates.parentContact;
     if (updates.academicYear !== undefined) payload.academic_year = updates.academicYear;
     if (updates.notes !== undefined) payload.notes = updates.notes;
-    if (updates.assignedCategories !== undefined) payload.assigned_categories = updates.assignedCategories;
-    if (updates.assignedSubjects !== undefined) payload.assigned_subjects = updates.assignedSubjects;
 
     const { data, error } = await supabase
       .from('students')
