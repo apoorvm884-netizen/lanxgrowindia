@@ -668,9 +668,14 @@ tr:hover td { background: var(--surface-low); }
         <div id="entity-fields-category" class="entity-fields" style="display:none;">
           <input type="hidden" id="entity-parent-id" value="">
           <div class="form-group">
-            <label class="form-label" for="input-name-cat">Category Name</label>
+            <label class="form-label" for="input-name-cat">Class Name</label>
             <input class="form-input" type="text" id="input-name-cat" placeholder="e.g. Class 11">
-            <div class="form-error">Category name is required.</div>
+            <div class="form-error">Class name is required.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="input-class-drive-folder">Google Drive Folder ID or URL</label>
+            <input class="form-input" type="text" id="input-class-drive-folder" placeholder="Paste the Class folder URL or Folder ID">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:5px;">Videos added to this Drive folder can be synced to this class.</div>
           </div>
         </div>
 
@@ -733,9 +738,9 @@ tr:hover td { background: var(--surface-low); }
             <div class="form-error">School is required.</div>
           </div>
           <div class="form-group">
-            <label class="form-label" for="input-content-section">Section</label>
+            <label class="form-label" for="input-content-section">Class</label>
             <select class="form-select" id="input-content-section"></select>
-            <div class="form-error">Section is required.</div>
+            <div class="form-error">Class is required.</div>
           </div>
           <div class="form-group">
             <label class="form-label" for="input-content-size">Size</label>
