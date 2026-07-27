@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase.js';
 import { AuditLogService } from './audit-log-service.js';
+import { AdminAccessService } from './admin-access-service.js';
+import { edgeFunctionError } from './edge-function-error.js';
 
 export const InvitationService = {
 
@@ -29,8 +31,7 @@ export const InvitationService = {
         redirectTo: window.location.origin
       }
     });
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
+    if (error || data?.error) throw await edgeFunctionError(error, data, 'Could not send the invitation.');
 
     await AuditLogService.log(
       'created', 'Invitation',
@@ -44,8 +45,7 @@ export const InvitationService = {
     const { data, error } = await supabase.functions.invoke('invite-user', {
       body: { action: 'resend', id, redirectTo: window.location.origin }
     });
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
+    if (error || data?.error) throw await edgeFunctionError(error, data, 'Could not resend the invitation.');
     return data.invitation;
   },
 
@@ -63,8 +63,7 @@ export const InvitationService = {
   },
 
   async delete(id) {
-    const { error } = await supabase.from('invitations').delete().eq('id', id);
-    if (error) throw error;
+    return AdminAccessService.deleteInvitation(id);
   },
 
   async getByEmail(email) {
