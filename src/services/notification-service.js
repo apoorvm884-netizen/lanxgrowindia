@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase.js';
+import { edgeFunctionError } from './edge-function-error.js';
 
 export const NotificationService = {
 
@@ -32,7 +33,7 @@ export const NotificationService = {
         school_id: schoolId || null
       }
     });
-    if (error || data?.error) throw new Error(data?.error || error?.message || 'Notification failed');
+    if (error || data?.error) throw await edgeFunctionError(error, data, 'Notification failed.');
     return data;
   },
 
