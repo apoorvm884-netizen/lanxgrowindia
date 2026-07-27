@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase.js';
 import { AuditLogService } from './audit-log-service.js';
+import { AdminAccessService } from './admin-access-service.js';
 
 export const SchoolService = {
 
@@ -124,11 +125,7 @@ export const SchoolService = {
       .single();
     if (fetchError) throw fetchError;
 
-    const { error } = await supabase
-      .from('schools')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
+    await AdminAccessService.deleteSchool(id);
 
     await AuditLogService.log('deleted', 'School', school?.name || 'Unknown', `School deleted`);
   }
