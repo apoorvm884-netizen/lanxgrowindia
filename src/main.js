@@ -107,10 +107,11 @@ window.AppStorage = {
     if (!forceRefresh && this._cache && (Date.now() - this._cacheTime) < this._cacheTTL) return this._cache;
 
     // Fetch core + secondary tables in parallel batches
-    const [core, contentRes, profilesRes, notificationsRes] = await Promise.all([
+    const [core, contentRes, profilesRes, counselorsRes, notificationsRes] = await Promise.all([
       this.loadCore(),
       this._fetchTable('content', supabase.from('content').select('*').order('created_at', { ascending: false }).limit(500)),
       this._fetchTable('profiles', supabase.from('profiles').select('*')),
+      this._fetchTable('counselors', supabase.from('counselors').select('*').order('name')),
       this._fetchTable('notifications', supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(30)),
     ]);
 
@@ -128,6 +129,7 @@ window.AppStorage = {
       ...core,
       content: contentRes || [],
       users,
+      counselors: counselorsRes || [],
       notifications: notificationsRes || [],
       // Lazy-loaded tables — will be populated on demand
       auditLog: this._partialCache.auditLog?.data || [],
@@ -873,7 +875,6 @@ window.AppRouter = {
               <div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Email</span><br><span style="font-weight:500;">${AppUtils.escapeHtml(school?.email || '—')}</span></div>
               <div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Address</span><br><span style="font-weight:500;">${[school?.address_line1, school?.city, school?.state].filter(Boolean).join(', ') || '—'}</span></div>
               <div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Plan</span><br><span class="status-badge status-active" style="font-size:10px;text-transform:capitalize;">${AppUtils.escapeHtml(school?.plan || 'basic')}</span></div>
-              ${isSuperAdmin && school?.admin_password ? `<div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">Admin Password</span><br><span style="font-weight:500;font-family:monospace;font-size:12px;">${AppUtils.escapeHtml(school.admin_password)}</span></div>` : ''}
               ${school?.latitude ? `<div style="padding:6px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-secondary);">GPS Location</span><br><span style="font-weight:500;font-size:12px;">${school.latitude.toFixed(4)}, ${school.longitude?.toFixed(4) || '—'}</span></div>` : ''}
             </div>
           </div>
@@ -2641,13 +2642,11 @@ function openSchoolForm(schoolData) {
   const latEl = document.getElementById('school-input-latitude');
   const lngEl = document.getElementById('school-input-longitude');
   const radiusEl = document.getElementById('school-input-attendance-radius');
-  const pwdEl = document.getElementById('school-input-admin-password');
   const trackingSheetEl = document.getElementById('school-input-tracking-sheet-id');
   const trackingSheetGroup = document.getElementById('school-tracking-sheet-group');
   if (latEl) latEl.value = schoolData?.latitude || '';
   if (lngEl) lngEl.value = schoolData?.longitude || '';
   if (radiusEl) radiusEl.value = schoolData?.attendance_radius_m || 200;
-  if (pwdEl) pwdEl.value = schoolData?.admin_password || '';
   if (trackingSheetEl) trackingSheetEl.value = schoolData?.tracking_sheet_id || '';
   if (trackingSheetGroup) trackingSheetGroup.style.display = AppRouter._currentProfile?.role === 'super_admin' ? '' : 'none';
 
@@ -2727,8 +2726,7 @@ async function handleSchoolSubmit() {
       status: document.getElementById('school-input-status').value || 'active',
       latitude: parseFloat(document.getElementById('school-input-latitude')?.value) || null,
       longitude: parseFloat(document.getElementById('school-input-longitude')?.value) || null,
-      attendance_radius_m: parseInt(document.getElementById('school-input-attendance-radius')?.value) || 200,
-      admin_password: document.getElementById('school-input-admin-password')?.value.trim() || null
+      attendance_radius_m: parseInt(document.getElementById('school-input-attendance-radius')?.value) || 200
     };
     if (AppRouter._currentProfile?.role === 'super_admin') {
       const trackingSheetId = document.getElementById('school-input-tracking-sheet-id')?.value.trim() || '';
@@ -4382,7 +4380,13 @@ async function handleContentFileUpload(fileInput) {
   const sizeInput = document.getElementById('input-content-size');
   try {
     const bucketName = 'content-uploads';
-    const filePath = `${Date.now()}-${file.name}`;
+    const profile = await AuthService.getProfile();
+    if (!profile?.id || !profile?.school_id) {
+      AppToast.show('Your account is not linked to a school. Upload was cancelled.', 'error');
+      return;
+    }
+    const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
+    const filePath = `${profile.school_id}/${profile.id}/${Date.now()}-${safeName}`;
     const { data, error } = await supabase.storage.from(bucketName).upload(filePath, file);
     if (error) {
       const bucketErr = error.message?.includes('bucket') || error.message?.includes('not found');
