@@ -83,7 +83,7 @@ window.SchoolStudents = {
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
         ${students.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">groups</span><h3>${q ? 'No students match your search' : 'No students enrolled yet'}</h3><p>${q ? 'Try adjusting your filters.' : 'Enroll students to get started with your school.'}</p>${q ? '' : `<button class="btn btn-primary" data-action="sp-add-student" style="margin-top:12px;"><span class="material-symbols-outlined" style="font-size:18px;">person_add</span> Add Student</button>`}</div>`
-        : `<div class="table-container"><table><thead><tr><th>Name</th><th>Email</th><th>Class</th><th>Counselor</th><th>Status</th><th>Courses</th><th style="width:140px;"></th></tr></thead><tbody>
+        : `<div class="table-container"><table><thead><tr><th>Name</th><th>Email</th><th>Class</th><th>Counselor</th><th>Status</th><th style="width:120px;"></th></tr></thead><tbody>
           ${pageItems.map(s => {
             const counselor = counselors.find(c => c.profileId === s.counselor_id);
             const courses = data.enrollments?.filter(e => e.student_id === s.id) || [];
@@ -95,12 +95,10 @@ window.SchoolStudents = {
               <td style="font-size:13px;">${eh(s.class || '—')}</td>
               <td style="font-size:13px;">${eh(counselor?.displayName || '—')}</td>
               <td><span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-suspended'}">${eh(s.status)}</span></td>
-              <td style="font-size:13px;">${courses.length}</td>
               <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
                 <button class="btn btn-ghost btn-sm" data-action="sp-view-student" data-id="${s.id}" title="View Profile"><span class="material-symbols-outlined" style="font-size:16px;">person</span></button>
                 <button class="btn btn-ghost btn-sm" data-action="sp-edit-student" data-id="${s.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
                 <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="sp-delete-student" data-id="${s.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
-                <button class="btn btn-ghost btn-sm" data-action="sp-student-courses" data-id="${s.id}" title="Assign Courses"><span class="material-symbols-outlined" style="font-size:16px;">assignment</span></button>
               </td>
             </tr>`;
           }).join('')}
@@ -1835,7 +1833,19 @@ window.SchoolProfile = {
 window.SchoolVideos = {
   async render(main, data, school) {
     const schoolId = school.id;
-    const content = data.content.filter(c => c.school_id === schoolId);
+    const profile = AppRouter._currentProfile;
+    const selectedClassId = AppRouter._selectedCategoryId;
+    let content = data.content.filter(c => c.school_id === schoolId);
+    if (profile?.role === 'student') {
+      const student = await window.StudentService?.getByUserId(profile.id);
+      content = student?.class_id
+        ? content.filter(item => item.category_id === student.class_id)
+        : [];
+    }
+    if (selectedClassId) content = content.filter(item => item.category_id === selectedClassId);
+    const selectedClass = selectedClassId
+      ? data.categories.find(classItem => classItem.id === selectedClassId)
+      : null;
     const q = (document.getElementById('sp-video-search')?.value || '').toLowerCase();
     const typeFilter = document.getElementById('sp-video-type')?.value || '';
     let items = content;
@@ -1849,7 +1859,7 @@ window.SchoolVideos = {
             <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
             <span style="font-size:12px;color:var(--text-secondary);">${eh(school.name)}</span>
           </div>
-          <h1 class="page-title">Video Library</h1><p class="page-subtitle">Manage videos and media for ${eh(school.name)}.</p>
+          <h1 class="page-title">${selectedClass ? eh(selectedClass.name) + ' Videos' : 'Video Library'}</h1><p class="page-subtitle">${selectedClass ? 'Videos available inside this class.' : `Manage class videos for ${eh(school.name)}.`}</p>
         </div>
         <div style="display:flex;gap:8px;">
           <span style="font-size:11px;color:var(--text-muted);align-self:center;">${items.length} items</span>
