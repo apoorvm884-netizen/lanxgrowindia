@@ -44,7 +44,8 @@ export const CategoryService = {
       .insert({
         name: category.name,
         school_id: category.schoolId,
-        parent_id: category.parentId || null
+        parent_id: null,
+        drive_folder_id: category.driveFolderId || null
       })
       .select()
       .single();
@@ -55,8 +56,8 @@ export const CategoryService = {
   },
 
   async update(id, updates) {
-    const payload = { name: updates.name };
-    if (updates.parentId !== undefined) payload.parent_id = updates.parentId;
+    const payload = { name: updates.name, parent_id: null };
+    if (updates.driveFolderId !== undefined) payload.drive_folder_id = updates.driveFolderId;
     const { data, error } = await supabase
       .from('categories')
       .update(payload)
