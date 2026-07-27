@@ -24,14 +24,11 @@ export const PermissionsService = {
 
   async set(role, permission, enabled) {
     const { data, error } = await supabase
-      .from('permissions')
-      .upsert({
-        role,
-        permission,
-        enabled
-      }, { onConflict: 'role,permission' })
-      .select()
-      .single();
+      .rpc('set_role_permission', {
+        p_role: role,
+        p_permission: permission,
+        p_enabled: enabled
+      });
     if (error) throw error;
 
     await AuditLogService.log(
