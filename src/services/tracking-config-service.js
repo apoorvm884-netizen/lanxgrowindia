@@ -1,18 +1,9 @@
 import { supabase } from '../lib/supabase.js';
+import { edgeFunctionError } from './edge-function-error.js';
 
 const invoke = async body => {
   const { data, error } = await supabase.functions.invoke('tracking-config', { body });
-  if (error) {
-    let message = error.message || 'Tracking configuration request failed.';
-    try {
-      const details = await error.context?.json();
-      if (details?.error) message = details.error;
-    } catch (_) {
-      // The response may not contain JSON.
-    }
-    throw new Error(message);
-  }
-  if (data?.error) throw new Error(data.error);
+  if (error || data?.error) throw await edgeFunctionError(error, data, 'Tracking configuration request failed.');
   return data;
 };
 
