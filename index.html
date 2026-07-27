@@ -930,6 +930,18 @@ tr:hover td { background: var(--surface-low); }
 
       <!-- Location & Access Tab -->
       <div id="school-tab-location" class="school-tab-panel" style="display:none;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">School Admin Login</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-login-email">Login Email <span style="color:var(--danger);">*</span></label>
+            <input class="form-input" type="email" id="school-input-login-email" autocomplete="off" placeholder="principal@school.edu">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" for="school-input-login-password">Password <span style="color:var(--danger);">*</span></label>
+            <input class="form-input" type="password" id="school-input-login-password" minlength="8" autocomplete="new-password" placeholder="Minimum 8 characters">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">On edit, enter a value only to reset the password. Passwords are never stored or shown.</div>
+          </div>
+        </div>
         <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px;">GPS Location (for attendance verification)</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
           <div class="form-group" style="margin:0;">
