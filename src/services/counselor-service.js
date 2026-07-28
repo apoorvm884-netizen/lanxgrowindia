@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase.js';
+import { AuditLogService } from './audit-log-service.js';
 
 export const CounselorService = {
 
@@ -19,6 +20,10 @@ export const CounselorService = {
       .eq('id', id)
       .single();
     if (error) throw error;
+    await AuditLogService.log('created', 'Counselor', data.name, `Counselor "${data.name}" created`, {
+      schoolId: data.school_id,
+      metadata: { counselor_id: data.id }
+    });
     return data;
   },
 
@@ -43,6 +48,10 @@ export const CounselorService = {
       .select()
       .single();
     if (error) throw error;
+    await AuditLogService.log('edited', 'Counselor', data.name, `Counselor "${data.name}" updated`, {
+      schoolId: data.school_id,
+      metadata: { counselor_id: data.id, changed_fields: Object.keys(payload) }
+    });
     return data;
   },
 
@@ -72,10 +81,20 @@ export const CounselorService = {
   },
 
   async delete(id) {
+    const { data: counselor, error: fetchError } = await supabase
+      .from('counselors')
+      .select('id, school_id, name')
+      .eq('id', id)
+      .single();
+    if (fetchError) throw fetchError;
     const { error } = await supabase
       .from('counselors')
       .delete()
       .eq('id', id);
     if (error) throw error;
+    await AuditLogService.log('deleted', 'Counselor', counselor.name, `Counselor "${counselor.name}" deleted`, {
+      schoolId: counselor.school_id,
+      metadata: { counselor_id: counselor.id }
+    });
   }
 };
