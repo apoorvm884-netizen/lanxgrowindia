@@ -70,7 +70,11 @@ export const SchoolService = {
       .single();
     if (error) throw error;
 
-    await AuditLogService.log('created', 'School', data.name, `School "${data.name}" created`);
+    await AuditLogService.log('created', 'School', data.name, `School "${data.name}" created`, {
+      schoolId: data.id,
+      companyId: data.company_id,
+      metadata: { school_id: data.id }
+    });
     return data;
   },
 
@@ -113,20 +117,27 @@ export const SchoolService = {
       .single();
     if (error) throw error;
 
-    await AuditLogService.log('edited', 'School', data.name, `School "${data.name}" updated`);
+    await AuditLogService.log('edited', 'School', data.name, `School "${data.name}" updated`, {
+      schoolId: data.id,
+      companyId: data.company_id,
+      metadata: { school_id: data.id, changed_fields: Object.keys(payload) }
+    });
     return data;
   },
 
   async delete(id) {
     const { data: school, error: fetchError } = await supabase
       .from('schools')
-      .select('name')
+      .select('id, name, company_id')
       .eq('id', id)
       .single();
     if (fetchError) throw fetchError;
 
     await AdminAccessService.deleteSchool(id);
 
-    await AuditLogService.log('deleted', 'School', school?.name || 'Unknown', `School deleted`);
+    await AuditLogService.log('deleted', 'School', school?.name || 'Unknown', 'School deleted', {
+      companyId: school?.company_id,
+      metadata: { school_id: school?.id }
+    });
   }
 };

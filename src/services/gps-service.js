@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase.js';
+import { AuditLogService } from './audit-log-service.js';
 
 export const GpsService = {
 
@@ -29,6 +30,10 @@ export const GpsService = {
       .select()
       .single();
     if (error) throw error;
+    await AuditLogService.log('created', 'Vehicle', data.label, `Vehicle "${data.label}" created`, {
+      schoolId: data.school_id,
+      metadata: { vehicle_id: data.id }
+    });
     return data;
   },
 
@@ -40,12 +45,26 @@ export const GpsService = {
       .select()
       .single();
     if (error) throw error;
+    await AuditLogService.log('edited', 'Vehicle', data.label, `Vehicle "${data.label}" updated`, {
+      schoolId: data.school_id,
+      metadata: { vehicle_id: data.id, changed_fields: Object.keys(updates) }
+    });
     return data;
   },
 
   async deleteVehicle(id) {
+    const { data: vehicle, error: fetchError } = await supabase
+      .from('vehicles')
+      .select('id, school_id, label')
+      .eq('id', id)
+      .single();
+    if (fetchError) throw fetchError;
     const { error } = await supabase.from('vehicles').delete().eq('id', id);
     if (error) throw error;
+    await AuditLogService.log('deleted', 'Vehicle', vehicle.label, `Vehicle "${vehicle.label}" deleted`, {
+      schoolId: vehicle.school_id,
+      metadata: { vehicle_id: vehicle.id }
+    });
   },
 
   // ── GPS Devices ───────────────────────────────────────────
@@ -72,6 +91,10 @@ export const GpsService = {
       .select()
       .single();
     if (error) throw error;
+    await AuditLogService.log('created', 'GPS Device', data.device_uid, `GPS device "${data.device_uid}" added`, {
+      schoolId: data.school_id,
+      metadata: { device_id: data.id, vehicle_id: data.vehicle_id }
+    });
     return data;
   },
 
@@ -83,12 +106,26 @@ export const GpsService = {
       .select()
       .single();
     if (error) throw error;
+    await AuditLogService.log('edited', 'GPS Device', data.device_uid, `GPS device "${data.device_uid}" updated`, {
+      schoolId: data.school_id,
+      metadata: { device_id: data.id, changed_fields: Object.keys(updates) }
+    });
     return data;
   },
 
   async deleteDevice(id) {
+    const { data: device, error: fetchError } = await supabase
+      .from('gps_devices')
+      .select('id, school_id, device_uid, vehicle_id')
+      .eq('id', id)
+      .single();
+    if (fetchError) throw fetchError;
     const { error } = await supabase.from('gps_devices').delete().eq('id', id);
     if (error) throw error;
+    await AuditLogService.log('deleted', 'GPS Device', device.device_uid, `GPS device "${device.device_uid}" deleted`, {
+      schoolId: device.school_id,
+      metadata: { device_id: device.id, vehicle_id: device.vehicle_id }
+    });
   },
 
   // ── Live Locations ────────────────────────────────────────
