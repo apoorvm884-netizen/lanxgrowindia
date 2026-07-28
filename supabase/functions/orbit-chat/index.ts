@@ -19,6 +19,14 @@ type Provider = {
   model: string;
   max_output_tokens: number;
   temperature: number;
+  consecutive_failures: number;
+};
+
+const PROVIDER_BASE_URLS: Record<string, string> = {
+  gemini: 'https://generativelanguage.googleapis.com/v1beta',
+  openai: 'https://api.openai.com/v1',
+  openrouter: 'https://openrouter.ai/api/v1',
+  nvidia: 'https://integrate.api.nvidia.com/v1'
 };
 
 Deno.serve(async request => {
@@ -59,6 +67,15 @@ Deno.serve(async request => {
       .select('id, status').eq('id', profile.school_id).single();
     if (!school || school.status !== 'active') return json({ error: 'This school is not active.' }, 403);
 
+    const { data: platformSettings } = await admin.from('platform_ai_settings')
+      .select('external_processing_enabled').eq('id', true).maybeSingle();
+    if (platformSettings?.external_processing_enabled !== true) {
+      return json({
+        error: 'Orbit AI processing is prepared but awaiting administrator approval.',
+        code: 'ORBIT_APPROVAL_REQUIRED'
+      }, 503);
+    }
+
     let content: { id: string; name: string; description: string | null } | null = null;
     if (contentId) {
       const { data } = await userClient.from('content')
@@ -75,7 +92,7 @@ Deno.serve(async request => {
     if (!quota?.allowed) return json({ error: quota?.message || 'Orbit is unavailable.', quota }, 429);
 
     const { data: providerRows } = await admin.from('ai_providers')
-      .select('id,label,provider,base_url,model,max_output_tokens,temperature,priority,school_id')
+      .select('id,label,provider,base_url,model,max_output_tokens,temperature,priority,school_id,consecutive_failures')
       .eq('enabled', true)
       .or(`school_id.is.null,school_id.eq.${profile.school_id}`)
       .order('priority');
@@ -86,7 +103,17 @@ Deno.serve(async request => {
     const { data: secretRows } = await admin.from('ai_provider_secrets')
       .select('provider_id,api_key').in('provider_id', providerIds);
     const keys = new Map((secretRows || []).map(row => [row.provider_id, row.api_key]));
-    if (!providers.some(provider => keys.has(provider.id))) {
+    const providerTypes = [...new Set(providers.map(provider => provider.provider))];
+    const { data: centralKeyRows } = await admin.from('api_keys')
+      .select('key_type,key_value,created_at')
+      .eq('is_active', true)
+      .in('key_type', providerTypes)
+      .order('created_at', { ascending: false });
+    const centralKeys = new Map<string, string>();
+    for (const row of centralKeyRows || []) {
+      if (!centralKeys.has(row.key_type)) centralKeys.set(row.key_type, row.key_value);
+    }
+    if (!providers.some(provider => keys.has(provider.id) || centralKeys.has(provider.provider))) {
       return json({ error: 'Orbit provider credentials are unavailable.' }, 503);
     }
 
@@ -125,15 +152,27 @@ Deno.serve(async request => {
     let usedProvider: Provider | null = null;
     let lastError = '';
     for (const provider of providers) {
-      const key = keys.get(provider.id);
+      const key = keys.get(provider.id) || centralKeys.get(provider.provider);
       if (!key) continue;
       try {
         reply = await callProvider(provider, key, messages);
         usedProvider = provider;
+        await admin.from('ai_providers').update({
+          consecutive_failures: 0,
+          needs_attention: false,
+          last_ok_at: new Date().toISOString(),
+          last_error: null,
+          last_status_code: 200
+        }).eq('id', provider.id);
         break;
       } catch (error) {
         lastError = error instanceof Error ? error.message : 'Provider failed';
         console.error(`Orbit provider ${provider.label} failed`, lastError);
+        await admin.from('ai_providers').update({
+          consecutive_failures: (provider.consecutive_failures || 0) + 1,
+          needs_attention: true,
+          last_error: lastError.slice(0, 500)
+        }).eq('id', provider.id);
       }
     }
     if (!reply || !usedProvider) {
@@ -234,8 +273,12 @@ function formatTime(value: number) {
 }
 
 async function callProvider(provider: Provider, apiKey: string, messages: Array<{ role: string; content: string }>) {
+  if (!PROVIDER_BASE_URLS[provider.provider]) {
+    throw new Error(`Unsupported AI provider: ${provider.provider}`);
+  }
+
   if (provider.provider === 'gemini') {
-    const base = provider.base_url || 'https://generativelanguage.googleapis.com/v1beta';
+    const base = PROVIDER_BASE_URLS.gemini;
     const system = messages.find(message => message.role === 'system')?.content || '';
     const conversation = messages.filter(message => message.role !== 'system').map(message => ({
       role: message.role === 'assistant' ? 'model' : 'user',
@@ -258,16 +301,19 @@ async function callProvider(provider: Provider, apiKey: string, messages: Array<
     return String(data?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   }
 
-  const base = provider.base_url ||
-    (provider.provider === 'openai' ? 'https://api.openai.com/v1' : 'https://openrouter.ai/api/v1');
+  const base = PROVIDER_BASE_URLS[provider.provider];
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    Accept: 'application/json'
+  };
+  if (provider.provider === 'openrouter') {
+    headers['HTTP-Referer'] = 'https://lanxgrowindia.vercel.app';
+    headers['X-Title'] = 'LanxGrow Orbit';
+  }
   const response = await fetch(`${base.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://lanxgrowindia.vercel.app',
-      'X-Title': 'LanxGrow Orbit'
-    },
+    headers,
     body: JSON.stringify({
       model: provider.model,
       messages,
@@ -276,6 +322,9 @@ async function callProvider(provider: Provider, apiKey: string, messages: Array<
     })
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data?.error?.message || `AI provider failed (${response.status})`);
+  if (!response.ok) {
+    const providerName = provider.provider === 'nvidia' ? 'NVIDIA NIM' : provider.label;
+    throw new Error(data?.error?.message || `${providerName} failed (${response.status})`);
+  }
   return String(data?.choices?.[0]?.message?.content || '').trim();
 }

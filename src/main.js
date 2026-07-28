@@ -1576,6 +1576,7 @@ window.AppRouter = {
       { value: 'gemini', label: 'Gemini AI Key' },
       { value: 'openai', label: 'OpenAI Key' },
       { value: 'openrouter', label: 'OpenRouter Key' },
+      { value: 'nvidia', label: 'NVIDIA NIM API Key' },
       { value: 'other', label: 'Other' }
     ];
 
@@ -1601,7 +1602,7 @@ window.AppRouter = {
           </div>
           <div class="form-group" style="margin-top:12px;">
             <label class="form-label">API Key Value</label>
-            <input class="form-input" type="text" id="api-key-value" placeholder="Paste your API key here">
+              <input class="form-input" type="password" id="api-key-value" autocomplete="new-password" placeholder="Paste your API key here">
           </div>
           <div style="display:flex;gap:8px;margin-top:12px;">
             <button class="btn btn-primary btn-sm" id="btn-save-api-key">Save Key</button>
@@ -4984,7 +4985,7 @@ window.AppAiOrbit = {
     </div>`;
     initIcons();
     this._bindEvents(schoolId, school);
-    if (canConfigure) this._loadProviders();
+    if (canConfigure) this._loadProviders(schoolId);
   },
 
   async _renderStudentChat(main, school) {
@@ -5087,17 +5088,17 @@ window.AppAiOrbit = {
 
     // Add provider button
     document.getElementById('btn-add-provider')?.addEventListener('click', () => {
-      this._showProviderModal(null);
+      this._showProviderModal(null, schoolId);
     });
   },
 
-  async _loadProviders() {
+  async _loadProviders(schoolId) {
     try {
-      const providers = await AiService.getProviders();
+      const providers = await AiService.getProviders(schoolId);
       const container = document.getElementById('orbit-providers-list');
       if (!container) return;
       if (providers.length === 0) {
-        container.innerHTML = '<div class="empty-state" style="padding:24px;"><span class="material-symbols-outlined" style="font-size:32px;">smart_toy</span><h3>No providers configured</h3><p>Add an AI provider like OpenRouter or Gemini to enable AI Q&A.</p></div>';
+        container.innerHTML = '<div class="empty-state" style="padding:24px;"><span class="material-symbols-outlined" style="font-size:32px;">smart_toy</span><h3>No providers configured</h3><p>Add Gemini, OpenAI, OpenRouter, or NVIDIA NIM to prepare Orbit.</p></div>';
         return;
       }
       container.innerHTML = providers.map(p => {
@@ -5118,6 +5119,26 @@ window.AppAiOrbit = {
         </div>`;
       }).join('');
       initIcons();
+      container.onclick = async event => {
+        const button = event.target.closest('[data-action]');
+        if (!button) return;
+        const provider = providers.find(item => item.id === button.dataset.id);
+        if (!provider) return;
+        if (button.dataset.action === 'edit-provider') {
+          this._showProviderModal(provider, schoolId);
+          return;
+        }
+        if (button.dataset.action === 'delete-provider') {
+          if (!confirm(`Delete AI provider "${provider.label}"?`)) return;
+          try {
+            await AiService.deleteProvider(provider.id);
+            AppToast.show('Provider deleted');
+            await this._loadProviders(schoolId);
+          } catch (error) {
+            AppToast.show(error.message, 'error');
+          }
+        }
+      };
     } catch (err) {
       const container = document.getElementById('orbit-providers-list');
       if (container) container.innerHTML = `<div style="color:var(--error);font-size:13px;">Error loading providers: ${AppUtils.escapeHtml(err.message)}</div>`;
@@ -5161,7 +5182,7 @@ window.AppAiOrbit = {
     });
   },
 
-  _showProviderModal(provider) {
+  _showProviderModal(provider, schoolId) {
     let overlay = document.getElementById('modal-orbit-provider');
     if (overlay) overlay.remove();
     const p = provider || {};
@@ -5173,14 +5194,16 @@ window.AppAiOrbit = {
           <div class="form-group"><label class="form-label">Label</label><input type="text" class="form-input" id="prov-label" value="${AppUtils.escapeHtml(p.label || '')}" placeholder="e.g. OpenRouter GPT-4"></div>
           <div class="form-group"><label class="form-label">Provider</label>
             <select class="form-select" id="prov-provider">
-              <option value="openrouter" ${p.provider === 'openrouter' ? 'selected' : ''}>OpenRouter</option>
               <option value="gemini" ${p.provider === 'gemini' ? 'selected' : ''}>Google Gemini</option>
               <option value="openai" ${p.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
-              <option value="anthropic" ${p.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
+              <option value="openrouter" ${p.provider === 'openrouter' ? 'selected' : ''}>OpenRouter</option>
+              <option value="nvidia" ${p.provider === 'nvidia' ? 'selected' : ''}>NVIDIA NIM</option>
             </select>
           </div>
           <div class="form-group"><label class="form-label">Model</label><input type="text" class="form-input" id="prov-model" value="${AppUtils.escapeHtml(p.model || '')}" placeholder="e.g. google/gemini-2.0-flash"></div>
+          <div class="form-group"><label class="form-label">API Endpoint</label><input type="url" class="form-input" id="prov-base-url" value="${AppUtils.escapeHtml(p.base_url || '')}" readonly></div>
           <div class="form-group"><label class="form-label">API Key</label><input type="password" class="form-input" id="prov-key" placeholder="${isEdit ? 'Leave blank to keep existing' : 'Enter API key'}"></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:-8px;">Provider-specific key is stored server-side in Supabase. If left blank, an active central key of the same provider type can be used.</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="form-group"><label class="form-label">Priority (lower = first)</label><input type="number" class="form-input" id="prov-priority" value="${p.priority || 100}" min="1"></div>
             <div class="form-group"><label class="form-label">Temperature</label><input type="number" class="form-input" id="prov-temp" value="${p.temperature || 0.3}" min="0" max="2" step="0.1"></div>
@@ -5191,6 +5214,18 @@ window.AppAiOrbit = {
     </div>`;
     document.body.insertAdjacentHTML('beforeend', html);
 
+    const providerSelect = document.getElementById('prov-provider');
+    const applyPreset = (force = false) => {
+      const preset = AiService.getProviderPreset(providerSelect.value);
+      if (!preset) return;
+      const modelInput = document.getElementById('prov-model');
+      const baseUrlInput = document.getElementById('prov-base-url');
+      if (force || !modelInput.value.trim()) modelInput.value = preset.model;
+      if (force || !baseUrlInput.value.trim()) baseUrlInput.value = preset.baseUrl;
+    };
+    providerSelect.addEventListener('change', () => applyPreset(true));
+    applyPreset(false);
+
     document.getElementById('btn-save-provider')?.addEventListener('click', async () => {
       const label = document.getElementById('prov-label').value.trim();
       const model = document.getElementById('prov-model').value.trim();
@@ -5199,8 +5234,14 @@ window.AppAiOrbit = {
         const payload = {
           label, model,
           provider: document.getElementById('prov-provider').value,
+          base_url: AiService.getProviderPreset(document.getElementById('prov-provider').value)?.baseUrl,
           priority: parseInt(document.getElementById('prov-priority').value) || 100,
-          temperature: parseFloat(document.getElementById('prov-temp').value) || 0.3
+          temperature: Number.isFinite(parseFloat(document.getElementById('prov-temp').value))
+            ? parseFloat(document.getElementById('prov-temp').value)
+            : 0.3,
+          school_id: p.school_id || schoolId || null,
+          enabled: p.enabled !== false,
+          max_output_tokens: p.max_output_tokens || 1500
         };
         let savedProvider;
         if (isEdit) {
@@ -5214,7 +5255,7 @@ window.AppAiOrbit = {
         }
         AppToast.show(isEdit ? 'Provider updated' : 'Provider added');
         document.getElementById('modal-orbit-provider').classList.remove('active');
-        this._loadProviders();
+        this._loadProviders(schoolId);
       } catch (err) { AppToast.show(err.message, 'error'); }
     });
   }
