@@ -1,30 +1,69 @@
 import { supabase } from '../lib/supabase.js';
 
+const PROVIDER_PRESETS = Object.freeze({
+  gemini: {
+    label: 'Google Gemini',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    model: 'gemini-2.0-flash'
+  },
+  openai: {
+    label: 'OpenAI',
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-4.1-mini'
+  },
+  openrouter: {
+    label: 'OpenRouter',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'openai/gpt-4.1-mini'
+  },
+  nvidia: {
+    label: 'NVIDIA NIM',
+    baseUrl: 'https://integrate.api.nvidia.com/v1',
+    model: 'nvidia/nemotron-3-super-120b-a12b'
+  }
+});
+
+function normalizeProvider(provider) {
+  const preset = PROVIDER_PRESETS[provider.provider];
+  if (!preset) throw new Error('Unsupported AI provider.');
+  return {
+    label: provider.label || preset.label,
+    provider: provider.provider,
+    base_url: preset.baseUrl,
+    model: provider.model || preset.model,
+    priority: provider.priority || 100,
+    enabled: provider.enabled !== false,
+    max_output_tokens: provider.max_output_tokens || 1500,
+    temperature: provider.temperature ?? 0.3,
+    school_id: provider.school_id || null
+  };
+}
+
 export const AiService = {
+  PROVIDER_PRESETS,
+
+  getProviderPreset(provider) {
+    return PROVIDER_PRESETS[provider] || null;
+  },
 
   // ── Providers ─────────────────────────────────────────────
-  async getProviders() {
-    const { data, error } = await supabase
+  async getProviders(schoolId = null) {
+    let query = supabase
       .from('ai_providers')
       .select('*')
       .order('priority');
+    if (schoolId) query = query.or(`school_id.is.null,school_id.eq.${schoolId}`);
+    const { data, error } = await query;
     if (error) throw error;
     return data || [];
   },
 
   async createProvider(provider) {
+    const payload = normalizeProvider(provider);
     const { data, error } = await supabase
       .from('ai_providers')
       .insert({
-        label: provider.label,
-        provider: provider.provider,
-        base_url: provider.base_url || null,
-        model: provider.model,
-        priority: provider.priority || 100,
-        enabled: provider.enabled !== false,
-        max_output_tokens: provider.max_output_tokens || 1500,
-        temperature: provider.temperature || 0.3,
-        school_id: provider.school_id || null,
+        ...payload,
         created_by: provider.created_by || null
       })
       .select()
@@ -34,9 +73,10 @@ export const AiService = {
   },
 
   async updateProvider(id, updates) {
+    const payload = normalizeProvider(updates);
     const { data, error } = await supabase
       .from('ai_providers')
-      .update(updates)
+      .update(payload)
       .eq('id', id)
       .select()
       .single();
@@ -50,16 +90,12 @@ export const AiService = {
   },
 
   async setProviderKey(providerId, apiKey) {
-    const fingerprint = apiKey.slice(0, 4) + '...' + apiKey.slice(-4);
-    const { error } = await supabase
-      .from('ai_provider_secrets')
-      .upsert({
-        provider_id: providerId,
-        api_key: apiKey,
-        key_fingerprint: fingerprint
-      }, { onConflict: 'provider_id' });
+    if (!apiKey || apiKey.length < 12) throw new Error('Enter a valid API key.');
+    const { error } = await supabase.rpc('set_ai_provider_secret', {
+      p_provider_id: providerId,
+      p_api_key: apiKey
+    });
     if (error) throw error;
-    await supabase.from('ai_providers').update({ key_fingerprint: fingerprint }).eq('id', providerId);
   },
 
   // ── School AI Settings ────────────────────────────────────
@@ -79,6 +115,34 @@ export const AiService = {
       .upsert({ school_id: schoolId, ...settings }, { onConflict: 'school_id' })
       .select()
       .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async setSchoolPolicy(schoolId, accessMode, dailyLimit) {
+    const { data, error } = await supabase.rpc('set_school_orbit_policy', {
+      p_school_id: schoolId,
+      p_access_mode: accessMode,
+      p_daily_limit: dailyLimit ?? null
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async getQuota(contentId = null) {
+    const { data, error } = await supabase.rpc('orbit_quota_status', {
+      p_content_id: contentId
+    });
+    if (error) throw error;
+    return Array.isArray(data) ? data[0] : data;
+  },
+
+  async setStudentAccess(studentId, enabled, dailyLimit) {
+    const { data, error } = await supabase.rpc('set_student_orbit_access', {
+      p_student_id: studentId,
+      p_enabled: enabled,
+      p_daily_limit: dailyLimit ?? null
+    });
     if (error) throw error;
     return data;
   },

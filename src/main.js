@@ -461,7 +461,7 @@ window.AppSidebar = {
     { id: 'sep-s4', separator: true },
     { id: 'school-attendance', label: 'Attendance', icon: 'how_to_reg', route: 'school-attendance' },
     { id: 'school-gps', label: 'GPS Tracking', icon: 'location_on', route: 'school-gps' },
-    { id: 'school-orbit', label: 'AI Orbit', icon: 'smart_toy', route: 'school-orbit' },
+    { id: 'school-orbit', label: 'Orbit', icon: 'smart_toy', route: 'school-orbit' },
     { id: 'sep-s5-extra', separator: true },
     { id: 'school-reports', label: 'Reports', icon: 'bar-chart-3', route: 'school-reports' },
     { id: 'school-notifications', label: 'Notifications', icon: 'notifications', route: 'school-notifications' },
@@ -489,6 +489,10 @@ window.AppSidebar = {
     { id: 'sep-s1', separator: true },
     { id: 'school-students', label: 'Students', icon: 'groups', route: 'school-students' },
     { id: 'sep-s2', separator: true },
+    { id: 'school-videos', label: 'Video Review', icon: 'video-library', route: 'school-videos' },
+    { id: 'school-orbit', label: 'Orbit Usage', icon: 'smart_toy', route: 'school-orbit' },
+    { id: 'school-attendance', label: 'My Attendance', icon: 'how_to_reg', route: 'school-attendance' },
+    { id: 'sep-s2b', separator: true },
     { id: 'school-reports', label: 'Reports & Analytics', icon: 'bar-chart-3', route: 'school-reports' },
     { id: 'school-notifications', label: 'Notifications', icon: 'notifications', route: 'school-notifications' },
     { id: 'sep-s3', separator: true },
@@ -499,6 +503,7 @@ window.AppSidebar = {
     { id: 'school-dashboard', label: 'My Dashboard', icon: 'layout-dashboard', route: 'school-dashboard' },
     { id: 'sep-s1', separator: true },
     { id: 'school-videos', label: 'My Class Videos', icon: 'video-library', route: 'school-videos' },
+    { id: 'school-orbit', label: 'Orbit', icon: 'smart_toy', route: 'school-orbit' },
     { id: 'sep-s2', separator: true },
     { id: 'school-reports', label: 'My Progress', icon: 'bar-chart-3', route: 'school-reports' },
     { id: 'school-notifications', label: 'Notifications', icon: 'notifications', route: 'school-notifications' },
@@ -772,6 +777,14 @@ window.AppRouter = {
     const schoolId = this.currentSchoolId;
 
     if (this.currentRoute === 'school-dashboard') {
+      if (profile?.role === 'student') {
+        await window.StudentLearningDashboard.render(main, data, school, profile);
+        return;
+      }
+      if (profile?.role === 'counselor') {
+        await window.CounselorLearningDashboard.render(main, data, school, profile);
+        return;
+      }
       const cats = data.categories.filter(c => c.school_id === schoolId);
       const subjects = data.subjects.filter(s => s.school_id === schoolId);
       const sections = data.sections.filter(sec => sec.school_id === schoolId);
@@ -1457,8 +1470,11 @@ window.AppRouter = {
     let settings = {};
     try {
       const all = await window.SettingsService?.getAll() || [];
-      for (const s of all) settings[s.key] = s.value;
+      for (const s of all) {
+        if (!s.is_system_default) settings[s.key] = s.value;
+      }
     } catch (_) {}
+    this._companySettingsDraft = settings;
     main.innerHTML = `<div class="fade-in">
       <div class="page-header">
         <div class="page-header-left"><h1 class="page-title">Company Settings</h1><p class="page-subtitle">Configure global platform preferences.</p></div>
@@ -1474,27 +1490,30 @@ window.AppRouter = {
   },
 
   _settingsTabContent(tab, settings) {
-    const v = (key, fallback) => settings[key] !== undefined ? AppUtils.escapeHtml(settings[key]) : fallback;
+    const v = (key, fallback = '') => settings[key] !== undefined ? AppUtils.escapeHtml(settings[key]) : fallback;
     if (tab === 'general') {
       return `<div class="card" style="max-width:600px;">
         <div class="card-header"><h3 class="card-title">General Settings</h3></div>
         <div style="padding:20px;">
-          <div class="form-group"><label class="form-label">Company Name</label><input type="text" class="form-input" value="${v('companyName', 'LanxGrow Learning')}" data-action="save-setting" data-key="companyName"></div>
+          <div class="form-group"><label class="form-label">Company Name</label><input type="text" class="form-input" value="${v('companyName')}" placeholder="Enter company name" data-action="save-setting" data-key="companyName"></div>
           <div class="form-group" style="margin-top:16px;"><label class="form-label">Default Platform Language</label>
             <select class="form-select" data-action="save-setting" data-key="language">
-              <option value="en" ${v('language', 'en') === 'en' ? 'selected' : ''}>English</option>
-              <option value="es" ${v('language', 'en') === 'es' ? 'selected' : ''}>Spanish</option>
-              <option value="fr" ${v('language', 'en') === 'fr' ? 'selected' : ''}>French</option>
+              <option value="" ${v('language') === '' ? 'selected' : ''}>Not configured</option>
+              <option value="en" ${v('language') === 'en' ? 'selected' : ''}>English</option>
+              <option value="es" ${v('language') === 'es' ? 'selected' : ''}>Spanish</option>
+              <option value="fr" ${v('language') === 'fr' ? 'selected' : ''}>French</option>
             </select>
           </div>
           <div class="form-group" style="margin-top:16px;"><label class="form-label">Timezone</label>
             <select class="form-select" data-action="save-setting" data-key="timezone">
-              <option value="UTC" ${v('timezone', 'UTC') === 'UTC' ? 'selected' : ''}>UTC</option>
-              <option value="US/Eastern" ${v('timezone', 'UTC') === 'US/Eastern' ? 'selected' : ''}>US/Eastern</option>
-              <option value="US/Pacific" ${v('timezone', 'UTC') === 'US/Pacific' ? 'selected' : ''}>US/Pacific</option>
+              <option value="" ${v('timezone') === '' ? 'selected' : ''}>Not configured</option>
+              <option value="UTC" ${v('timezone') === 'UTC' ? 'selected' : ''}>UTC</option>
+              <option value="Asia/Kolkata" ${v('timezone') === 'Asia/Kolkata' ? 'selected' : ''}>Asia/Kolkata</option>
+              <option value="US/Eastern" ${v('timezone') === 'US/Eastern' ? 'selected' : ''}>US/Eastern</option>
+              <option value="US/Pacific" ${v('timezone') === 'US/Pacific' ? 'selected' : ''}>US/Pacific</option>
             </select>
           </div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">Max Upload Size (MB)</label><input type="number" class="form-input" value="${v('maxUploadSize', 100)}" data-action="save-setting" data-key="maxUploadSize"></div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">Max Upload Size (MB)</label><input type="number" class="form-input" min="1" max="100" value="${v('maxUploadSize')}" placeholder="100" data-action="save-setting" data-key="maxUploadSize"></div>
           <div style="margin-top:20px;display:flex;gap:12px;">
             <button class="btn btn-primary" data-action="save-settings" style="height:40px;font-size:13px;">Save Changes</button>
             <button class="btn btn-secondary" data-action="reset-settings" style="height:40px;font-size:13px;">Reset</button>
@@ -1502,12 +1521,19 @@ window.AppRouter = {
         </div>
       </div>`;
     } else if (tab === 'branding') {
+      const logoUrl = v('companyLogo');
       return `<div class="card" style="max-width:600px;">
         <div class="card-header"><h3 class="card-title">Branding</h3></div>
         <div style="padding:20px;">
-          <div class="form-group"><label class="form-label">Company Logo</label><div style="width:120px;height:120px;border:2px dashed var(--border);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;cursor:pointer;"><i data-icon="upload" class="icon-26" style="color:var(--text-muted);"></i></div></div>
+          <div class="form-group">
+            <label class="form-label">Company Logo</label>
+            <label for="company-logo-input" style="width:120px;height:120px;border:2px dashed var(--border);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:var(--surface-low);">
+              ${logoUrl ? `<img src="${logoUrl}" alt="Company logo" style="width:100%;height:100%;object-fit:contain;padding:8px;">` : '<span class="material-symbols-outlined" style="font-size:30px;color:var(--text-muted);">upload</span>'}
+            </label>
+            <input id="company-logo-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none;">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">PNG, JPG, WebP or SVG. Maximum 2 MB.</div>
+          </div>
           <div class="form-group" style="margin-top:16px;"><label class="form-label">Primary Color</label><div style="display:flex;align-items:center;gap:12px;"><input type="color" class="form-input" value="${v('primaryColor', '#1A56DB')}" style="width:48px;height:40px;padding:4px;" data-action="save-setting" data-key="primaryColor"><input type="text" class="form-input" value="${v('primaryColor', '#1A56DB')}" style="flex:1;"></div></div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">Favicon</label><input type="file" class="form-input" accept="image/*"></div>
           <div style="margin-top:20px;display:flex;gap:12px;">
             <button class="btn btn-primary" data-action="save-settings" style="height:40px;font-size:13px;">Save Changes</button>
             <button class="btn btn-secondary" data-action="reset-settings" style="height:40px;font-size:13px;">Reset</button>
@@ -1518,10 +1544,10 @@ window.AppRouter = {
       return `<div class="card" style="max-width:600px;">
         <div class="card-header"><h3 class="card-title">Email Configuration</h3></div>
         <div style="padding:20px;">
-          <div class="form-group"><label class="form-label">SMTP Host</label><input type="text" class="form-input" value="${v('smtpHost', 'smtp.sendgrid.net')}" data-action="save-setting" data-key="smtpHost"></div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">SMTP Port</label><input type="number" class="form-input" value="${v('smtpPort', 587)}" data-action="save-setting" data-key="smtpPort"></div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">From Address</label><input type="email" class="form-input" value="${v('fromEmail', 'noreply@lanxgrow.com')}" data-action="save-setting" data-key="fromEmail"></div>
-          <div class="form-group" style="margin-top:16px;"><label class="form-label">From Name</label><input type="text" class="form-input" value="${v('fromName', 'LanxGrow Learning')}" data-action="save-setting" data-key="fromName"></div>
+          <div class="form-group"><label class="form-label">SMTP Host</label><input type="text" class="form-input" value="${v('smtpHost')}" placeholder="smtp.example.com" data-action="save-setting" data-key="smtpHost"></div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">SMTP Port</label><input type="number" class="form-input" value="${v('smtpPort')}" placeholder="587" data-action="save-setting" data-key="smtpPort"></div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">From Address</label><input type="email" class="form-input" value="${v('fromEmail')}" placeholder="noreply@example.com" data-action="save-setting" data-key="fromEmail"></div>
+          <div class="form-group" style="margin-top:16px;"><label class="form-label">From Name</label><input type="text" class="form-input" value="${v('fromName')}" placeholder="Company name" data-action="save-setting" data-key="fromName"></div>
           <div style="margin-top:20px;display:flex;gap:12px;">
             <button class="btn btn-primary" data-action="save-settings" style="height:40px;font-size:13px;">Save Changes</button>
             <button class="btn btn-secondary" data-action="test-email" style="height:40px;font-size:13px;">Send Test</button>
@@ -1540,12 +1566,17 @@ window.AppRouter = {
     const container = document.getElementById('settings-content');
     if (!container) return;
     const allInputs = document.querySelectorAll('#settings-content [data-action="save-setting"]');
-    const settings = {};
+    const settings = { ...(this._companySettingsDraft || {}) };
     allInputs.forEach(input => {
       const key = input.dataset.key;
       if (!key) return;
-      settings[key] = input.type === 'checkbox' ? input.checked : input.type === 'number' ? parseFloat(input.value) || 0 : input.value;
+      if (input.type === 'number' && input.value.trim() === '') {
+        delete settings[key];
+        return;
+      }
+      settings[key] = input.type === 'checkbox' ? input.checked : input.type === 'number' ? parseFloat(input.value) : input.value;
     });
+    this._companySettingsDraft = settings;
     container.innerHTML = this._settingsTabContent(tab, settings);
     initIcons();
   },
@@ -1563,6 +1594,7 @@ window.AppRouter = {
       { value: 'gemini', label: 'Gemini AI Key' },
       { value: 'openai', label: 'OpenAI Key' },
       { value: 'openrouter', label: 'OpenRouter Key' },
+      { value: 'nvidia', label: 'NVIDIA NIM API Key' },
       { value: 'other', label: 'Other' }
     ];
 
@@ -1588,7 +1620,7 @@ window.AppRouter = {
           </div>
           <div class="form-group" style="margin-top:12px;">
             <label class="form-label">API Key Value</label>
-            <input class="form-input" type="text" id="api-key-value" placeholder="Paste your API key here">
+              <input class="form-input" type="password" id="api-key-value" autocomplete="new-password" placeholder="Paste your API key here">
           </div>
           <div style="display:flex;gap:8px;margin-top:12px;">
             <button class="btn btn-primary btn-sm" id="btn-save-api-key">Save Key</button>
@@ -3123,6 +3155,34 @@ document.addEventListener('click', async function (e) {
   if (action === 'add-content') { AppContent.openCreate(id); return; }
   if (action === 'edit-content') { AppContent.edit(id); return; }
   if (action === 'delete-content') { AppContent.confirmDelete(id); return; }
+  if (action === 'review-content-approve') {
+    try {
+      await ContentService.review(id, 'approved');
+      AppToast.show('Video approved. Students can now watch it.', 'success');
+      AppStorage.invalidate();
+      await AppRouter.render();
+    } catch (error) {
+      AppToast.show(error.message || 'Video approval failed.', 'error');
+    }
+    return;
+  }
+  if (action === 'review-content-reject') {
+    const reason = window.prompt('Why is this video being rejected? This reason is required.');
+    if (reason === null) return;
+    if (!reason.trim()) {
+      AppToast.show('A rejection reason is required.', 'error');
+      return;
+    }
+    try {
+      await ContentService.review(id, 'rejected', reason.trim());
+      AppToast.show('Video rejected with a recorded reason.', 'success');
+      AppStorage.invalidate();
+      await AppRouter.render();
+    } catch (error) {
+      AppToast.show(error.message || 'Video rejection failed.', 'error');
+    }
+    return;
+  }
   if (action === 'play-video' || action === 'view-content') {
     const pdata = await AppStorage.load();
     const pitem = pdata.content.find(c => c.id === id);
@@ -3322,7 +3382,9 @@ document.addEventListener('click', async function (e) {
       const key = input.dataset.key;
       if (!key) return;
       if (input.type === 'checkbox') settings[key] = input.checked;
-      else if (input.type === 'number') settings[key] = parseFloat(input.value) || 0;
+      else if (input.type === 'number') {
+        if (input.value.trim() !== '') settings[key] = parseFloat(input.value);
+      }
       else settings[key] = input.value;
     });
     try {
@@ -3381,6 +3443,16 @@ document.addEventListener('click', async function (e) {
   if (action === 'sp-save-student') { window.SchoolStudents.save(false, id); return; }
   if (action === 'sp-update-student') { window.SchoolStudents.save(true, id); return; }
   if (action === 'sp-edit-student') { window.SchoolStudents.openEdit(id); return; }
+  if (action === 'sp-reset-student-devices') {
+    if (!window.confirm('Revoke all registered devices for this student? They can register up to two devices again on their next logins.')) return;
+    try {
+      const count = await StudentService.resetDevices(id);
+      AppToast.show(`${count} registered device(s) revoked.`, 'success');
+    } catch (error) {
+      AppToast.show(error.message || 'Device reset failed.', 'error');
+    }
+    return;
+  }
   if (action === 'sp-delete-student') { window.SchoolStudents.confirmDelete(id); return; }
   if (action === 'sp-confirm-delete-student') {
     try { await window.StudentService?.delete(id); AppToast.show('Student deleted.', 'success'); AppStorage.invalidate(); AppModal.close('modal-confirm-student'); AppRouter.render(); }
@@ -4427,6 +4499,28 @@ document.addEventListener('change', function (e) {
   if (e.target.id === 'input-content-file') { handleContentFileUpload(e.target); }
 });
 
+document.addEventListener('change', async function (e) {
+  if (e.target.id !== 'company-logo-input') return;
+  const input = e.target;
+  const file = input.files?.[0];
+  if (!file) return;
+  input.disabled = true;
+  try {
+    const logoUrl = await window.SettingsService.uploadBrandAsset(file, 'logo');
+    await window.SettingsService.set('companyLogo', logoUrl, 'Company logo URL');
+    AppRouter._companySettingsDraft = {
+      ...(AppRouter._companySettingsDraft || {}),
+      companyLogo: logoUrl
+    };
+    AppRouter.renderSettingsTab('branding');
+    AppToast.show('Company logo uploaded and saved.', 'success');
+  } catch (error) {
+    AppToast.show(error.message || 'Company logo upload failed.', 'error');
+    input.disabled = false;
+    input.value = '';
+  }
+});
+
 // Content file upload via change delegation
 async function handleContentFileUpload(fileInput) {
   const file = fileInput.files?.[0];
@@ -4469,58 +4563,23 @@ async function recordAttendance() {
   try {
     const profile = await AuthService.getProfile();
     if (!profile || !profile.school_id) return;
-    // Only record for teachers/counselors/school_admins
     if (!['teacher','counselor','school_admin'].includes(profile.role)) return;
 
-    const { data: school } = await supabase.from('schools').select('latitude, longitude, attendance_radius_m').eq('id', profile.school_id).single();
-    if (!school) return;
-
-    const today = new Date().toISOString().split('T')[0];
-    // Check if already recorded today
-    const { data: existing } = await supabase.from('attendance').select('id').eq('user_id', profile.id).eq('date', today).single();
-    if (existing) return; // Already recorded
-
-    // Get current location
-    if (navigator.geolocation && school.latitude && school.longitude) {
+    const mark = async (latitude, longitude) => {
+      await supabase.rpc('mark_my_attendance', {
+        p_latitude: latitude,
+        p_longitude: longitude,
+        p_device_info: navigator.userAgent
+      });
+    };
+    if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const dist = haversineDistance(pos.coords.latitude, pos.coords.longitude, school.latitude, school.longitude);
-          const radius = school.attendance_radius_m || 200;
-          const verified = dist <= radius;
-          await supabase.from('attendance').insert({
-            user_id: profile.id,
-            school_id: profile.school_id,
-            date: today,
-            check_in_time: new Date().toISOString(),
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            status: verified ? 'present' : 'unattended',
-            location_verified: verified,
-          });
-        },
-        async () => {
-          // Location denied — mark as unattended
-          await supabase.from('attendance').insert({
-            user_id: profile.id,
-            school_id: profile.school_id,
-            date: today,
-            check_in_time: new Date().toISOString(),
-            status: 'unattended',
-            location_verified: false,
-          });
-        },
+        position => mark(position.coords.latitude, position.coords.longitude),
+        () => mark(null, null),
         { enableHighAccuracy: true, timeout: 10000 }
       );
     } else {
-      // No GPS on school or no browser geolocation — mark unattended
-      await supabase.from('attendance').insert({
-        user_id: profile.id,
-        school_id: profile.school_id,
-        date: today,
-        check_in_time: new Date().toISOString(),
-        status: 'unattended',
-        location_verified: false,
-      });
+      await mark(null, null);
     }
   } catch (_) { /* attendance is non-critical */ }
 }
@@ -4875,6 +4934,12 @@ window.AppGpsTracking = {
 // ==============================================================
 window.AppAiOrbit = {
   async render(main, school, schoolId) {
+    const profile = await AuthService.getProfile();
+    if (profile?.role === 'student') {
+      await this._renderStudentChat(main, school);
+      return;
+    }
+    const canConfigure = ['super_admin', 'company_admin'].includes(profile?.role);
     const [escalations, settings, conversations] = await Promise.all([
       AiService.getEscalations(schoolId).catch(() => []),
       AiService.getSchoolSettings(schoolId).catch(() => null),
@@ -4886,10 +4951,10 @@ window.AppAiOrbit = {
       <div class="page-header">
         <div class="page-header-left">
           <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;margin-bottom:4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-          <h1 class="page-title">AI Orbit</h1>
+          <h1 class="page-title">Orbit</h1>
           <p class="page-subtitle">${AppUtils.escapeHtml(school.name)} — Student Q&A powered by AI</p>
         </div>
-        <button class="btn btn-secondary" id="btn-orbit-settings"><span class="material-symbols-outlined" style="font-size:18px;">settings</span> Settings</button>
+        ${canConfigure ? '<button class="btn btn-secondary" id="btn-orbit-settings"><span class="material-symbols-outlined" style="font-size:18px;">settings</span> Settings</button>' : ''}
       </div>
 
       <!-- Stats -->
@@ -4916,7 +4981,7 @@ window.AppAiOrbit = {
       <div class="tabs" style="margin-bottom:20px;">
         <button class="tab active" data-orbit-tab="escalations">Escalation Queue (${openCount})</button>
         <button class="tab" data-orbit-tab="conversations">Recent Conversations</button>
-        <button class="tab" data-orbit-tab="providers">AI Providers</button>
+        ${canConfigure ? '<button class="tab" data-orbit-tab="providers">AI Providers</button>' : ''}
       </div>
 
       <!-- Escalation Queue -->
@@ -4950,7 +5015,7 @@ window.AppAiOrbit = {
       </div>
 
       <!-- Providers -->
-      <div id="orbit-tab-providers" class="card" style="padding:0;display:none;">
+      ${canConfigure ? `<div id="orbit-tab-providers" class="card" style="padding:0;display:none;">
         <div style="padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
           <div style="font-size:13px;font-weight:600;">AI Provider Chain</div>
           <button class="btn btn-primary btn-sm" id="btn-add-provider"><span class="material-symbols-outlined" style="font-size:16px;">add</span> Add Provider</button>
@@ -4958,11 +5023,78 @@ window.AppAiOrbit = {
         <div id="orbit-providers-list" style="padding:16px;">
           <div style="color:var(--text-muted);font-size:13px;">Loading providers...</div>
         </div>
-      </div>
+      </div>` : ''}
     </div>`;
     initIcons();
     this._bindEvents(schoolId, school);
-    this._loadProviders();
+    if (canConfigure) this._loadProviders(schoolId);
+  },
+
+  async _renderStudentChat(main, school) {
+    const quota = await AiService.getQuota().catch(() => null);
+    main.innerHTML = `<div class="fade-in" style="max-width:900px;margin:0 auto;">
+      <div class="page-header"><div><h1 class="page-title">Orbit</h1><p class="page-subtitle">Your education-only learning assistant</p></div>
+        <span id="orbit-general-quota" class="status-badge ${quota?.allowed ? 'status-active' : 'status-suspended'}">${quota?.unlimited ? 'Unlimited' : `${Math.max(0, quota?.remaining ?? 0)} questions left today`}</span>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div id="orbit-general-messages" style="height:min(58vh,560px);overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;">
+          <div style="margin:auto;text-align:center;max-width:460px;color:var(--text-secondary);">
+            <span class="material-symbols-outlined" style="font-size:48px;color:var(--primary);">smart_toy</span>
+            <h2 style="font-size:18px;color:var(--on-surface);">How can Orbit help you learn?</h2>
+            <p style="font-size:13px;">Ask an education-related question. Video questions should be asked from that video's Orbit panel.</p>
+          </div>
+        </div>
+        <div style="padding:14px;border-top:1px solid var(--border);display:flex;gap:8px;">
+          <textarea id="orbit-general-input" class="form-input" rows="2" maxlength="2000" placeholder="Ask an education question..." ${quota?.allowed ? '' : 'disabled'} style="resize:none;"></textarea>
+          <button class="btn btn-primary" id="orbit-general-send" ${quota?.allowed ? '' : 'disabled'}><span class="material-symbols-outlined">send</span></button>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:10px;">Orbit can make mistakes. Verify important information with your counselor or teacher.</p>
+    </div>`;
+    initIcons();
+
+    const input = document.getElementById('orbit-general-input');
+    const send = document.getElementById('orbit-general-send');
+    const messages = document.getElementById('orbit-general-messages');
+    const submit = async () => {
+      const question = input.value.trim();
+      if (!question || send.disabled) return;
+      messages.querySelector('[style*="margin:auto"]')?.remove();
+      messages.insertAdjacentHTML('beforeend', `<div style="align-self:flex-end;max-width:80%;background:var(--primary);color:white;padding:10px 13px;border-radius:14px 14px 3px 14px;">${AppUtils.escapeHtml(question)}</div>`);
+      input.value = '';
+      send.disabled = true;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const response = await fetch(`${supabase.supabaseUrl}/functions/v1/orbit-chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${sessionData.session?.access_token || ''}`
+          },
+          body: JSON.stringify({
+            message: question,
+            school_id: school?.id || undefined
+          })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Orbit request failed');
+        messages.insertAdjacentHTML('beforeend', `<div style="align-self:flex-start;max-width:80%;background:var(--surface-low);padding:10px 13px;border-radius:14px 14px 14px 3px;line-height:1.55;">${AppUtils.escapeHtml(result.reply).replace(/\n/g, '<br>')}</div>`);
+        const quotaLabel = document.getElementById('orbit-general-quota');
+        if (quotaLabel && result.quota) quotaLabel.textContent = result.quota.unlimited ? 'Unlimited' : `${Math.max(0, result.quota.remaining)} questions left today`;
+        send.disabled = !result.quota?.allowed;
+      } catch (error) {
+        messages.insertAdjacentHTML('beforeend', `<div style="align-self:flex-start;color:var(--danger);font-size:13px;">${AppUtils.escapeHtml(error.message)}</div>`);
+        send.disabled = false;
+      }
+      messages.scrollTop = messages.scrollHeight;
+    };
+    send?.addEventListener('click', submit);
+    input?.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        submit();
+      }
+    });
   },
 
   _bindEvents(schoolId, school) {
@@ -4998,17 +5130,17 @@ window.AppAiOrbit = {
 
     // Add provider button
     document.getElementById('btn-add-provider')?.addEventListener('click', () => {
-      this._showProviderModal(null);
+      this._showProviderModal(null, schoolId);
     });
   },
 
-  async _loadProviders() {
+  async _loadProviders(schoolId) {
     try {
-      const providers = await AiService.getProviders();
+      const providers = await AiService.getProviders(schoolId);
       const container = document.getElementById('orbit-providers-list');
       if (!container) return;
       if (providers.length === 0) {
-        container.innerHTML = '<div class="empty-state" style="padding:24px;"><span class="material-symbols-outlined" style="font-size:32px;">smart_toy</span><h3>No providers configured</h3><p>Add an AI provider like OpenRouter or Gemini to enable AI Q&A.</p></div>';
+        container.innerHTML = '<div class="empty-state" style="padding:24px;"><span class="material-symbols-outlined" style="font-size:32px;">smart_toy</span><h3>No providers configured</h3><p>Add Gemini, OpenAI, OpenRouter, or NVIDIA NIM to prepare Orbit.</p></div>';
         return;
       }
       container.innerHTML = providers.map(p => {
@@ -5029,6 +5161,26 @@ window.AppAiOrbit = {
         </div>`;
       }).join('');
       initIcons();
+      container.onclick = async event => {
+        const button = event.target.closest('[data-action]');
+        if (!button) return;
+        const provider = providers.find(item => item.id === button.dataset.id);
+        if (!provider) return;
+        if (button.dataset.action === 'edit-provider') {
+          this._showProviderModal(provider, schoolId);
+          return;
+        }
+        if (button.dataset.action === 'delete-provider') {
+          if (!confirm(`Delete AI provider "${provider.label}"?`)) return;
+          try {
+            await AiService.deleteProvider(provider.id);
+            AppToast.show('Provider deleted');
+            await this._loadProviders(schoolId);
+          } catch (error) {
+            AppToast.show(error.message, 'error');
+          }
+        }
+      };
     } catch (err) {
       const container = document.getElementById('orbit-providers-list');
       if (container) container.innerHTML = `<div style="color:var(--error);font-size:13px;">Error loading providers: ${AppUtils.escapeHtml(err.message)}</div>`;
@@ -5041,23 +5193,19 @@ window.AppAiOrbit = {
     const s = settings || {};
     const html = `<div class="modal-overlay active" id="modal-orbit-settings" role="dialog" aria-modal="true">
       <div class="modal" style="max-width:500px;">
-        <div class="modal-header"><h2 class="modal-title">AI Orbit Settings</h2><button class="modal-close" onclick="document.getElementById('modal-orbit-settings').classList.remove('active');">&times;</button></div>
+        <div class="modal-header"><h2 class="modal-title">Orbit Settings</h2><button class="modal-close" onclick="document.getElementById('modal-orbit-settings').classList.remove('active');">&times;</button></div>
         <div class="modal-body">
-          <div class="form-group"><label class="form-label">AI Enabled</label>
-            <select class="form-select" id="orbit-s-enabled"><option value="true" ${s.enabled !== false ? 'selected' : ''}>Yes</option><option value="false" ${s.enabled === false ? 'selected' : ''}>No</option></select>
+          <div class="form-group"><label class="form-label">Student Orbit Policy</label>
+            <select class="form-select" id="orbit-s-mode">
+              <option value="disabled" ${s.access_mode === 'disabled' ? 'selected' : ''}>Disabled</option>
+              <option value="restricted" ${!s.access_mode || s.access_mode === 'restricted' ? 'selected' : ''}>Restricted</option>
+              <option value="unlimited" ${s.access_mode === 'unlimited' ? 'selected' : ''}>Unlimited</option>
+            </select>
           </div>
-          <div class="form-group"><label class="form-label">Daily Question Limit (per student)</label>
+          <div class="form-group"><label class="form-label">School Daily Maximum (Restricted mode)</label>
             <input type="number" class="form-input" id="orbit-s-limit" value="${s.daily_question_limit || 10}" min="0" max="200">
           </div>
-          <div class="form-group"><label class="form-label">Max Response Words</label>
-            <input type="number" class="form-input" id="orbit-s-words" value="${s.max_response_words || 1000}" min="100" max="5000">
-          </div>
-          <div class="form-group"><label class="form-label">Allow Escalation</label>
-            <select class="form-select" id="orbit-s-escalation"><option value="true" ${s.allow_escalation !== false ? 'selected' : ''}>Yes</option><option value="false" ${s.allow_escalation === false ? 'selected' : ''}>No</option></select>
-          </div>
-          <div class="form-group"><label class="form-label">Student Access</label>
-            <select class="form-select" id="orbit-s-access"><option value="true" ${s.student_access !== false ? 'selected' : ''}>Yes</option><option value="false" ${s.student_access === false ? 'selected' : ''}>No</option></select>
-          </div>
+          <div style="padding:12px;background:var(--surface-low);border-radius:8px;font-size:12px;color:var(--text-secondary);">Video Orbit remains a separate limit of ${s.video_daily_question_limit || 10} questions per video per day and cannot be changed here.</div>
           <button class="btn btn-primary" id="btn-save-orbit-settings" style="width:100%;margin-top:16px;">Save Settings</button>
         </div>
       </div>
@@ -5066,13 +5214,9 @@ window.AppAiOrbit = {
 
     document.getElementById('btn-save-orbit-settings')?.addEventListener('click', async () => {
       try {
-        await AiService.upsertSchoolSettings(schoolId, {
-          enabled: document.getElementById('orbit-s-enabled').value === 'true',
-          daily_question_limit: parseInt(document.getElementById('orbit-s-limit').value) || 10,
-          max_response_words: parseInt(document.getElementById('orbit-s-words').value) || 1000,
-          allow_escalation: document.getElementById('orbit-s-escalation').value === 'true',
-          student_access: document.getElementById('orbit-s-access').value === 'true'
-        });
+        const mode = document.getElementById('orbit-s-mode').value;
+        const limit = Number(document.getElementById('orbit-s-limit').value);
+        await AiService.setSchoolPolicy(schoolId, mode, mode === 'restricted' ? limit : null);
         AppToast.show('Settings saved');
         document.getElementById('modal-orbit-settings').classList.remove('active');
         await this.render(document.getElementById('main-content'), school, schoolId);
@@ -5080,7 +5224,7 @@ window.AppAiOrbit = {
     });
   },
 
-  _showProviderModal(provider) {
+  _showProviderModal(provider, schoolId) {
     let overlay = document.getElementById('modal-orbit-provider');
     if (overlay) overlay.remove();
     const p = provider || {};
@@ -5092,14 +5236,16 @@ window.AppAiOrbit = {
           <div class="form-group"><label class="form-label">Label</label><input type="text" class="form-input" id="prov-label" value="${AppUtils.escapeHtml(p.label || '')}" placeholder="e.g. OpenRouter GPT-4"></div>
           <div class="form-group"><label class="form-label">Provider</label>
             <select class="form-select" id="prov-provider">
-              <option value="openrouter" ${p.provider === 'openrouter' ? 'selected' : ''}>OpenRouter</option>
               <option value="gemini" ${p.provider === 'gemini' ? 'selected' : ''}>Google Gemini</option>
               <option value="openai" ${p.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
-              <option value="anthropic" ${p.provider === 'anthropic' ? 'selected' : ''}>Anthropic</option>
+              <option value="openrouter" ${p.provider === 'openrouter' ? 'selected' : ''}>OpenRouter</option>
+              <option value="nvidia" ${p.provider === 'nvidia' ? 'selected' : ''}>NVIDIA NIM</option>
             </select>
           </div>
           <div class="form-group"><label class="form-label">Model</label><input type="text" class="form-input" id="prov-model" value="${AppUtils.escapeHtml(p.model || '')}" placeholder="e.g. google/gemini-2.0-flash"></div>
+          <div class="form-group"><label class="form-label">API Endpoint</label><input type="url" class="form-input" id="prov-base-url" value="${AppUtils.escapeHtml(p.base_url || '')}" readonly></div>
           <div class="form-group"><label class="form-label">API Key</label><input type="password" class="form-input" id="prov-key" placeholder="${isEdit ? 'Leave blank to keep existing' : 'Enter API key'}"></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:-8px;">Provider-specific key is stored server-side in Supabase. If left blank, an active central key of the same provider type can be used.</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="form-group"><label class="form-label">Priority (lower = first)</label><input type="number" class="form-input" id="prov-priority" value="${p.priority || 100}" min="1"></div>
             <div class="form-group"><label class="form-label">Temperature</label><input type="number" class="form-input" id="prov-temp" value="${p.temperature || 0.3}" min="0" max="2" step="0.1"></div>
@@ -5110,6 +5256,18 @@ window.AppAiOrbit = {
     </div>`;
     document.body.insertAdjacentHTML('beforeend', html);
 
+    const providerSelect = document.getElementById('prov-provider');
+    const applyPreset = (force = false) => {
+      const preset = AiService.getProviderPreset(providerSelect.value);
+      if (!preset) return;
+      const modelInput = document.getElementById('prov-model');
+      const baseUrlInput = document.getElementById('prov-base-url');
+      if (force || !modelInput.value.trim()) modelInput.value = preset.model;
+      if (force || !baseUrlInput.value.trim()) baseUrlInput.value = preset.baseUrl;
+    };
+    providerSelect.addEventListener('change', () => applyPreset(true));
+    applyPreset(false);
+
     document.getElementById('btn-save-provider')?.addEventListener('click', async () => {
       const label = document.getElementById('prov-label').value.trim();
       const model = document.getElementById('prov-model').value.trim();
@@ -5118,8 +5276,14 @@ window.AppAiOrbit = {
         const payload = {
           label, model,
           provider: document.getElementById('prov-provider').value,
+          base_url: AiService.getProviderPreset(document.getElementById('prov-provider').value)?.baseUrl,
           priority: parseInt(document.getElementById('prov-priority').value) || 100,
-          temperature: parseFloat(document.getElementById('prov-temp').value) || 0.3
+          temperature: Number.isFinite(parseFloat(document.getElementById('prov-temp').value))
+            ? parseFloat(document.getElementById('prov-temp').value)
+            : 0.3,
+          school_id: p.school_id || schoolId || null,
+          enabled: p.enabled !== false,
+          max_output_tokens: p.max_output_tokens || 1500
         };
         let savedProvider;
         if (isEdit) {
@@ -5133,7 +5297,7 @@ window.AppAiOrbit = {
         }
         AppToast.show(isEdit ? 'Provider updated' : 'Provider added');
         document.getElementById('modal-orbit-provider').classList.remove('active');
-        this._loadProviders();
+        this._loadProviders(schoolId);
       } catch (err) { AppToast.show(err.message, 'error'); }
     });
   }
@@ -5389,6 +5553,136 @@ AppRouter.renderInvitations = async function(main) {
 };
 
 // ==============================================================
+// ROLE-FOCUSED LEARNING DASHBOARDS
+// ==============================================================
+window.StudentLearningDashboard = {
+  async render(main, data, school, profile) {
+    const student = await StudentService.getByUserId(profile.id);
+    const [progress, quota] = await Promise.all([
+      ContentService.getMyProgress(),
+      AiService.getQuota()
+    ]);
+    const videos = (data.content || []).filter(item =>
+      item.school_id === school.id &&
+      item.type === 'Video' &&
+      item.status === 'published' &&
+      item.sync_state === 'active' &&
+      student?.drive_folder_id &&
+      item.drive_folder_id === student.drive_folder_id
+    );
+    const progressByContent = new Map(progress.map(item => [item.content_id, item]));
+    const completed = progress.filter(item => item.completed).length;
+    const totalWatchSeconds = progress.reduce((sum, item) => sum + Number(item.watched_seconds || 0), 0);
+    const percent = videos.length ? Math.round(completed / videos.length * 100) : 0;
+    const recentCutoff = Date.now() - 7 * 86400000;
+    const recent = progress.filter(item => new Date(item.last_viewed_at).getTime() >= recentCutoff);
+    const continuing = videos.filter(item => {
+      const itemProgress = progressByContent.get(item.id);
+      return itemProgress && !itemProgress.completed && Number(itemProgress.position_seconds) > 0;
+    }).slice(0, 4);
+    const counselor = (data.users || []).find(user => user.id === student?.counselor_id);
+    const card = item => {
+      const itemProgress = progressByContent.get(item.id);
+      const itemPercent = itemProgress?.duration_seconds
+        ? Math.min(100, Math.round(Number(itemProgress.position_seconds) / Number(itemProgress.duration_seconds) * 100))
+        : 0;
+      return `<button class="card" data-action="play-video" data-id="${item.id}" style="padding:0;text-align:left;overflow:hidden;border:1px solid var(--border);cursor:pointer;">
+        <div style="aspect-ratio:16/9;background:linear-gradient(135deg,#1A56DB,#111827);display:flex;align-items:center;justify-content:center;color:#fff;">
+          <span class="material-symbols-outlined" style="font-size:42px;">play_circle</span>
+        </div>
+        <div style="padding:12px;"><div style="font-size:13px;font-weight:700;">${AppUtils.escapeHtml(item.name)}</div>
+          <div style="height:4px;background:var(--border);border-radius:4px;margin-top:10px;"><div style="height:100%;width:${itemPercent}%;background:var(--primary);border-radius:4px;"></div></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:5px;">${itemProgress?.completed ? 'Completed' : itemPercent ? `${itemPercent}% watched` : 'Not started'}</div>
+        </div>
+      </button>`;
+    };
+
+    main.innerHTML = `<div class="fade-in">
+      <div class="page-header"><div><h1 class="page-title">My Learning</h1><p class="page-subtitle">${AppUtils.escapeHtml(school.name)} · ${AppUtils.escapeHtml(student?.drive_folder_name || 'Assigned class folder')}</p></div></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
+        <div class="metric-card"><div class="metric-info"><h2>${percent}%</h2><p>Overall Completion</p></div></div>
+        <div class="metric-card"><div class="metric-info"><h2>${completed}/${videos.length}</h2><p>Videos Completed</p></div></div>
+        <div class="metric-card"><div class="metric-info"><h2>${Math.round(totalWatchSeconds / 60)}</h2><p>Watch Minutes</p></div></div>
+        <div class="metric-card"><div class="metric-info"><h2>${recent.length}</h2><p>Watched in 7 Days</p></div></div>
+        <div class="metric-card"><div class="metric-info"><h2>${quota?.unlimited ? '∞' : Math.max(0, quota?.remaining ?? 0)}</h2><p>Orbit Questions Left</p></div></div>
+      </div>
+      <div class="card" style="margin-bottom:20px;padding:16px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;font-size:13px;">
+          <div><span style="color:var(--text-muted);">Admission:</span> ${AppUtils.escapeHtml(student?.admission_no || '—')}</div>
+          <div><span style="color:var(--text-muted);">Academic Year:</span> ${AppUtils.escapeHtml(student?.academic_year || '—')}</div>
+          <div><span style="color:var(--text-muted);">Counselor:</span> ${AppUtils.escapeHtml(counselor?.name || 'Not assigned')}</div>
+          <div><span style="color:var(--text-muted);">Status:</span> ${AppUtils.escapeHtml(student?.status || 'inactive')}</div>
+        </div>
+      </div>
+      <section style="margin-bottom:24px;"><h2 style="font-size:16px;margin-bottom:12px;">Continue Watching</h2>
+        ${continuing.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;">${continuing.map(card).join('')}</div>` : '<div class="card" style="padding:20px;color:var(--text-muted);font-size:13px;">Start a video and it will appear here.</div>'}
+      </section>
+      <section style="margin-bottom:24px;"><h2 style="font-size:16px;margin-bottom:12px;">All Assigned Videos</h2>
+        ${videos.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;">${videos.map(card).join('')}</div>` : '<div class="card"><div class="empty-state"><h3>No approved videos yet</h3><p>Your counselor will see new videos after they are reviewed.</p></div></div>'}
+      </section>
+      <section><h2 style="font-size:16px;margin-bottom:12px;">More Learning Tools</h2>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+          ${['Certificates','Assignments','Quizzes'].map(label => `<div class="card" style="padding:18px;"><strong>${label}</strong><div style="font-size:12px;color:var(--text-muted);margin-top:6px;">Coming Soon</div></div>`).join('')}
+        </div>
+      </section>
+    </div>`;
+    initIcons();
+  }
+};
+
+window.CounselorLearningDashboard = {
+  async render(main, data, school) {
+    const students = (data.students || []).filter(student => student.school_id === school.id);
+    const { data: progress } = await supabase.from('content_progress').select('*')
+      .eq('school_id', school.id).order('last_viewed_at', { ascending: false });
+    const today = new Date().toISOString().slice(0, 10);
+    const activeToday = new Set((progress || []).filter(item => item.last_viewed_at?.startsWith(today)).map(item => item.user_id)).size;
+    const watchSeconds = (progress || []).reduce((sum, item) => sum + Number(item.watched_seconds || 0), 0);
+    const completed = (progress || []).filter(item => item.completed).length;
+    const pendingVideos = (data.content || []).filter(item => item.school_id === school.id && item.status === 'review');
+    const { data: usage } = await supabase.from('ai_usage_daily').select('question_count').eq('school_id', school.id).eq('usage_date', today);
+    const aiQuestions = (usage || []).reduce((sum, item) => sum + Number(item.question_count || 0), 0);
+
+    main.innerHTML = `<div class="fade-in">
+      <div class="page-header"><div><h1 class="page-title">Counselor Dashboard</h1><p class="page-subtitle">${AppUtils.escapeHtml(school.name)} learning overview</p></div>
+        <button class="btn btn-secondary" data-action="navigate" data-route="school-reports"><span class="material-symbols-outlined">download</span> Export Reports</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
+        <div class="metric-card"><div class="metric-info"><h2>${students.length}</h2><p>Total Students</p></div></div>
+        <div class="metric-card"><div class="metric-info"><h2>${activeToday}</h2><p>Active Today</p></div></div>
+        <div class="metric-card"><div class="metric-info"><h2>${Math.round(watchSeconds / 60)}</h2><p>Total Watch Minutes</p></div></div>
+        <div class="metric-card"><div class="metric-info"><h2>${completed}</h2><p>Video Completions</p></div></div>
+        <div class="metric-card"><div class="metric-info"><h2>${students.filter(student => student.status === 'inactive').length}</h2><p>Inactive Learners</p></div></div>
+        <div class="metric-card"><div class="metric-info"><h2>${aiQuestions}</h2><p>Orbit Questions Today</p></div></div>
+      </div>
+      ${pendingVideos.length ? `<div class="card" style="padding:18px;margin-bottom:20px;border-left:4px solid var(--warning);display:flex;align-items:center;gap:12px;">
+        <span class="material-symbols-outlined" style="color:var(--warning);">rate_review</span>
+        <div style="flex:1;"><strong>${pendingVideos.length} video(s) need review</strong><div style="font-size:12px;color:var(--text-muted);">Students cannot watch these until one reviewer approves them.</div></div>
+        <button class="btn btn-primary" data-action="navigate" data-route="school-videos">Review Videos</button>
+      </div>` : ''}
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
+        <div class="card"><div class="card-header"><h3 class="card-title">Recent Learning Activity</h3></div>
+          ${(progress || []).slice(0, 8).length ? `<div class="table-container"><table><thead><tr><th>Student</th><th>Progress</th><th>Last Viewed</th></tr></thead><tbody>${(progress || []).slice(0, 8).map(item => {
+            const student = students.find(row => row.user_id === item.user_id);
+            const percentage = item.duration_seconds ? Math.round(Number(item.position_seconds) / Number(item.duration_seconds) * 100) : 0;
+            return `<tr><td>${AppUtils.escapeHtml(student?.name || 'Student')}</td><td>${item.completed ? 'Completed' : `${percentage}%`}</td><td>${AppUtils.formatDate(item.last_viewed_at)}</td></tr>`;
+          }).join('')}</tbody></table></div>` : '<div class="empty-state"><p>No learning activity yet.</p></div>'}
+        </div>
+        <div class="card"><div class="card-header"><h3 class="card-title">Quick Actions</h3></div>
+          <div style="display:grid;gap:8px;">
+            <button class="btn btn-secondary" data-action="navigate" data-route="school-students">Manage Students</button>
+            <button class="btn btn-secondary" data-action="navigate" data-route="school-videos">Review Videos</button>
+            <button class="btn btn-secondary" data-action="navigate" data-route="school-notifications">Send Notification</button>
+            <button class="btn btn-secondary" data-action="navigate" data-route="school-attendance">My Attendance</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+    initIcons();
+  }
+};
+
+// ==============================================================
 // VIDEO PLAYER MODULE (with AI Ask Panel)
 // ==============================================================
 window.AppVideoPlayer = {
@@ -5396,15 +5690,29 @@ window.AppVideoPlayer = {
   _conversationId: null,
   _askPanelOpen: false,
 
-  open(contentItem, school) {
+  async open(contentItem, school) {
     const projectUrl = window.supabase?.supabaseUrl || 'https://rbldzenddjrxxzkaofby.supabase.co';
-    const streamUrl = `${projectUrl}/functions/v1/drive-stream`;
     this._conversationId = null;
+
+    let playback;
+    let savedProgress;
+    let quota;
+    try {
+      [playback, savedProgress, quota] = await Promise.all([
+        ContentService.issuePlaybackToken(contentItem.id),
+        ContentService.getProgress(contentItem.id),
+        AiService.getQuota(contentItem.id)
+      ]);
+    } catch (error) {
+      AppToast.show(error.message || 'Unable to start secure playback.', 'error');
+      return;
+    }
+    const streamUrl = `${projectUrl}${playback.stream_path}`;
 
     let overlay = document.getElementById('modal-video-player');
     if (overlay) overlay.remove();
 
-    const savedPos = this._resumePositions[contentItem.id] || 0;
+    const savedPos = Number(savedProgress?.position_seconds) || this._resumePositions[contentItem.id] || 0;
 
     const html = `<div class="modal-overlay active" id="modal-video-player" role="dialog" aria-modal="true" style="z-index:2000;">
       <div style="display:flex;max-width:1280px;width:95vw;max-height:90vh;margin:auto;gap:0;border-radius:12px;overflow:hidden;box-shadow:0 24px 48px rgba(0,0,0,0.4);">
@@ -5418,7 +5726,7 @@ window.AppVideoPlayer = {
 
             <!-- Video element -->
             <video id="vp-video" style="width:100%;height:100%;max-height:540px;background:#000;object-fit:contain;" preload="metadata">
-              <source src="${streamUrl}?content_id=${contentItem.id}" type="video/mp4">
+              <source src="${streamUrl}" type="${AppUtils.escapeHtml(contentItem.mime_type || 'video/mp4')}">
               Your browser does not support video playback.
             </video>
 
@@ -5431,10 +5739,14 @@ window.AppVideoPlayer = {
                 <button id="vp-play" style="background:none;border:none;color:white;cursor:pointer;padding:0;">
                   <span class="material-symbols-outlined" style="font-size:28px;">play_arrow</span>
                 </button>
+                <button id="vp-volume" style="background:none;border:none;color:white;cursor:pointer;padding:0;" title="Mute or unmute">
+                  <span class="material-symbols-outlined" style="font-size:24px;">volume_up</span>
+                </button>
+                <input id="vp-volume-range" type="range" min="0" max="1" step="0.05" value="1" aria-label="Volume" style="width:72px;">
                 <span id="vp-time" style="font-size:12px;font-family:monospace;min-width:90px;">0:00 / 0:00</span>
                 <div style="flex:1;"></div>
                 <select id="vp-speed" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);color:white;font-size:12px;padding:2px 6px;border-radius:4px;cursor:pointer;">
-                  <option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1" selected>1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option>
+                  <option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1" selected>1x</option><option value="1.03">1.03x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option>
                 </select>
                 <button id="vp-pip" style="background:none;border:none;color:white;cursor:pointer;padding:0;" title="Picture-in-Picture">
                   <span class="material-symbols-outlined" style="font-size:22px;">picture_in_picture_alt</span>
@@ -5442,7 +5754,7 @@ window.AppVideoPlayer = {
                 <button id="vp-fullscreen" style="background:none;border:none;color:white;cursor:pointer;padding:0;">
                   <span class="material-symbols-outlined" style="font-size:22px;">fullscreen</span>
                 </button>
-                <button id="vp-toggle-ask" style="background:none;border:none;color:white;cursor:pointer;padding:0;" title="Ask AI">
+                <button id="vp-toggle-ask" style="background:none;border:none;color:white;cursor:pointer;padding:0;" title="Open Orbit">
                   <span class="material-symbols-outlined" style="font-size:22px;">smart_toy</span>
                 </button>
               </div>
@@ -5462,8 +5774,8 @@ window.AppVideoPlayer = {
           <div style="padding:14px 16px;border-bottom:1px solid var(--border, #e5e7eb);display:flex;align-items:center;gap:10px;">
             <span class="material-symbols-outlined" style="font-size:22px;color:var(--primary, #1A56DB);">smart_toy</span>
             <div style="flex:1;">
-              <div style="font-size:14px;font-weight:600;color:var(--text-primary, #111);">Ask AI</div>
-              <div style="font-size:11px;color:var(--text-secondary, #6b7280);">Questions about this video</div>
+              <div style="font-size:14px;font-weight:600;color:var(--text-primary, #111);">Orbit</div>
+              <div id="vp-orbit-quota" style="font-size:11px;color:var(--text-secondary, #6b7280);">${quota?.unlimited ? 'Unlimited' : `${Math.max(0, quota?.remaining ?? 0)} of ${quota?.daily_limit ?? 10} questions left today`}</div>
             </div>
             <button id="vp-ask-close" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--text-muted, #9ca3af);">
               <span class="material-symbols-outlined" style="font-size:18px;">close</span>
@@ -5474,7 +5786,7 @@ window.AppVideoPlayer = {
           <div id="vp-ask-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:0;">
             <div style="text-align:center;padding:24px 12px;">
               <span class="material-symbols-outlined" style="font-size:40px;color:var(--primary, #1A56DB);opacity:0.5;">school</span>
-              <p style="font-size:13px;color:var(--text-secondary, #6b7280);margin-top:8px;">Ask me anything about this video! I'll use the course material to help you understand.</p>
+              <p style="font-size:13px;color:var(--text-secondary, #6b7280);margin-top:8px;">Ask Orbit about this video. Answers use the available video transcript and show source timestamps when available.</p>
               <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px;">
                 <button class="vp-ask-suggestion" style="background:var(--card-bg, #f3f4f6);border:1px solid var(--border, #e5e7eb);border-radius:16px;padding:6px 12px;font-size:11px;cursor:pointer;color:var(--text-primary, #111);transition:background 0.15s;" data-suggestion="Explain the main concept">Explain the main concept</button>
                 <button class="vp-ask-suggestion" style="background:var(--card-bg, #f3f4f6);border:1px solid var(--border, #e5e7eb);border-radius:16px;padding:6px 12px;font-size:11px;cursor:pointer;color:var(--text-primary, #111);transition:background 0.15s;" data-suggestion="Give me a summary">Give me a summary</button>
@@ -5502,6 +5814,9 @@ window.AppVideoPlayer = {
     const timeEl = document.getElementById('vp-time');
     const progressBar = document.getElementById('vp-progress-bar');
     const progressWrap = document.getElementById('vp-progress-wrap');
+    let lastSavedAt = 0;
+    let watchedSeconds = Number(savedProgress?.watched_seconds) || 0;
+    let lastPlaybackTick = 0;
 
     if (savedPos > 0) video.currentTime = savedPos;
 
@@ -5516,6 +5831,19 @@ window.AppVideoPlayer = {
       progressBar.style.width = pct + '%';
       timeEl.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration || 0)}`;
       this._resumePositions[contentItem.id] = video.currentTime;
+      if (!video.paused && lastPlaybackTick) {
+        watchedSeconds += Math.min(2, Math.max(0, video.currentTime - lastPlaybackTick));
+      }
+      lastPlaybackTick = video.currentTime;
+      if (Date.now() - lastSavedAt > 10000) {
+        lastSavedAt = Date.now();
+        ContentService.saveProgress(contentItem.id, contentItem.school_id, {
+          positionSeconds: video.currentTime,
+          durationSeconds: video.duration,
+          playbackRate: video.playbackRate,
+          watchedSeconds
+        }).catch(() => {});
+      }
     });
 
     video.addEventListener('play', () => { playBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:28px;">pause</span>'; });
@@ -5523,13 +5851,28 @@ window.AppVideoPlayer = {
 
     playBtn.addEventListener('click', () => { video.paused ? video.play() : video.pause(); });
 
+    const volumeButton = document.getElementById('vp-volume');
+    const volumeRange = document.getElementById('vp-volume-range');
+    volumeButton.addEventListener('click', () => {
+      video.muted = !video.muted;
+      volumeButton.innerHTML = `<span class="material-symbols-outlined" style="font-size:24px;">${video.muted ? 'volume_off' : 'volume_up'}</span>`;
+    });
+    volumeRange.addEventListener('input', (event) => {
+      video.volume = Number(event.target.value);
+      video.muted = video.volume === 0;
+    });
+
     progressWrap.addEventListener('click', (e) => {
       const rect = progressWrap.getBoundingClientRect();
       const pct = (e.clientX - rect.left) / rect.width;
       if (video.duration) video.currentTime = pct * video.duration;
     });
 
-    document.getElementById('vp-speed').addEventListener('change', (e) => { video.playbackRate = parseFloat(e.target.value); });
+    const speedSelect = document.getElementById('vp-speed');
+    const savedRate = Number(savedProgress?.playback_rate) || 1;
+    if ([0.5, 0.75, 1, 1.03, 1.25, 1.5, 2].includes(savedRate)) speedSelect.value = String(savedRate);
+    video.playbackRate = savedRate;
+    speedSelect.addEventListener('change', (e) => { video.playbackRate = parseFloat(e.target.value); });
 
     document.getElementById('vp-fullscreen')?.addEventListener('click', () => {
       const container = document.getElementById('modal-video-player')?.querySelector('.modal') || document.getElementById('modal-video-player')?.firstElementChild;
@@ -5541,8 +5884,14 @@ window.AppVideoPlayer = {
       else if (video.requestPictureInPicture) video.requestPictureInPicture();
     });
 
-    document.getElementById('vp-close').addEventListener('click', () => {
+    document.getElementById('vp-close').addEventListener('click', async () => {
       video.pause();
+      await ContentService.saveProgress(contentItem.id, contentItem.school_id, {
+        positionSeconds: video.currentTime,
+        durationSeconds: video.duration,
+        playbackRate: video.playbackRate,
+        watchedSeconds
+      }).catch(() => {});
       document.getElementById('modal-video-player').classList.remove('active');
       setTimeout(() => document.getElementById('modal-video-player')?.remove(), 300);
     });
@@ -5629,6 +5978,12 @@ window.AppVideoPlayer = {
           `);
         } else {
           AppVideoPlayer._conversationId = data.conversation_id;
+          const quotaElement = document.getElementById('vp-orbit-quota');
+          if (quotaElement && data.quota) {
+            quotaElement.textContent = data.quota.unlimited
+              ? 'Unlimited'
+              : `${Math.max(0, data.quota.remaining)} of ${data.quota.daily_limit} questions left today`;
+          }
           // Simple markdown-like rendering for the AI reply
           const formatted = AppUtils.escapeHtml(data.reply || 'No response')
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -5769,6 +6124,14 @@ async function handleAuthenticatedSession() {
 
   if (profile.role === 'pending') {
     renderPendingAccess(profile);
+    return;
+  }
+
+  const access = await AuthService.verifySessionAccess();
+  if (!access.allowed) {
+    await AuthService.signOut();
+    setAuthScreen('login');
+    document.getElementById('login-error').textContent = access.error;
     return;
   }
 

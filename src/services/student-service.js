@@ -99,6 +99,14 @@ export const StudentService = {
     return data;
   },
 
+  async resetDevices(id) {
+    const { data, error } = await supabase.rpc('revoke_student_devices', {
+      p_student_id: id
+    });
+    if (error) throw error;
+    return Number(data) || 0;
+  },
+
   async delete(id) {
     const { data: item, error: fetchError } = await supabase
       .from('students')
