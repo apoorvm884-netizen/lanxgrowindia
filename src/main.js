@@ -436,7 +436,7 @@ window.AppSidebar = {
     { id: 'api-keys', label: 'API Keys', icon: 'key', route: 'api-keys' },
     { id: 'sep3', separator: true },
     { id: 'invitations', label: 'Invitations', icon: 'mail', route: 'invitations' },
-    { id: 'audit-log', label: 'Audit Log', icon: 'history', route: 'audit-log' },
+    { id: 'audit-log', label: 'Activity Logs', icon: 'history', route: 'audit-log' },
   ],
 
   COMPANY_ADMIN_ITEMS: [
@@ -448,7 +448,7 @@ window.AppSidebar = {
     { id: 'school-admins', label: 'School Admins', icon: 'user-cog', route: 'school-admins' },
     { id: 'company-settings', label: 'Settings', icon: 'settings', route: 'company-settings' },
     { id: 'sep3', separator: true },
-    { id: 'audit-log', label: 'Audit Log', icon: 'history', route: 'audit-log' },
+    { id: 'audit-log', label: 'Activity Logs', icon: 'history', route: 'audit-log' },
   ],
 
   SCHOOL_ITEMS: [
@@ -467,6 +467,8 @@ window.AppSidebar = {
     { id: 'school-notifications', label: 'Notifications', icon: 'notifications', route: 'school-notifications' },
     { id: 'sep-s5', separator: true },
     { id: 'school-settings', label: 'Settings', icon: 'settings', route: 'school-settings' },
+    { id: 'sep-s6', separator: true },
+    { id: 'school-activity-logs', label: 'Activity Logs', icon: 'history', route: 'school-activity-logs' },
   ],
 
   TEACHER_ITEMS: [
@@ -574,7 +576,7 @@ window.AppRouter = {
   SCHOOL_ROUTES: ['school-dashboard',
     'school-students','school-counselors','school-videos',
     'school-reports','school-notifications',
-    'school-settings','school-profile','school-gps','school-orbit','school-attendance'],
+    'school-settings','school-profile','school-gps','school-orbit','school-attendance','school-activity-logs'],
   COMPANY_ROUTES: ['company-dashboard','schools',
     'media-library','school-admins','roles-permissions','company-settings','api-keys','audit-log','invitations'],
 
@@ -611,6 +613,9 @@ window.AppRouter = {
   },
 
   navigate(route, params) {
+    if (this.currentRoute === 'audit-log' || this.currentRoute === 'school-activity-logs') {
+      AppAuditLog.destroy();
+    }
     this.currentRoute = route;
     if (params && params.schoolId) this.currentSchoolId = params.schoolId;
     this._selectedCategoryId = (params && params.categoryId) || null;
@@ -1133,6 +1138,13 @@ window.AppRouter = {
     }
     if (this.currentRoute === 'school-attendance') {
       await this.renderAttendance(main, school, schoolId);
+      return;
+    }
+    if (this.currentRoute === 'school-activity-logs') {
+      await AppAuditLog.render(main, {
+        schoolId,
+        scopeLabel: school.name
+      });
       return;
     }
 
@@ -2488,21 +2500,41 @@ window.AppGlobalSearch = {
 window.AppAuditLog = {
   _page: 1,
   _perPage: 50,
+  _channel: null,
+  _logs: [],
+  _allLogs: [],
+  _schools: [],
+  _options: {},
 
-  async render(main) {
-    const data = await AppStorage.load();
-    const logs = (data.auditLog || []).sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+  async render(main, options = {}) {
+    this.destroy();
+    this._options = options;
+    const [data, logs] = await Promise.all([
+      AppStorage.load(),
+      AuditLogService.getAll(500)
+    ]);
+    this._schools = data.schools || [];
+    this._allLogs = logs;
     this._logs = logs;
     this._page = 1;
     main.innerHTML = `<div class="fade-in">
-      <div class="page-header"><div class="page-header-left"><h1 class="page-title">Audit Log</h1><p class="page-subtitle">Track all activities across the platform.</p></div></div>
+      <div class="page-header">
+        <div class="page-header-left">
+          <h1 class="page-title">Activity Logs</h1>
+          <p class="page-subtitle">${options.schoolId ? `Live administrative changes for ${AppUtils.escapeHtml(options.scopeLabel || 'this school')}.` : 'Live administrative changes across your authorised scope.'}</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface);font-size:12px;color:var(--success);font-weight:600;">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 0 4px var(--success-light);"></span>
+          Live updates
+        </div>
+      </div>
       <div class="management-bar">
         <div class="search-bar" style="max-width:300px;"><span class="material-symbols-outlined" style="font-size:18px;">search</span><input type="text" id="audit-search" placeholder="Search activity..."></div>
         <select class="form-select" id="audit-action-filter" style="width:140px;height:44px;font-size:13px;">
-          <option value="">All Actions</option><option value="created">Created</option><option value="edited">Edited</option><option value="uploaded">Uploaded</option><option value="deleted">Deleted</option><option value="suspended">Suspended</option>
+          <option value="">All Actions</option><option value="created">Created</option><option value="edited">Edited</option><option value="uploaded">Uploaded</option><option value="deleted">Deleted</option><option value="suspended">Suspended</option><option value="granted">Granted</option><option value="revoked">Revoked</option>
         </select>
         <select class="form-select" id="audit-entity-filter" style="width:140px;height:44px;font-size:13px;">
-          <option value="">All Types</option><option value="School">School</option><option value="Category">Category</option><option value="Subject">Subject</option><option value="Section">Section</option><option value="Content">Content</option>
+          <option value="">All Types</option>${[...new Set(logs.map(log => log.entity).filter(Boolean))].sort().map(entity => `<option value="${AppUtils.escapeHtml(entity)}">${AppUtils.escapeHtml(entity)}</option>`).join('')}
         </select>
       </div>
       <div class="card" style="padding:0;overflow:hidden;" id="audit-log-card">
@@ -2511,6 +2543,10 @@ window.AppAuditLog = {
       </div>
     </div>`;
     initIcons();
+    this._bindFilters();
+    this._channel = AuditLogService.subscribe(log => this._prepend(log), {
+      schoolId: options.schoolId
+    });
   },
 
   _renderTable(logs) {
@@ -2520,13 +2556,16 @@ window.AppAuditLog = {
     const pageLogs = logs.slice(start, start + this._perPage);
     const eh = AppUtils.escapeHtml;
     const actionColors = { created: 'var(--success)', edited: 'var(--info)', uploaded: 'var(--primary)', deleted: 'var(--danger)', suspended: 'var(--warning)' };
-    return `<div class="table-container"><table><thead><tr><th>User</th><th>Action</th><th>Entity</th><th>Details</th><th>Date</th></tr></thead><tbody>${pageLogs.map(l => {
+    const showSchool = !this._options.schoolId;
+    return `<div class="table-container"><table><thead><tr><th>User</th><th>Action</th><th>Entity</th>${showSchool ? '<th>School</th>' : ''}<th>Details</th><th>Date & Time</th></tr></thead><tbody>${pageLogs.map(l => {
       const ac = actionColors[l.action] || 'var(--text-secondary)';
+      const schoolName = l.schools?.name || this._schools.find(s => s.id === l.school_id)?.name || (l.school_id ? 'Assigned school' : 'Platform');
       return `<tr><td><div class="flex-center gap-10" style="justify-content:flex-start;"><div class="user-avatar" style="width:28px;height:28px;font-size:10px;">${eh(l.user_name ? AppUtils.getInitials(l.user_name) : '?')}</div><div><div style="font-size:13px;font-weight:500;">${eh(l.user_name)}</div></div></div></td>
         <td><span style="font-size:12px;font-weight:600;color:${ac};">${eh(l.action.charAt(0).toUpperCase() + l.action.slice(1))}</span></td>
         <td><span style="font-size:13px;">${eh(l.entity)}</span><div style="font-size:11px;color:var(--text-muted);">${eh(l.entity_name)}</div></td>
+        ${showSchool ? `<td style="font-size:12px;color:var(--text-secondary);">${eh(schoolName)}</td>` : ''}
         <td style="font-size:13px;color:var(--text-secondary);max-width:300px;">${eh(l.detail)}</td>
-        <td style="font-size:13px;color:var(--text-secondary);white-space:nowrap;">${AppUtils.formatDate(l.created_at)}</td></tr>`;
+        <td style="font-size:13px;color:var(--text-secondary);white-space:nowrap;">${new Date(l.created_at).toLocaleString()}</td></tr>`;
     }).join('')}</tbody></table></div>
     ${totalPages > 1 ? `<div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-top:1px solid var(--border);">
       <button class="btn btn-sm btn-secondary" data-action="audit-page" data-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}>Previous</button>
@@ -2539,9 +2578,7 @@ window.AppAuditLog = {
     const q = (document.getElementById('audit-search')?.value || '').toLowerCase();
     const actionFilter = document.getElementById('audit-action-filter')?.value || '';
     const entityFilter = document.getElementById('audit-entity-filter')?.value || '';
-    AppStorage.load().then(data => {
-      const logs = (data.auditLog || []).sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-      let filtered = logs;
+      let filtered = this._allLogs;
       if (q) filtered = filtered.filter(l => l.user_name?.toLowerCase().includes(q) || l.entity_name?.toLowerCase().includes(q) || (l.detail || '').toLowerCase().includes(q));
       if (actionFilter) filtered = filtered.filter(l => l.action === actionFilter);
       if (entityFilter) filtered = filtered.filter(l => l.entity === entityFilter);
@@ -2550,12 +2587,25 @@ window.AppAuditLog = {
       if (filtered.length === 0) {
         card.innerHTML = `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">history</span><h3>No matching activity</h3></div>`;
       } else {
-        this._logs = filtered;
         this._page = 1;
+        this._logs = filtered;
         card.innerHTML = this._renderTable(filtered);
       }
       initIcons();
-    });
+  },
+
+  _bindFilters() {
+    document.getElementById('audit-search')?.addEventListener('input', () => this.filter());
+    document.getElementById('audit-action-filter')?.addEventListener('change', () => this.filter());
+    document.getElementById('audit-entity-filter')?.addEventListener('change', () => this.filter());
+  },
+
+  _prepend(log) {
+    if (!log?.id || this._allLogs.some(item => item.id === log.id)) return;
+    this._allLogs.unshift(log);
+    this._allLogs = this._allLogs.slice(0, 500);
+    this._page = 1;
+    this.filter();
   },
 
   goToPage(page) {
@@ -2566,6 +2616,11 @@ window.AppAuditLog = {
       card.innerHTML = this._renderTable(this._logs);
       initIcons();
     }
+  },
+
+  destroy() {
+    AuditLogService.unsubscribe(this._channel);
+    this._channel = null;
   }
 };
 
