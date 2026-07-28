@@ -12,6 +12,31 @@ export const AuthService = {
     return { success: true, user: data.user, session: data.session };
   },
 
+  getDeviceId() {
+    const key = 'lanxgrow_device_id';
+    let deviceId = window.localStorage.getItem(key);
+    if (!deviceId) {
+      deviceId = window.crypto?.randomUUID?.() ||
+        `browser-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      window.localStorage.setItem(key, deviceId);
+    }
+    return deviceId;
+  },
+
+  async verifySessionAccess() {
+    const { data, error } = await supabase.rpc('register_my_device', {
+      p_device_id: this.getDeviceId(),
+      p_device_label: navigator.userAgent.slice(0, 180)
+    });
+    if (error) return { allowed: false, error: error.message };
+    const result = Array.isArray(data) ? data[0] : data;
+    return {
+      allowed: result?.allowed === true,
+      activeDevices: result?.active_devices || 0,
+      error: result?.message || 'Access denied.'
+    };
+  },
+
   async signInWithGoogle() {
     this._profileCache = null;
     const { data, error } = await supabase.auth.signInWithOAuth({

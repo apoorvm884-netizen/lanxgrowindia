@@ -42,6 +42,75 @@ export const ContentService = {
     return data;
   },
 
+  async getProgress(contentId) {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) throw userError || new Error('Authentication required');
+    const { data, error } = await supabase
+      .from('content_progress')
+      .select('*')
+      .eq('content_id', contentId)
+      .eq('user_id', userData.user.id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async getMyProgress() {
+    const { data, error } = await supabase
+      .from('content_progress')
+      .select('*')
+      .order('last_viewed_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async saveProgress(contentId, schoolId, progress) {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) throw userError || new Error('Authentication required');
+    const duration = Number(progress.durationSeconds) || null;
+    const position = Math.max(0, Number(progress.positionSeconds) || 0);
+    const completed = Boolean(progress.completed) || Boolean(duration && position / duration >= 0.75);
+    const { data, error } = await supabase
+      .from('content_progress')
+      .upsert({
+        content_id: contentId,
+        user_id: userData.user.id,
+        school_id: schoolId,
+        position_seconds: position,
+        duration_seconds: duration,
+        playback_rate: Math.min(2, Math.max(0.25, Number(progress.playbackRate) || 1)),
+        completed,
+        watched_seconds: Math.max(0, Number(progress.watchedSeconds) || position),
+        last_viewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'content_id,user_id' })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async issuePlaybackToken(contentId) {
+    const { data, error } = await supabase.rpc('issue_playback_token', {
+      p_content_id: contentId,
+      p_client_fingerprint: null
+    });
+    if (error) throw error;
+    const token = Array.isArray(data) ? data[0] : data;
+    if (!token?.stream_path) throw new Error('Unable to create a secure playback session.');
+    return token;
+  },
+
+  async review(id, decision, reason) {
+    const { data, error } = await supabase.rpc('review_content', {
+      p_content_id: id,
+      p_decision: decision,
+      p_reason: reason || null
+    });
+    if (error) throw error;
+    return data;
+  },
+
   async create(item) {
     const { data, error } = await supabase
       .from('content')

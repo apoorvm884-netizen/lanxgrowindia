@@ -83,6 +83,34 @@ export const AiService = {
     return data;
   },
 
+  async setSchoolPolicy(schoolId, accessMode, dailyLimit) {
+    const { data, error } = await supabase.rpc('set_school_orbit_policy', {
+      p_school_id: schoolId,
+      p_access_mode: accessMode,
+      p_daily_limit: dailyLimit ?? null
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async getQuota(contentId = null) {
+    const { data, error } = await supabase.rpc('orbit_quota_status', {
+      p_content_id: contentId
+    });
+    if (error) throw error;
+    return Array.isArray(data) ? data[0] : data;
+  },
+
+  async setStudentAccess(studentId, enabled, dailyLimit) {
+    const { data, error } = await supabase.rpc('set_student_orbit_access', {
+      p_student_id: studentId,
+      p_enabled: enabled,
+      p_daily_limit: dailyLimit ?? null
+    });
+    if (error) throw error;
+    return data;
+  },
+
   // ── Conversations / Messages ──────────────────────────────
   async getConversations(schoolId, limit = 50) {
     const { data, error } = await supabase

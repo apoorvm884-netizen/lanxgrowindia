@@ -30,6 +30,9 @@ window.SchoolStudents = {
 
   async render(main, data, school) {
     const schoolId = school.id;
+    const profile = AppRouter._currentProfile;
+    const canPermanentlyDelete = ['super_admin', 'company_admin', 'school_admin'].includes(profile?.role);
+    const canResetDevices = canPermanentlyDelete;
     const q = (document.getElementById('sp-student-search')?.value || '').toLowerCase();
     const counselorFilter = document.getElementById('sp-student-counselor')?.value || '';
     const statusFilter = document.getElementById('sp-student-status')?.value || '';
@@ -70,7 +73,6 @@ window.SchoolStudents = {
           <option value="">All Status</option>
           <option value="active" ${statusFilter === 'active' ? 'selected' : ''}>Active</option>
           <option value="inactive" ${statusFilter === 'inactive' ? 'selected' : ''}>Inactive</option>
-          <option value="suspended" ${statusFilter === 'suspended' ? 'selected' : ''}>Suspended</option>
         </select>
         <span style="font-size:11px;color:var(--text-muted);margin-left:auto;">Showing ${pageItems.length} of ${students.length} students</span>
       </div>
@@ -91,7 +93,8 @@ window.SchoolStudents = {
               <td class="td-actions" style="display:flex;gap:4px;padding-top:8px;">
                 <button class="btn btn-ghost btn-sm" data-action="sp-view-student" data-id="${s.id}" title="View Profile"><span class="material-symbols-outlined" style="font-size:16px;">person</span></button>
                 <button class="btn btn-ghost btn-sm" data-action="sp-edit-student" data-id="${s.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
-                <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="sp-delete-student" data-id="${s.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
+                ${canResetDevices ? `<button class="btn btn-ghost btn-sm" data-action="sp-reset-student-devices" data-id="${s.id}" title="Reset registered devices"><span class="material-symbols-outlined" style="font-size:16px;">devices</span></button>` : ''}
+                ${canPermanentlyDelete ? `<button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="sp-delete-student" data-id="${s.id}" title="Delete permanently"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>` : ''}
               </td>
             </tr>`;
           }).join('')}
@@ -158,6 +161,10 @@ window.SchoolStudents = {
           </div>
           <div class="form-group"><label class="form-label">Login Password</label><input type="password" class="form-input" id="sp-input-student-password" minlength="8" autocomplete="new-password" placeholder="Minimum 8 characters"></div>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" id="sp-input-student-orbit-enabled" checked> General Orbit access</label>
+          <div class="form-group"><label class="form-label">Daily Orbit Limit</label><input type="number" class="form-input" id="sp-input-student-orbit-limit" min="0" max="200" placeholder="Use school limit"></div>
+        </div>
         <div class="form-group" style="margin-top:4px;"><label class="form-label">Notes</label><textarea class="form-input" id="sp-input-student-notes" placeholder="Optional notes..." style="height:50px;resize:vertical;"></textarea></div>
       </div>
       <div class="modal-footer">
@@ -217,7 +224,11 @@ window.SchoolStudents = {
             <select class="form-select" id="sp-input-student-counselor"><option value="">None</option>${counselors.filter(c => c.profileId).map(c => `<option value="${c.profileId}" ${c.profileId === student.counselor_id ? 'selected' : ''}>${eh(c.displayName)}</option>`).join('')}</select>
           </div>
           <div class="form-group" style="margin-top:12px;"><label class="form-label">Status</label>
-            <select class="form-select" id="sp-input-student-status"><option value="active" ${student.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${student.status === 'inactive' ? 'selected' : ''}>Inactive</option><option value="suspended" ${student.status === 'suspended' ? 'selected' : ''}>Suspended</option></select>
+            <select class="form-select" id="sp-input-student-status"><option value="active" ${student.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${student.status === 'inactive' ? 'selected' : ''}>Inactive</option></select>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" id="sp-input-student-orbit-enabled" ${student.general_orbit_enabled !== false ? 'checked' : ''}> General Orbit access</label>
+            <div class="form-group"><label class="form-label">Daily Orbit Limit</label><input type="number" class="form-input" id="sp-input-student-orbit-limit" min="0" max="200" value="${student.general_orbit_daily_limit ?? ''}" placeholder="Use school limit"></div>
           </div>
           <div class="form-group" style="margin-top:8px;"><label class="form-label">Notes</label><textarea class="form-input" id="sp-input-student-notes" style="height:50px;resize:vertical;">${eh(student.notes || '')}</textarea></div>
         </div>
@@ -252,6 +263,9 @@ window.SchoolStudents = {
     const counselorId = document.getElementById('sp-input-student-counselor')?.value || null;
     const notes = document.getElementById('sp-input-student-notes')?.value?.trim() || null;
     const status = document.getElementById('sp-input-student-status')?.value || 'active';
+    const orbitEnabled = document.getElementById('sp-input-student-orbit-enabled')?.checked !== false;
+    const orbitLimitValue = document.getElementById('sp-input-student-orbit-limit')?.value;
+    const orbitLimit = orbitLimitValue === '' || orbitLimitValue == null ? null : Number(orbitLimitValue);
     const btn = document.getElementById('sp-btn-save-student');
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...'; }
     try {
@@ -285,6 +299,7 @@ window.SchoolStudents = {
         AppToast.show(`Student "${name}" created.`, 'success');
       }
       if (savedStudent?.id) {
+        await window.AiService?.setStudentAccess(savedStudent.id, orbitEnabled, orbitLimit);
         const { data: syncData, error: syncError } = await window.supabase.functions.invoke('drive-sync', {
           body: { student_id: savedStudent.id }
         });
@@ -1845,6 +1860,9 @@ window.SchoolVideos = {
   async render(main, data, school) {
     const schoolId = school.id;
     const profile = AppRouter._currentProfile;
+    const canUpload = ['super_admin', 'company_admin'].includes(profile?.role);
+    const canReview = ['school_admin', 'counselor'].includes(profile?.role);
+    const canManage = ['super_admin', 'company_admin'].includes(profile?.role);
     let content = data.content.filter(c => c.school_id === schoolId);
     if (profile?.role === 'student') {
       const student = await window.StudentService?.getByUserId(profile.id);
@@ -1869,7 +1887,7 @@ window.SchoolVideos = {
         </div>
         <div style="display:flex;gap:8px;">
           <span style="font-size:11px;color:var(--text-muted);align-self:center;">${items.length} items</span>
-          <button class="btn btn-primary" data-action="add-content"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add Content</button>
+          ${canUpload ? '<button class="btn btn-primary" data-action="add-content"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add Content</button>' : ''}
         </div>
       </div>
       <div class="management-bar" style="margin-bottom:16px;">
@@ -1879,7 +1897,7 @@ window.SchoolVideos = {
           <option value="Video">Video</option><option value="PDF">PDF</option><option value="Image">Image</option><option value="Document">Document</option><option value="Other">Other</option>
         </select>
       </div>
-      ${items.length === 0 ? `<div class="card"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">video_library</span><h3>No media available</h3><p>${content.length === 0 ? 'Upload videos and documents to your courses.' : 'No media matches your search criteria.'}</p>${content.length === 0 ? `<button class="btn btn-primary" data-action="add-content" style="margin-top:12px;"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add Content</button>` : ''}</div></div>`
+      ${items.length === 0 ? `<div class="card"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">video_library</span><h3>No media available</h3><p>${content.length === 0 ? 'No Drive videos are available for this school yet.' : 'No media matches your search criteria.'}</p>${content.length === 0 && canUpload ? `<button class="btn btn-primary" data-action="add-content" style="margin-top:12px;"><span class="material-symbols-outlined" style="font-size:18px;">add</span> Add Content</button>` : ''}</div></div>`
       : `<div class="subjects-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));">${items.map(m => {
         const isVideo = m.type === 'Video';
         const stats = window.VIDEO_VIEWS?.[m.id] || {};
@@ -1891,11 +1909,14 @@ window.SchoolVideos = {
           <div style="padding:12px;">
             <div style="font-size:14px;font-weight:600;">${eh(m.name)}</div>
             <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">${eh(m.type)} · ${eh(m.size || '—')}</div>
-            ${isVideo && stats.views ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${eh(stats.views)} views · ${eh(stats.likes || 0)} likes</div>` : ''}
+            <div style="margin-top:6px;"><span class="status-badge ${m.status === 'published' ? 'status-active' : m.status === 'review' ? 'status-pending' : 'status-suspended'}">${m.status === 'review' ? 'Awaiting Review' : eh(m.status)}</span></div>
+            ${isVideo && stats.views ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${eh(stats.views)} views</div>` : ''}
             <div style="display:flex;gap:8px;margin-top:8px;">
               ${isVideo ? `<button class="btn btn-primary btn-sm" style="flex:1;height:32px;font-size:12px;" data-action="sp-view-video" data-id="${m.id}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span> Details</button>` : `<button class="btn btn-primary btn-sm" style="flex:1;height:32px;font-size:12px;" data-action="preview-image" data-id="${m.id}"><span class="material-symbols-outlined" style="font-size:18px;">visibility</span> View</button>`}
-              <button class="btn btn-ghost btn-sm" style="width:32px;height:32px;padding:0;" data-action="edit-content" data-id="${m.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
-              <button class="btn btn-ghost btn-sm btn-danger-ghost" style="width:32px;height:32px;padding:0;" data-action="sp-delete-content" data-id="${m.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
+              ${canReview && m.status === 'review' ? `<button class="btn btn-ghost btn-sm" style="width:32px;height:32px;padding:0;color:#059669;" data-action="review-content-approve" data-id="${m.id}" title="Approve"><span class="material-symbols-outlined" style="font-size:18px;">check_circle</span></button>
+              <button class="btn btn-ghost btn-sm btn-danger-ghost" style="width:32px;height:32px;padding:0;" data-action="review-content-reject" data-id="${m.id}" title="Reject"><span class="material-symbols-outlined" style="font-size:18px;">cancel</span></button>` : ''}
+              ${canManage ? `<button class="btn btn-ghost btn-sm" style="width:32px;height:32px;padding:0;" data-action="edit-content" data-id="${m.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
+              <button class="btn btn-ghost btn-sm btn-danger-ghost" style="width:32px;height:32px;padding:0;" data-action="sp-delete-content" data-id="${m.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>` : ''}
             </div>
           </div>
         </div>`;
@@ -1909,11 +1930,14 @@ window.SchoolVideos = {
       const data = await AppStorage.load();
       const video = data.content?.find(c => c.id === videoId);
       if (!video) { AppToast.show('Video not found.', 'error'); return; }
-      const stats = window.VIDEO_VIEWS?.[videoId] || { views: 0, completions: 0, likes: 0, avgWatch: '0:00' };
-      const related = data.content?.filter(c => c.subject_id === video.subject_id && c.id !== videoId && c.type === 'Video').slice(0, 4) || [];
-      const subject = data.subjects?.find(s => s.id === video.subject_id);
-      const section = data.sections?.find(s => s.id === video.section_id);
-      const category = data.categories?.find(c => c.id === video.category_id);
+      const stats = window.VIDEO_VIEWS?.[videoId] || { views: 0, completions: 0, avgWatch: '0:00' };
+      const related = data.content?.filter(c =>
+        c.drive_folder_id === video.drive_folder_id &&
+        c.id !== videoId &&
+        c.type === 'Video' &&
+        c.status === 'published' &&
+        c.sync_state === 'active'
+      ).slice(0, 4) || [];
       const completionPct = stats.views ? Math.round(stats.completions / stats.views * 100) : 0;
 
       const existing = document.getElementById('modal-video-detail');
@@ -1931,14 +1955,10 @@ window.SchoolVideos = {
           <h2 style="font-size:18px;font-weight:700;margin:0 0 4px;">${eh(video.name)}</h2>
           <p style="font-size:13px;color:var(--text-secondary);margin:0 0 16px;">${eh(video.description || 'No description available.')}</p>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
             <div style="padding:10px;background:#eff6ff;border-radius:8px;text-align:center;">
               <div style="font-size:18px;font-weight:700;color:#3b82f6;">${eh(stats.views)}</div>
               <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Views</div>
-            </div>
-            <div style="padding:10px;background:#f0fdf4;border-radius:8px;text-align:center;">
-              <div style="font-size:18px;font-weight:700;color:#10b981;">${eh(stats.likes)}</div>
-              <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Likes</div>
             </div>
             <div style="padding:10px;background:#fffbeb;border-radius:8px;text-align:center;">
               <div style="font-size:18px;font-weight:700;color:#f59e0b;">${completionPct}%</div>
@@ -1955,9 +1975,7 @@ window.SchoolVideos = {
               <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Details</div>
               <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
                 <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Duration</span><span style="font-weight:500;">${eh(video.duration || '—')}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Category</span><span style="font-weight:500;">${eh(category?.name || '—')}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Subject</span><span style="font-weight:500;">${eh(subject?.name || '—')}</span></div>
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Section</span><span style="font-weight:500;">${eh(section?.name || '—')}</span></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Review Status</span><span style="font-weight:500;">${eh(video.status || 'review')}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Uploaded By</span><span style="font-weight:500;">${eh(video.uploaded_by || '—')}</span></div>
               </div>
             </div>

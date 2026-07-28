@@ -33,8 +33,8 @@ Deno.serve(async request => {
     });
     const { data: profile } = await admin.from('profiles')
       .select('role, school_id, company_id').eq('id', userData.user.id).single();
-    if (!profile || !['super_admin', 'company_admin', 'school_admin'].includes(profile.role)) {
-      return json({ error: 'Admin access required' }, 403);
+    if (!profile || !['super_admin', 'company_admin', 'school_admin', 'counselor'].includes(profile.role)) {
+      return json({ error: 'School staff access required' }, 403);
     }
 
     const body = await request.json().catch(() => ({}));
@@ -44,7 +44,7 @@ Deno.serve(async request => {
     const { data: student, error: studentError } = await admin.from('students')
       .select('id, name, school_id, drive_folder_id').eq('id', studentId).single();
     if (studentError || !student) return json({ error: 'Student not found' }, 404);
-    if (profile.role === 'school_admin' && profile.school_id !== student.school_id) {
+    if (['school_admin', 'counselor'].includes(profile.role) && profile.school_id !== student.school_id) {
       return json({ error: 'Student is outside your school' }, 403);
     }
     if (profile.role === 'company_admin') {
@@ -67,10 +67,13 @@ Deno.serve(async request => {
 
     const files = await driveList(student.drive_folder_id, apiKey);
     let videos = 0;
+    let awaitingReview = 0;
     const activeIds: string[] = [];
     for (const file of files) {
       if (!String(file.mimeType || '').startsWith('video/')) continue;
       activeIds.push(file.id);
+      const { data: existing } = await admin.from('content')
+        .select('id,status').eq('drive_file_id', file.id).maybeSingle();
       const { error } = await admin.from('content').upsert({
         name: String(file.name || 'Video').replace(/\.[^.]+$/, ''),
         type: 'Video',
@@ -86,12 +89,13 @@ Deno.serve(async request => {
         drive_modified_time: file.modifiedTime || null,
         source: 'drive',
         sync_state: 'active',
-        status: 'published',
+        status: existing?.status || 'review',
         description_source: 'drive',
         last_synced_at: new Date().toISOString()
       }, { onConflict: 'drive_file_id' });
       if (error) throw error;
       videos++;
+      if (!existing) awaitingReview++;
     }
 
     let stale = admin.from('content').update({ sync_state: 'removed' })
@@ -105,7 +109,31 @@ Deno.serve(async request => {
       last_drive_sync_error: null
     }).eq('id', student.id);
 
-    return json({ success: true, folder_name: folder.name, videos });
+    if (awaitingReview > 0) {
+      const { data: reviewers } = await admin.from('profiles')
+        .select('id').eq('school_id', student.school_id)
+        .in('role', ['school_admin', 'counselor']).eq('status', 'active');
+      if (reviewers?.length) {
+        await admin.from('notifications').insert(reviewers.map(reviewer => ({
+          user_id: reviewer.id,
+          title: 'New videos need review',
+          message: `${awaitingReview} new video(s) from ${folder.name} are waiting for approval.`,
+          action_url: 'school-videos',
+          metadata: {
+            kind: 'content_review',
+            student_id: student.id,
+            drive_folder_id: student.drive_folder_id
+          }
+        })));
+      }
+    }
+
+    return json({
+      success: true,
+      folder_name: folder.name,
+      videos,
+      awaiting_review: awaitingReview
+    });
   } catch (error) {
     console.error('drive-sync failed', error);
     return json({ error: error instanceof Error ? error.message : 'Drive sync failed' }, 400);
