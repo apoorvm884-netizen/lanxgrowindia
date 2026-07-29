@@ -1227,7 +1227,11 @@ window.AppRouter = {
       return;
     }
     if (this.currentRoute === 'school-reports') {
-      window.SchoolReports.render(main, data, school);
+      if (profile?.role === 'student') {
+        await window.StudentLearningDashboard.render(main, data, school, profile);
+        return;
+      }
+      await window.RoleLearningReports.render(main, data, school, profile);
       return;
     }
     if (this.currentRoute === 'school-notifications') {
@@ -1582,7 +1586,8 @@ window.AppRouter = {
       <div class="tab-bar" style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding:0 0 0;background:transparent;border-radius:0;">
         <button class="tab-item active" data-action="settings-tab" data-tab="general" style="padding:12px 20px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--primary);color:var(--text);">General</button>
         <button class="tab-item" data-action="settings-tab" data-tab="branding" style="padding:12px 20px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-secondary);">Branding</button>
-        <button class="tab-item" data-action="settings-tab" data-tab="email" style="padding:12px 20px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-secondary);">Email</button>
+        <button class="tab-item" data-action="settings-tab" data-tab="account" style="padding:12px 20px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-secondary);">My Account</button>
+        <button class="tab-item" data-action="settings-tab" data-tab="email" style="padding:12px 20px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-secondary);">Outbound Email</button>
       </div>
       <div id="settings-content">${this._settingsTabContent('general', settings)}</div>
     </div>`;
@@ -1648,10 +1653,26 @@ window.AppRouter = {
           </div>
         </div>
       </div>`;
+    } else if (tab === 'account') {
+      const profile = this._currentProfile || {};
+      return `<div class="card" style="max-width:600px;">
+        <div class="card-header"><h3 class="card-title">My Login Account</h3></div>
+        <div style="padding:20px;">
+          <div class="form-group">
+            <label class="form-label">Current Login Email</label>
+            <input type="email" class="form-input" value="${AppUtils.escapeHtml(profile.email || '')}" readonly>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Changing this sends a confirmation link to the new address. The same account-email option is available to every authenticated role.</div>
+          </div>
+          <button class="btn btn-primary" data-action="sp-change-email" style="height:40px;font-size:13px;margin-top:18px;">
+            <span class="material-symbols-outlined" style="font-size:17px;">alternate_email</span> Change Login Email
+          </button>
+        </div>
+      </div>`;
     } else if (tab === 'email') {
       return `<div class="card" style="max-width:600px;">
-        <div class="card-header"><h3 class="card-title">Email Configuration</h3></div>
+        <div class="card-header"><h3 class="card-title">Outbound Email (SMTP)</h3></div>
         <div style="padding:20px;">
+          <div style="padding:10px 12px;margin-bottom:16px;border-radius:8px;background:var(--surface-low);font-size:12px;color:var(--text-secondary);">These settings control platform-generated emails. They do not change your login email.</div>
           <div class="form-group"><label class="form-label">SMTP Host</label><input type="text" class="form-input" value="${v('smtpHost')}" placeholder="smtp.example.com" data-action="save-setting" data-key="smtpHost"></div>
           <div class="form-group" style="margin-top:16px;"><label class="form-label">SMTP Port</label><input type="number" class="form-input" value="${v('smtpPort')}" placeholder="587" data-action="save-setting" data-key="smtpPort"></div>
           <div class="form-group" style="margin-top:16px;"><label class="form-label">From Address</label><input type="email" class="form-input" value="${v('fromEmail')}" placeholder="noreply@example.com" data-action="save-setting" data-key="fromEmail"></div>
@@ -5800,11 +5821,6 @@ window.StudentLearningDashboard = {
       <section style="margin-bottom:24px;"><h2 style="font-size:16px;margin-bottom:12px;">All Assigned Videos</h2>
         ${videos.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;">${videos.map(card).join('')}</div>` : '<div class="card"><div class="empty-state"><h3>No approved videos yet</h3><p>Your counselor will see new videos after they are reviewed.</p></div></div>'}
       </section>
-      <section><h2 style="font-size:16px;margin-bottom:12px;">More Learning Tools</h2>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
-          ${['Certificates','Assignments','Quizzes'].map(label => `<div class="card" style="padding:18px;"><strong>${label}</strong><div style="font-size:12px;color:var(--text-muted);margin-top:6px;">Coming Soon</div></div>`).join('')}
-        </div>
-      </section>
     </div>`;
     initIcons();
   }
@@ -5856,6 +5872,97 @@ window.CounselorLearningDashboard = {
             <button class="btn btn-secondary" data-action="navigate" data-route="school-attendance">My Attendance</button>
           </div>
         </div>
+      </div>
+    </div>`;
+    initIcons();
+  }
+};
+
+window.RoleLearningReports = {
+  async render(main, data, school, profile) {
+    let students = await StudentService.getBySchool(school.id);
+    const counselorRecord = (data.counselors || []).find(item => item.user_id === profile?.id);
+    if (profile?.role === 'counselor') {
+      students = students.filter(student =>
+        student.counselor_id === profile.id ||
+        (counselorRecord && student.counselor_id === counselorRecord.id)
+      );
+    }
+
+    const studentUserIds = students.map(student => student.user_id).filter(Boolean);
+    let progress = [];
+    if (studentUserIds.length) {
+      const { data: rows, error } = await supabase
+        .from('content_progress')
+        .select('*')
+        .eq('school_id', school.id)
+        .in('user_id', studentUserIds)
+        .order('last_viewed_at', { ascending: false });
+      if (error) throw error;
+      progress = rows || [];
+    }
+
+    const videos = (data.content || []).filter(item =>
+      item.school_id === school.id &&
+      item.type === 'Video' &&
+      item.status === 'published' &&
+      item.sync_state === 'active'
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    const activeToday = new Set(progress
+      .filter(item => item.last_viewed_at?.startsWith(today))
+      .map(item => item.user_id)).size;
+    const completedViews = progress.filter(item => item.completed).length;
+    const watchMinutes = Math.round(progress.reduce((sum, item) => sum + Number(item.watched_seconds || 0), 0) / 60);
+    const title = profile?.role === 'counselor' ? 'Assigned Student Reports' : 'School Learning Reports';
+
+    const rows = students.map(student => {
+      const studentProgress = progress.filter(item => item.user_id === student.user_id);
+      const assignedVideos = videos.filter(video =>
+        student.drive_folder_id && video.drive_folder_id === student.drive_folder_id
+      );
+      const completed = studentProgress.filter(item => item.completed).length;
+      const minutes = Math.round(studentProgress.reduce((sum, item) => sum + Number(item.watched_seconds || 0), 0) / 60);
+      const lastViewed = studentProgress[0]?.last_viewed_at;
+      const completion = assignedVideos.length
+        ? Math.min(100, Math.round(completed / assignedVideos.length * 100))
+        : 0;
+      return { student, assignedVideos: assignedVideos.length, completed, minutes, lastViewed, completion };
+    });
+
+    main.innerHTML = `<div class="fade-in">
+      <div class="page-header">
+        <div class="page-header-left">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
+            <span style="font-size:12px;color:var(--text-secondary);">${AppUtils.escapeHtml(school.name)}</span>
+          </div>
+          <h1 class="page-title">${title}</h1>
+          <p class="page-subtitle">Video learning and completion data relevant to your role.</p>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
+        <div class="metric-card"><div class="metric-info"><h2>${students.length}</h2><p>${profile?.role === 'counselor' ? 'Assigned Students' : 'Students'}</p></div></div>
+        <div class="metric-card"><div class="metric-info"><h2>${activeToday}</h2><p>Active Today</p></div></div>
+        <div class="metric-card"><div class="metric-info"><h2>${videos.length}</h2><p>Published Videos</p></div></div>
+        <div class="metric-card"><div class="metric-info"><h2>${completedViews}</h2><p>Video Completions</p></div></div>
+        <div class="metric-card"><div class="metric-info"><h2>${watchMinutes}</h2><p>Watch Minutes</p></div></div>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="card-header" style="padding:16px 20px;"><h3 class="card-title">Student Learning Progress</h3></div>
+        ${rows.length ? `<div class="table-container"><table>
+          <thead><tr><th>Student</th><th>Assigned Videos</th><th>Completed</th><th>Completion</th><th>Watch Minutes</th><th>Last Activity</th></tr></thead>
+          <tbody>${rows.map(row => `<tr>
+            <td><div class="font-semibold">${AppUtils.escapeHtml(row.student.name)}</div><div style="font-size:11px;color:var(--text-muted);">${AppUtils.escapeHtml(row.student.admission_no || row.student.email || '')}</div></td>
+            <td>${row.assignedVideos}</td>
+            <td>${row.completed}</td>
+            <td><div style="display:flex;align-items:center;gap:8px;min-width:120px;"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${row.completion}%;background:var(--primary);border-radius:3px;"></div></div><strong style="font-size:11px;">${row.completion}%</strong></div></td>
+            <td>${row.minutes}</td>
+            <td>${row.lastViewed ? AppUtils.formatDate(row.lastViewed) : 'Not started'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>` : '<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">monitoring</span><h3>No student learning data yet</h3><p>Progress will appear after an assigned student watches a video.</p></div>'}
       </div>
     </div>`;
     initIcons();
