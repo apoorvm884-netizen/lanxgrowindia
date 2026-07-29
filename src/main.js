@@ -57,6 +57,83 @@ window.AiService = AiService;
 window.TrackingConfigService = TrackingConfigService;
 window.supabase = supabase;
 
+window.AppBranding = {
+  settings: {},
+
+  async load(profile = null) {
+    try {
+      const settings = await SettingsService.getEffectiveBranding();
+      let schoolLogo = null;
+      if (profile?.school_id) {
+        const school = await SupabaseSchoolService.getById(profile.school_id).catch(() => null);
+        schoolLogo = school?.logo_url || null;
+      }
+      this.apply(settings, schoolLogo);
+    } catch (error) {
+      console.warn('Branding could not be loaded:', error?.message || error);
+    }
+  },
+
+  apply(settings = {}, schoolLogo = null) {
+    this.settings = settings || {};
+    const primary = String(settings.primaryColor || '').trim();
+    if (/^#[0-9a-f]{6}$/i.test(primary)) {
+      document.documentElement.style.setProperty('--primary', primary);
+    }
+
+    const faviconUrl = String(settings.faviconUrl || '').trim();
+    if (faviconUrl) {
+      let favicon = document.querySelector('link[rel="icon"]');
+      if (!favicon) {
+        favicon = document.createElement('link');
+        favicon.rel = 'icon';
+        document.head.appendChild(favicon);
+      }
+      favicon.href = faviconUrl;
+    }
+
+    const logoUrl = schoolLogo || String(settings.companyLogo || '').trim();
+    const logo = document.getElementById('sidebar-brand-logo');
+    const icon = document.getElementById('sidebar-brand-icon');
+    if (logo && icon) {
+      if (logoUrl) {
+        logo.src = logoUrl;
+        logo.style.display = 'block';
+        icon.style.display = 'none';
+      } else {
+        logo.removeAttribute('src');
+        logo.style.display = 'none';
+        icon.style.display = '';
+      }
+    }
+    const brandName = document.getElementById('sidebar-brand-name');
+    if (brandName) brandName.textContent = String(settings.companyName || 'LANXGROW');
+  },
+
+  orbitAvatar(size = 76) {
+    const customLogo = String(this.settings.orbitLogo || '').trim();
+    if (customLogo) {
+      return `<div class="orbit-companion custom" style="width:${size}px;height:${size}px;" aria-label="Orbit AI">
+        <img src="${AppUtils.escapeHtml(customLogo)}" alt="Orbit AI">
+      </div>`;
+    }
+    return `<div class="orbit-companion" style="width:${size}px;height:${size}px;" aria-label="Animated Orbit AI">
+      <svg class="orbit-companion-shell" viewBox="0 0 80 80" role="img" aria-hidden="true">
+        <defs><linearGradient id="orbit-body" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6f7cff"/><stop offset="1" stop-color="#142cae"/></linearGradient></defs>
+        <ellipse cx="39" cy="70" rx="22" ry="5" fill="rgba(20,44,174,.12)"/>
+        <rect x="17" y="26" width="45" height="38" rx="16" fill="url(#orbit-body)"/>
+        <rect x="20" y="12" width="39" height="32" rx="14" fill="#fff" stroke="#142cae" stroke-width="3"/>
+        <path d="M39 12V7" stroke="#142cae" stroke-width="3" stroke-linecap="round"/><circle cx="39" cy="5" r="3" fill="#ffbd4a"/>
+        <g class="orbit-eye"><ellipse cx="32" cy="27" rx="4" ry="5" fill="#142cae"/><ellipse cx="47" cy="27" rx="4" ry="5" fill="#142cae"/></g>
+        <path d="M32 36c4 4 11 4 15 0" fill="none" stroke="#ff7b72" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M17 44c-7 1-8 10-3 15" fill="none" stroke="#142cae" stroke-width="6" stroke-linecap="round"/>
+        <g class="orbit-arm"><path d="M62 43c8-7 12-2 10 4" fill="none" stroke="#142cae" stroke-width="6" stroke-linecap="round"/><circle cx="72" cy="45" r="4" fill="#ffbd4a"/></g>
+        <circle cx="39" cy="53" r="5" fill="#ffbd4a"/><path d="M29 64v7M50 64v7" stroke="#142cae" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+    </div>`;
+  }
+};
+
 // ==============================================================
 // DATA LAYER — Supabase-backed with lazy loading & caching
 // ==============================================================
@@ -1545,16 +1622,24 @@ window.AppRouter = {
       </div>`;
     } else if (tab === 'branding') {
       const logoUrl = v('companyLogo');
-      return `<div class="card" style="max-width:600px;">
+      const faviconUrl = v('faviconUrl');
+      const orbitLogo = v('orbitLogo');
+      const assetUpload = (id, label, url, icon, help) => `
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">${label}</label>
+          <label for="${id}" style="width:112px;height:112px;border:2px dashed var(--border);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:var(--surface-low);">
+            ${url ? `<img src="${url}" alt="${label}" style="width:100%;height:100%;object-fit:contain;padding:8px;">` : `<span class="material-symbols-outlined" style="font-size:30px;color:var(--text-muted);">${icon}</span>`}
+          </label>
+          <input id="${id}" type="file" accept="image/png,image/jpeg,image/webp" data-brand-upload style="display:none;">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">${help}</div>
+        </div>`;
+      return `<div class="card" style="max-width:760px;">
         <div class="card-header"><h3 class="card-title">Branding</h3></div>
         <div style="padding:20px;">
-          <div class="form-group">
-            <label class="form-label">Company Logo</label>
-            <label for="company-logo-input" style="width:120px;height:120px;border:2px dashed var(--border);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;background:var(--surface-low);">
-              ${logoUrl ? `<img src="${logoUrl}" alt="Company logo" style="width:100%;height:100%;object-fit:contain;padding:8px;">` : '<span class="material-symbols-outlined" style="font-size:30px;color:var(--text-muted);">upload</span>'}
-            </label>
-            <input id="company-logo-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none;">
-            <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">PNG, JPG, WebP or SVG. Maximum 2 MB.</div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;">
+            ${assetUpload('company-logo-input', 'Dashboard Logo', logoUrl, 'dashboard_customize', 'Shown in the main sidebar and login branding.')}
+            ${assetUpload('favicon-input', 'Website Favicon', faviconUrl, 'web_asset', 'Shown in the browser tab. PNG/JPG/WebP, max 2 MB.')}
+            ${assetUpload('orbit-logo-input', 'Orbit AI Logo', orbitLogo, 'smart_toy', 'Optional custom Orbit face; animation remains active.')}
           </div>
           <div class="form-group" style="margin-top:16px;"><label class="form-label">Primary Color</label><div style="display:flex;align-items:center;gap:12px;"><input type="color" class="form-input" value="${v('primaryColor', '#1A56DB')}" style="width:48px;height:40px;padding:4px;" data-action="save-setting" data-key="primaryColor"><input type="text" class="form-input" value="${v('primaryColor', '#1A56DB')}" style="flex:1;"></div></div>
           <div style="margin-top:20px;display:flex;gap:12px;">
@@ -1818,7 +1903,9 @@ window.AppRouter = {
           const adminCount = adminCountBySchool[s.id] || 0;
           return `<div class="school-card" style="cursor:pointer;" data-action="open-school" data-id="${s.id}">
             <div class="school-card-top">
-              <div class="school-logo ${logoClass}">${AppUtils.getInitials(s.name)}</div>
+              <div class="school-logo ${logoClass}">${s.logo_url
+                ? `<img src="${AppUtils.escapeHtml(s.logo_url)}" alt="${AppUtils.escapeHtml(s.name)} logo" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;">`
+                : AppUtils.getInitials(s.name)}</div>
               <div class="school-info">
                 <div class="school-name">${AppUtils.escapeHtml(s.name)}</div>
                 <div class="school-code">Code: ${AppUtils.escapeHtml(s.code)}</div>
@@ -2700,6 +2787,14 @@ function openSchoolForm(schoolData) {
   document.getElementById('school-input-login-email').value = schoolData?.email || '';
   document.getElementById('school-input-login-password').value = '';
   document.getElementById('school-input-website').value = schoolData?.website || '';
+  const logoInput = document.getElementById('school-input-logo');
+  const logoPreview = document.getElementById('school-logo-preview');
+  if (logoInput) logoInput.value = '';
+  if (logoPreview) {
+    logoPreview.innerHTML = schoolData?.logo_url
+      ? `<img src="${AppUtils.escapeHtml(schoolData.logo_url)}" alt="${AppUtils.escapeHtml(schoolData.name || 'School')} logo" style="width:100%;height:100%;object-fit:contain;">`
+      : '<span class="material-symbols-outlined" style="font-size:30px;color:var(--text-muted);">add_photo_alternate</span>';
+  }
 
   document.getElementById('school-input-addr1').value = schoolData?.address_line1 || '';
   document.getElementById('school-input-addr2').value = schoolData?.address_line2 || '';
@@ -2830,6 +2925,8 @@ async function handleSchoolSubmit() {
       payload.tracking_sheet_id = trackingSheetId || null;
     }
 
+    const logoFile = document.getElementById('school-input-logo')?.files?.[0] || null;
+    let savedSchoolId = id;
     if (isEdit) {
       await SchoolService.update(id, payload);
       if (loginPassword) {
@@ -2844,6 +2941,7 @@ async function handleSchoolSubmit() {
       AppToast.show('School updated.', 'success');
     } else {
       const school = await SchoolService.create({ ...payload, email: loginEmail });
+      savedSchoolId = school.id;
       try {
         await AccountService.provision({
           email: loginEmail,
@@ -2857,6 +2955,10 @@ async function handleSchoolSubmit() {
         throw accountError;
       }
       AppToast.show('School and School Admin login created.', 'success');
+    }
+    if (logoFile) {
+      const logoUrl = await SettingsService.uploadSchoolLogo(logoFile, savedSchoolId);
+      await SchoolService.update(savedSchoolId, { logo_url: logoUrl });
     }
     AppModal.close('modal-school');
     AppStorage.invalidate();
@@ -3417,6 +3519,11 @@ document.addEventListener('click', async function (e) {
       for (const [key, value] of Object.entries(settings)) {
         await window.SettingsService.set(key, value);
       }
+      AppRouter._companySettingsDraft = {
+        ...(AppRouter._companySettingsDraft || {}),
+        ...settings
+      };
+      await window.AppBranding.load(AppRouter._currentProfile);
       AppToast.show('Settings saved.', 'success');
     } catch (err) {
       AppToast.show(err.message || 'Failed to save settings.', 'error');
@@ -4523,25 +4630,44 @@ document.addEventListener('change', function (e) {
 document.addEventListener('change', function (e) {
   if (e.target.id === 'input-content-school') { AppContent.populateSections(e.target.value); }
   if (e.target.id === 'input-content-file') { handleContentFileUpload(e.target); }
+  if (e.target.id === 'school-input-logo') {
+    const file = e.target.files?.[0];
+    const preview = document.getElementById('school-logo-preview');
+    if (!file || !preview) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+      e.target.value = '';
+      AppToast.show('Choose a PNG, JPG, or WebP image up to 2 MB.', 'error');
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    preview.innerHTML = `<img src="${previewUrl}" alt="Selected school logo" style="width:100%;height:100%;object-fit:contain;">`;
+  }
 });
 
 document.addEventListener('change', async function (e) {
-  if (e.target.id !== 'company-logo-input') return;
+  if (!e.target.matches('[data-brand-upload]')) return;
   const input = e.target;
   const file = input.files?.[0];
   if (!file) return;
+  const config = {
+    'company-logo-input': { kind: 'logo', key: 'companyLogo', label: 'Dashboard logo' },
+    'favicon-input': { kind: 'favicon', key: 'faviconUrl', label: 'Website favicon' },
+    'orbit-logo-input': { kind: 'orbit', key: 'orbitLogo', label: 'Orbit AI logo' }
+  }[input.id];
+  if (!config) return;
   input.disabled = true;
   try {
-    const logoUrl = await window.SettingsService.uploadBrandAsset(file, 'logo');
-    await window.SettingsService.set('companyLogo', logoUrl, 'Company logo URL');
+    const assetUrl = await window.SettingsService.uploadBrandAsset(file, config.kind);
+    await window.SettingsService.set(config.key, assetUrl, `${config.label} URL`);
     AppRouter._companySettingsDraft = {
       ...(AppRouter._companySettingsDraft || {}),
-      companyLogo: logoUrl
+      [config.key]: assetUrl
     };
+    await window.AppBranding.load(AppRouter._currentProfile);
     AppRouter.renderSettingsTab('branding');
-    AppToast.show('Company logo uploaded and saved.', 'success');
+    AppToast.show(`${config.label} uploaded and applied.`, 'success');
   } catch (error) {
-    AppToast.show(error.message || 'Company logo upload failed.', 'error');
+    AppToast.show(error.message || `${config.label} upload failed.`, 'error');
     input.disabled = false;
     input.value = '';
   }
@@ -5059,13 +5185,13 @@ window.AppAiOrbit = {
   async _renderStudentChat(main, school) {
     const quota = await AiService.getQuota().catch(() => null);
     main.innerHTML = `<div class="fade-in" style="max-width:900px;margin:0 auto;">
-      <div class="page-header"><div><h1 class="page-title">Orbit</h1><p class="page-subtitle">Your education-only learning assistant</p></div>
+      <div class="page-header"><div style="display:flex;align-items:center;gap:14px;">${window.AppBranding.orbitAvatar(68)}<div><h1 class="page-title">Orbit</h1><p class="page-subtitle">Your education-only learning assistant</p></div></div>
         <span id="orbit-general-quota" class="status-badge ${quota?.allowed ? 'status-active' : 'status-suspended'}">${quota?.unlimited ? 'Unlimited' : `${Math.max(0, quota?.remaining ?? 0)} questions left today`}</span>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
         <div id="orbit-general-messages" style="height:min(58vh,560px);overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;">
           <div style="margin:auto;text-align:center;max-width:460px;color:var(--text-secondary);">
-            <span class="material-symbols-outlined" style="font-size:48px;color:var(--primary);">smart_toy</span>
+            <div style="display:flex;justify-content:center;margin-bottom:8px;">${window.AppBranding.orbitAvatar(88)}</div>
             <h2 style="font-size:18px;color:var(--on-surface);">How can Orbit help you learn?</h2>
             <p style="font-size:13px;">Ask an education-related question. Video questions should be asked from that video's Orbit panel.</p>
           </div>
@@ -6214,6 +6340,7 @@ async function handleAuthenticatedSession() {
   document.getElementById('sidebar').style.display = '';
   document.getElementById('sidebar-toggle').style.display = '';
   setAuthScreen('app');
+  await window.AppBranding.load(profile);
   AppRouter._clearProfile();
   await AppRouter.init();
   await window.AppNotificationCenter.start(profile);
@@ -6224,12 +6351,27 @@ async function handleAuthenticatedSession() {
 async function initApp() {
   AppStorage.init();
   AppModal.init();
+  await window.AppBranding.load();
 
   // Password recovery detection — must be set before login check
   const lc = document.getElementById('login-form-container');
   const fc = document.getElementById('forgot-password-container');
   const rc = document.getElementById('reset-password-container');
   const loginTitle = document.querySelector('#app-login .card h2');
+  const recoveryHash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const recoveryError = recoveryHash.get('error');
+  if (recoveryError) {
+    lc.style.display = 'none';
+    rc.style.display = 'none';
+    fc.style.display = 'block';
+    const errorEl = document.getElementById('forgot-error');
+    errorEl.textContent = recoveryHash.get('error_code') === 'otp_expired'
+      ? 'This password reset link has expired or was already used. Please request a new link.'
+      : (recoveryHash.get('error_description') || 'This password reset link is invalid. Please request a new link.');
+    errorEl.style.display = 'block';
+    if (loginTitle) loginTitle.textContent = 'Request a New Reset Link';
+    history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+  }
 
   AuthService.onAuthStateChange((event) => {
     if (event === 'PASSWORD_RECOVERY') {

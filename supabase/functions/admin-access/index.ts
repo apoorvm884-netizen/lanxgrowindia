@@ -14,6 +14,7 @@ type Actor = {
   id: string;
   role: string;
   company_id: string | null;
+  school_id: string | null;
 };
 
 Deno.serve(async request => {
@@ -39,16 +40,22 @@ Deno.serve(async request => {
     });
     const { data: actor } = await admin
       .from('profiles')
-      .select('id, role, company_id')
+      .select('id, role, company_id, school_id')
       .eq('id', authData.user.id)
       .single();
-    if (!actor || !['super_admin', 'company_admin'].includes(actor.role)) {
-      return json({ error: 'Only Super Admin or Company Admin can perform this action' }, 403);
+    if (!actor || !['super_admin', 'company_admin', 'school_admin'].includes(actor.role)) {
+      return json({ error: 'Only an authorized administrator can perform this action' }, 403);
     }
 
     const body = await request.json().catch(() => ({}));
     const action = String(body.action || '');
 
+    if (action === 'delete_counselor') {
+      return await deleteCounselor(admin, actor as Actor, String(body.counselor_id || ''));
+    }
+    if (actor.role === 'school_admin') {
+      return json({ error: 'School Admin access is limited to counselors in their own school' }, 403);
+    }
     if (action === 'delete_school_admin') {
       return await deleteSchoolAdmin(admin, actor as Actor, String(body.user_id || ''));
     }
@@ -66,6 +73,49 @@ Deno.serve(async request => {
     return json({ error: error instanceof Error ? error.message : 'Administrative action failed' }, 400);
   }
 });
+
+async function deleteCounselor(admin: any, actor: Actor, counselorId: string) {
+  if (!counselorId) return json({ error: 'Counselor ID is required' }, 400);
+  const { data: counselor } = await admin
+    .from('counselors')
+    .select('id, name, school_id, user_id')
+    .eq('id', counselorId)
+    .single();
+  if (!counselor) return json({ error: 'Counselor was not found' }, 404);
+
+  if (actor.role === 'school_admin' && counselor.school_id !== actor.school_id) {
+    return json({ error: 'Counselor is outside your school' }, 403);
+  }
+  if (actor.role === 'company_admin') {
+    const { data: school } = await admin
+      .from('schools')
+      .select('company_id')
+      .eq('id', counselor.school_id)
+      .single();
+    if (!school || school.company_id !== actor.company_id) {
+      return json({ error: 'Counselor is outside your company' }, 403);
+    }
+  }
+  if (counselor.user_id === actor.id) {
+    return json({ error: 'You cannot delete your own account' }, 400);
+  }
+
+  if (counselor.user_id) {
+    const { error: authError } = await admin.auth.admin.deleteUser(counselor.user_id);
+    if (authError) throw authError;
+  }
+  const { error: counselorError } = await admin
+    .from('counselors')
+    .delete()
+    .eq('id', counselor.id);
+  if (counselorError) throw counselorError;
+
+  return json({
+    ok: true,
+    deleted: 'counselor',
+    access_revoked: Boolean(counselor.user_id)
+  });
+}
 
 async function deleteSchoolAdmin(admin: any, actor: Actor, userId: string) {
   if (!userId || userId === actor.id) return json({ error: 'You cannot delete your own account' }, 400);

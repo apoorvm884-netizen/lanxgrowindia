@@ -1,6 +1,17 @@
 import { supabase } from '../lib/supabase.js';
 import { AuditLogService } from './audit-log-service.js';
 
+const BRAND_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+
+function validateBrandImage(file) {
+  if (!file || !BRAND_IMAGE_TYPES.has(file.type)) {
+    throw new Error('Please choose a PNG, JPG, or WebP image.');
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    throw new Error('Brand images must be 2 MB or smaller.');
+  }
+}
+
 export const SettingsService = {
 
   async _getScope() {
@@ -54,13 +65,14 @@ export const SettingsService = {
     return data;
   },
 
+  async getEffectiveBranding() {
+    const { data, error } = await supabase.rpc('get_effective_branding');
+    if (error) throw error;
+    return data || {};
+  },
+
   async uploadBrandAsset(file, kind = 'logo') {
-    if (!file || !file.type?.startsWith('image/')) {
-      throw new Error('Please choose a valid image file.');
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      throw new Error('Brand images must be 2 MB or smaller.');
-    }
+    validateBrandImage(file);
 
     const { profile } = await this._getScope();
     const { data: authData } = await supabase.auth.getUser();
@@ -70,8 +82,8 @@ export const SettingsService = {
       throw new Error('You are not authorized to manage company branding.');
     }
 
-    const extension = (file.name.split('.').pop() || 'png').replace(/[^a-z0-9]/gi, '').toLowerCase();
-    const safeKind = kind === 'favicon' ? 'favicon' : 'logo';
+    const extension = file.type === 'image/jpeg' ? 'jpg' : file.type.split('/')[1];
+    const safeKind = ['favicon', 'orbit'].includes(kind) ? kind : 'logo';
     const path = `${prefix}/${safeKind}-${Date.now()}-${authData.user.id}.${extension}`;
     const { error: uploadError } = await supabase.storage
       .from('branding-assets')
@@ -80,6 +92,49 @@ export const SettingsService = {
 
     const { data: publicData } = supabase.storage.from('branding-assets').getPublicUrl(path);
     if (!publicData?.publicUrl) throw new Error('Brand image URL could not be created.');
+    return publicData.publicUrl;
+  },
+
+  async uploadSchoolLogo(file, schoolId) {
+    validateBrandImage(file);
+    if (!schoolId) throw new Error('Save the school before uploading its logo.');
+
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData?.user) throw authError || new Error('Authentication required.');
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role, school_id, company_id')
+      .eq('id', authData.user.id)
+      .single();
+    if (profileError) throw profileError;
+
+    if (profile.role === 'school_admin' && profile.school_id !== schoolId) {
+      throw new Error('You can only change your own school logo.');
+    }
+    if (profile.role === 'company_admin') {
+      const { data: school, error } = await supabase
+        .from('schools')
+        .select('company_id')
+        .eq('id', schoolId)
+        .single();
+      if (error) throw error;
+      if (!profile.company_id || school.company_id !== profile.company_id) {
+        throw new Error('This school is outside your company.');
+      }
+    }
+    if (!['super_admin', 'company_admin', 'school_admin'].includes(profile.role)) {
+      throw new Error('You are not authorized to change school branding.');
+    }
+
+    const extension = file.type === 'image/jpeg' ? 'jpg' : file.type.split('/')[1];
+    const path = `schools/${schoolId}/logo-${Date.now()}-${authData.user.id}.${extension}`;
+    const { error: uploadError } = await supabase.storage
+      .from('branding-assets')
+      .upload(path, file, { contentType: file.type, upsert: false });
+    if (uploadError) throw uploadError;
+
+    const { data: publicData } = supabase.storage.from('branding-assets').getPublicUrl(path);
+    if (!publicData?.publicUrl) throw new Error('School logo URL could not be created.');
     return publicData.publicUrl;
   },
 

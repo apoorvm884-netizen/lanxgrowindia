@@ -64,7 +64,8 @@ export const SchoolService = {
         latitude: school.latitude || null,
         longitude: school.longitude || null,
         attendance_radius_m: school.attendance_radius_m || 200,
-        tracking_sheet_id: school.tracking_sheet_id || null
+        tracking_sheet_id: school.tracking_sheet_id || null,
+        logo_url: school.logo_url || null
       })
       .select()
       .single();
@@ -108,6 +109,7 @@ export const SchoolService = {
     if (updates.longitude !== undefined) payload.longitude = updates.longitude;
     if (updates.attendance_radius_m !== undefined) payload.attendance_radius_m = updates.attendance_radius_m;
     if (updates.tracking_sheet_id !== undefined) payload.tracking_sheet_id = updates.tracking_sheet_id;
+    if (updates.logo_url !== undefined) payload.logo_url = updates.logo_url;
 
     const { data, error } = await supabase
       .from('schools')

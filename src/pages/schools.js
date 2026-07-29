@@ -50,7 +50,9 @@ export async function render(main, data, router) {
         const canDeleteSchool = ['super_admin', 'company_admin'].includes(router._currentProfile?.role);
         return `<div class="school-card" style="cursor:pointer;" data-action="open-school" data-id="${s.id}">
           <div class="school-card-top">
-            <div class="school-logo ${logoClass}">${AppUtils.getInitials(eh(s.name))}</div>
+            <div class="school-logo ${logoClass}">${s.logo_url
+              ? `<img src="${eh(s.logo_url)}" alt="${eh(s.name)} logo" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;">`
+              : AppUtils.getInitials(s.name)}</div>
             <div class="school-info">
               <div class="school-name">${eh(s.name)}</div>
               <div class="school-code">Code: ${eh(s.code)} · ${eh(s.school_type || 'N/A')} · ${eh(s.board || 'N/A')}</div>
