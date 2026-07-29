@@ -781,6 +781,11 @@ window.SchoolCounselors = {
       AppStorage.invalidate();
       AppRouter.render();
     } catch (err) {
+      if (isUpdate && /no longer exists|outside your access/i.test(err.message || '')) {
+        AppStorage.invalidateTable('counselors');
+        AppModal.close('modal-counselor');
+        await AppRouter.render();
+      }
       AppToast.show(err.message || 'Failed to save counselor.', 'error');
     }
     if (btn) { btn.disabled = false; btn.textContent = isUpdate ? 'Save Changes' : 'Add Counselor'; }
