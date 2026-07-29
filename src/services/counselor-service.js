@@ -19,7 +19,7 @@ export const CounselorService = {
       .from('counselors')
       .select('*')
       .eq('id', id)
-      .single();
+      .maybeSingle();
     if (error) throw error;
     return data;
   },
@@ -64,13 +64,22 @@ export const CounselorService = {
     if (updates.department !== undefined) payload.department = updates.department;
     if (updates.status !== undefined) payload.status = updates.status;
 
+    if (Object.keys(payload).length === 0) {
+      const current = await this.getById(id);
+      if (!current) throw new Error('This counselor record no longer exists. Refresh the page and create the counselor again.');
+      return current;
+    }
+
     const { data, error } = await supabase
       .from('counselors')
       .update(payload)
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle();
     if (error) throw error;
+    if (!data) {
+      throw new Error('This counselor record no longer exists or is outside your access. The list has been refreshed; create the counselor again if needed.');
+    }
     await AuditLogService.log('edited', 'Counselor', data.name, `Counselor "${data.name}" updated`, {
       schoolId: data.school_id,
       metadata: { counselor_id: data.id, changed_fields: Object.keys(payload) }
