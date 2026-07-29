@@ -147,6 +147,23 @@ export const AiService = {
     return data;
   },
 
+  async getManagedStudentQuota(studentId) {
+    const { data, error } = await supabase.rpc('managed_student_orbit_status', {
+      p_student_id: studentId
+    });
+    if (error) throw error;
+    return Array.isArray(data) ? data[0] : data;
+  },
+
+  async grantStudentQuestions(studentId, questions) {
+    const { data, error } = await supabase.rpc('grant_student_orbit_questions', {
+      p_student_id: studentId,
+      p_questions: Number(questions)
+    });
+    if (error) throw error;
+    return Array.isArray(data) ? data[0] : data;
+  },
+
   // ── Conversations / Messages ──────────────────────────────
   async getConversations(schoolId, limit = 50) {
     const { data, error } = await supabase
