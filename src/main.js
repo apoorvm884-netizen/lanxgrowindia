@@ -435,6 +435,7 @@ window.AppSidebar = {
     { id: 'company-settings', label: 'Settings', icon: 'settings', route: 'company-settings' },
     { id: 'api-keys', label: 'API Keys', icon: 'key', route: 'api-keys' },
     { id: 'sep3', separator: true },
+    { id: 'company-notifications', label: 'Notifications', icon: 'notifications', route: 'company-notifications' },
     { id: 'invitations', label: 'Invitations', icon: 'mail', route: 'invitations' },
     { id: 'audit-log', label: 'Activity Logs', icon: 'history', route: 'audit-log' },
   ],
@@ -448,6 +449,8 @@ window.AppSidebar = {
     { id: 'school-admins', label: 'School Admins', icon: 'user-cog', route: 'school-admins' },
     { id: 'company-settings', label: 'Settings', icon: 'settings', route: 'company-settings' },
     { id: 'sep3', separator: true },
+    { id: 'company-notifications', label: 'Notifications', icon: 'notifications', route: 'company-notifications' },
+    { id: 'invitations', label: 'Invitations', icon: 'mail', route: 'invitations' },
     { id: 'audit-log', label: 'Activity Logs', icon: 'history', route: 'audit-log' },
   ],
 
@@ -583,10 +586,15 @@ window.AppRouter = {
     'school-reports','school-notifications',
     'school-settings','school-profile','school-gps','school-orbit','school-attendance','school-activity-logs'],
   COMPANY_ROUTES: ['company-dashboard','schools',
-    'media-library','school-admins','roles-permissions','company-settings','api-keys','audit-log','invitations'],
+    'media-library','school-admins','roles-permissions','company-settings','api-keys','audit-log','invitations','company-notifications'],
 
   COMPANY_ADMIN_ROUTES: ['company-dashboard','schools',
-    'media-library','school-admins','roles-permissions','company-settings','audit-log','invitations'],
+    'media-library','school-admins','roles-permissions','company-settings','audit-log','invitations','company-notifications'],
+  ROLE_SCHOOL_ROUTES: {
+    teacher: ['school-dashboard','school-students','school-videos','school-reports','school-notifications','school-profile'],
+    counselor: ['school-dashboard','school-students','school-videos','school-orbit','school-attendance','school-reports','school-notifications','school-profile'],
+    student: ['school-dashboard','school-videos','school-orbit','school-reports','school-notifications','school-profile'],
+  },
 
   async _getProfile() {
     if (!this._currentProfile) this._currentProfile = await AuthService.getProfile();
@@ -647,6 +655,15 @@ window.AppRouter = {
     this._currentProfile = profile;
 
     const isSchoolRoute = this.currentRoute && this.currentRoute.startsWith('school-');
+    const scopedSchoolRoutes = this.ROLE_SCHOOL_ROUTES[profile.role];
+    if (isSchoolRoute && scopedSchoolRoutes && !scopedSchoolRoutes.includes(this.currentRoute)) {
+      this.navigate('school-dashboard', { schoolId: profile.school_id });
+      return;
+    }
+    if (isSchoolRoute && scopedSchoolRoutes && this.currentSchoolId !== profile.school_id) {
+      this.navigate('school-dashboard', { schoolId: profile.school_id });
+      return;
+    }
 
     // Role-based redirect: non-admin users must always be in their school context
     if (!isSchoolRoute && this.currentRoute !== 'company-dashboard') {
@@ -755,6 +772,13 @@ window.AppRouter = {
         break;
       case 'invitations':
         try { await this.renderInvitations(main); } catch (err) { this._renderError(main, err); }
+        break;
+      case 'company-notifications':
+        try {
+          await import('./school-portal.js');
+          const data = await AppStorage.load();
+          await window.SchoolNotifications.render(main, data, null);
+        } catch (err) { this._renderError(main, err); }
         break;
       default:
         try { await this.renderCompanyDashboard(main); } catch (err) { this._renderError(main, err); }
@@ -1397,34 +1421,32 @@ window.AppRouter = {
       { role: 'super_admin', title: 'Super Admin', icon: 'admin_panel_settings', description: 'Full system access - all permissions enabled by default', disabled: true,
         perms: [
           { label: 'Manage Schools', key: 'manage_schools' },
-          { label: 'Manage Categories', key: 'manage_categories' },
-          { label: 'Manage Subjects', key: 'manage_subjects' },
-          { label: 'Manage Sections', key: 'manage_sections' },
-          { label: 'Manage Content', key: 'manage_content' },
+          { label: 'Manage Videos', key: 'manage_content' },
           { label: 'Manage Users', key: 'manage_users' },
           { label: 'Manage Roles', key: 'manage_roles' },
           { label: 'View Analytics', key: 'view_analytics' },
           { label: 'Access Settings', key: 'access_settings' },
           { label: 'Manage Drive', key: 'manage_drive' },
           { label: 'Manage Media Library', key: 'manage_media' },
+          { label: 'Send Notifications', key: 'send_notifications' },
           { label: 'View Audit Log', key: 'view_audit_log' }
         ]},
       { role: 'company_admin', title: 'Company Admin', icon: 'business', description: 'Manages their own company and schools', disabled: false,
         perms: [
           { label: 'Manage Schools', key: 'manage_schools', checked: true },
-          { label: 'Manage Classes', key: 'manage_categories', checked: true },
           { label: 'Manage Videos', key: 'manage_content', checked: true },
           { label: 'Manage Users', key: 'manage_users', checked: true },
           { label: 'View Analytics', key: 'view_analytics', checked: true },
           { label: 'Access Settings', key: 'access_settings', checked: true },
+          { label: 'Send Notifications', key: 'send_notifications', checked: true },
           { label: 'Manage Own Profile', key: 'manage_own_profile', checked: true }
         ]},
       { role: 'school_admin', title: 'School Admin', icon: 'manage_accounts', description: 'Restricted to own school', disabled: false,
         perms: [
           { label: 'Manage School Settings', key: 'manage_school_settings', checked: true },
-          { label: 'Manage Classes', key: 'manage_categories', checked: true },
           { label: 'Manage Videos', key: 'manage_content', checked: true },
           { label: 'View Analytics', key: 'view_analytics', checked: false },
+          { label: 'Send Notifications', key: 'send_notifications', checked: true },
           { label: 'Manage Own Profile', key: 'manage_own_profile', checked: true },
           { label: 'Upload Drive Files', key: 'manage_drive_upload', checked: false }
         ]},
@@ -1435,6 +1457,7 @@ window.AppRouter = {
           { label: 'Grade Assignments', key: 'grade_assignments', checked: true },
           { label: 'Grade Quizzes', key: 'grade_quizzes', checked: true },
           { label: 'View Reports', key: 'view_analytics', checked: true },
+          { label: 'Send Notifications', key: 'send_notifications', checked: true },
           { label: 'View Own Profile', key: 'manage_own_profile', checked: true }
         ]},
       { role: 'counselor', title: 'Counselor', icon: 'badge', description: 'Manage assigned students and counseling records', disabled: false,
@@ -1680,9 +1703,8 @@ window.AppRouter = {
       const data = await AppStorage.load();
       const counts = {
         schools: data.schools.length,
-        categories: data.categories.length,
-        subjects: data.subjects.length,
-        sections: data.sections.length,
+        students: (data.students || []).length,
+        counselors: (data.users || []).filter(user => user.role === 'counselor').length,
         content: data.content.length
       };
       const recentContent = data.content.slice(0, 8);
@@ -1700,12 +1722,12 @@ window.AppRouter = {
             <div class="metric-info"><h2>${counts.schools}</h2><p>Schools</p></div>
           </div>
           <div class="metric-card" data-action="navigate" data-route="schools" style="cursor:pointer;">
-            <div class="metric-icon metric-icon-green"><span class="material-symbols-outlined">category</span></div>
-            <div class="metric-info"><h2>${counts.categories}</h2><p>Categories</p></div>
+            <div class="metric-icon metric-icon-green"><span class="material-symbols-outlined">groups</span></div>
+            <div class="metric-info"><h2>${counts.students}</h2><p>Students</p></div>
           </div>
           <div class="metric-card" data-action="navigate" data-route="schools" style="cursor:pointer;">
-            <div class="metric-icon metric-icon-purple"><span class="material-symbols-outlined">auto_stories</span></div>
-            <div class="metric-info"><h2>${counts.subjects}</h2><p>Subjects</p></div>
+            <div class="metric-icon metric-icon-purple"><span class="material-symbols-outlined">badge</span></div>
+            <div class="metric-info"><h2>${counts.counselors}</h2><p>Counselors</p></div>
           </div>
           <div class="metric-card" data-action="navigate" data-route="media-library" style="cursor:pointer;">
             <div class="metric-icon metric-icon-orange"><span class="material-symbols-outlined">videocam</span></div>
@@ -1787,7 +1809,11 @@ window.AppRouter = {
         </div>
         ${schools.length === 0 ? `<div class="card"><div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">business</span><h3>No schools yet</h3><p>Create your first school to get started.</p></div></div>`
         : `<div class="schools-grid">${pageSchools.map(s => {
-          const stats = { categories: data.categories.filter(c => c.school_id === s.id).length, subjects: data.subjects.filter(sub => sub.school_id === s.id).length, sections: data.sections.filter(sec => sec.school_id === s.id).length };
+          const stats = {
+            students: (data.students || []).filter(student => student.school_id === s.id).length,
+            counselors: (data.users || []).filter(user => user.schoolId === s.id && user.role === 'counselor').length,
+            videos: (data.content || []).filter(item => item.school_id === s.id && item.type === 'Video').length
+          };
           const logoClass = s.status === 'suspended' ? 'school-logo-suspended' : 'school-logo-default';
           const adminCount = adminCountBySchool[s.id] || 0;
           return `<div class="school-card" style="cursor:pointer;" data-action="open-school" data-id="${s.id}">
@@ -1801,9 +1827,9 @@ window.AppRouter = {
               <span class="status-badge ${s.status === 'active' ? 'status-active' : 'status-suspended'}">${AppUtils.escapeHtml(s.status)}</span>
             </div>
             <div class="school-stats">
-              <div class="school-stat"><div class="school-stat-value">${stats.categories}</div><div class="school-stat-label">Categories</div></div>
-              <div class="school-stat"><div class="school-stat-value">${stats.subjects}</div><div class="school-stat-label">Subjects</div></div>
-              <div class="school-stat"><div class="school-stat-value">${stats.sections}</div><div class="school-stat-label">Sections</div></div>
+              <div class="school-stat"><div class="school-stat-value">${stats.students}</div><div class="school-stat-label">Students</div></div>
+              <div class="school-stat"><div class="school-stat-value">${stats.counselors}</div><div class="school-stat-label">Counselors</div></div>
+              <div class="school-stat"><div class="school-stat-value">${stats.videos}</div><div class="school-stat-label">Videos</div></div>
               <div class="school-stat"><div class="school-stat-value">${adminCount}</div><div class="school-stat-label">Admins</div></div>
             </div>
           </div>`;
@@ -4278,7 +4304,7 @@ document.addEventListener('click', async function (e) {
   if (action === 'sp-send-notification') {
     const data = await AppStorage.load();
     const school = data.schools.find(s => s.id === AppRouter.currentSchoolId);
-    if (school) window.SchoolNotifications.openSend(school.id);
+    window.SchoolNotifications.openSend(school?.id || null);
     return;
   }
   if (action === 'sp-send-notification-now') { window.SchoolNotifications.send(); return; }
@@ -5098,6 +5124,8 @@ window.AppAiOrbit = {
   },
 
   _bindEvents(schoolId, school) {
+    const pageRoot = document.getElementById('main-content')?.firstElementChild;
+
     // Tab switching
     document.querySelectorAll('[data-orbit-tab]').forEach(tab => {
       tab.addEventListener('click', () => {
@@ -5109,7 +5137,7 @@ window.AppAiOrbit = {
     });
 
     // Reply to escalation
-    document.addEventListener('click', async (e) => {
+    pageRoot?.addEventListener('click', async (e) => {
       const btn = e.target.closest('[data-action="reply-escalation"]');
       if (!btn) return;
       const reply = prompt('Type your reply to the student:');
@@ -5382,11 +5410,12 @@ window.AppInvitations = {
   },
 
   _bindEvents(data, profile, companies, pendingRequests) {
+    const pageRoot = document.getElementById('main-content')?.firstElementChild;
     document.getElementById('btn-new-invitation')?.addEventListener('click', () => {
       this._showInviteModal(data.schools, companies, profile);
     });
 
-    document.addEventListener('click', async (e) => {
+    pageRoot?.addEventListener('click', async (e) => {
       const approveBtn = e.target.closest('[data-action="approve-access-request"]');
       if (approveBtn) {
         const request = pendingRequests.find(item => item.id === approveBtn.dataset.id);
@@ -6062,6 +6091,52 @@ window.AppVideoPlayer = {
 // ==============================================================
 let selectedOnboardingRole = null;
 
+window.AppNotificationCenter = {
+  channel: null,
+  userId: null,
+
+  async refresh() {
+    const badge = document.getElementById('notification-count-badge');
+    if (!badge || !this.userId) return;
+    try {
+      const count = await NotificationService.getUnreadCount(this.userId);
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.hidden = count === 0;
+      document.getElementById('btn-notifications')?.setAttribute(
+        'aria-label',
+        count ? `Notifications, ${count} unread` : 'Notifications'
+      );
+    } catch (error) {
+      console.warn('Unable to refresh notification count:', error.message);
+      badge.hidden = true;
+    }
+  },
+
+  async start(profile) {
+    this.stop();
+    if (!profile?.id) return;
+    this.userId = profile.id;
+    await this.refresh();
+    this.channel = NotificationService.subscribe(profile.id, async () => {
+      AppStorage.invalidate();
+      await this.refresh();
+      if (['school-notifications', 'company-notifications'].includes(AppRouter.currentRoute)) {
+        AppRouter.render();
+      } else {
+        AppToast.show('You have a new notification.', 'info');
+      }
+    });
+  },
+
+  stop() {
+    NotificationService.unsubscribe(this.channel);
+    this.channel = null;
+    this.userId = null;
+    const badge = document.getElementById('notification-count-badge');
+    if (badge) badge.hidden = true;
+  }
+};
+
 function setAuthScreen(screen) {
   const login = document.getElementById('app-login');
   const onboarding = document.getElementById('app-onboarding');
@@ -6069,6 +6144,7 @@ function setAuthScreen(screen) {
   login.style.display = screen === 'login' ? '' : 'none';
   onboarding.style.display = screen === 'onboarding' ? 'flex' : 'none';
   layout.classList.toggle('hidden', screen !== 'app');
+  if (screen !== 'app') window.AppNotificationCenter.stop();
 }
 
 function configureOnboardingForm(profile) {
@@ -6140,6 +6216,7 @@ async function handleAuthenticatedSession() {
   setAuthScreen('app');
   AppRouter._clearProfile();
   await AppRouter.init();
+  await window.AppNotificationCenter.start(profile);
   initIcons();
   recordAttendance();
 }
@@ -6345,7 +6422,16 @@ async function initApp() {
 
   // Top nav
   document.getElementById('btn-topnav-search').addEventListener('click', () => { AppGlobalSearch.open(); });
-  document.getElementById('btn-notifications').addEventListener('click', () => { AppRouter.navigate('school-notifications'); });
+  document.getElementById('btn-notifications').addEventListener('click', async () => {
+    const profile = await AuthService.getProfile();
+    if (['super_admin', 'company_admin'].includes(profile?.role) && !AppRouter.currentSchoolId) {
+      AppRouter.navigate('company-notifications');
+      return;
+    }
+    AppRouter.navigate('school-notifications', {
+      schoolId: AppRouter.currentSchoolId || profile?.school_id
+    });
+  });
   document.getElementById('btn-theme-toggle').addEventListener('click', () => {
     document.documentElement.classList.toggle('dark');
     const isDark = document.documentElement.classList.contains('dark');
