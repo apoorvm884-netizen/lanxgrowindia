@@ -137,6 +137,29 @@ export const AiService = {
     return Array.isArray(data) ? data[0] : data;
   },
 
+  async transcribeVoice(audioBlob) {
+    if (!(audioBlob instanceof Blob) || !audioBlob.size) {
+      throw new Error('No voice recording was captured.');
+    }
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) throw new Error('Please sign in again to use voice input.');
+
+    const form = new FormData();
+    form.append('mode', 'voice');
+    form.append('audio', audioBlob, 'orbit-recording.webm');
+    const response = await fetch(`${supabase.supabaseUrl}/functions/v1/transcribe`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.error || 'Orbit could not transcribe the recording.');
+    }
+    return result;
+  },
+
   async setStudentAccess(studentId, enabled, dailyLimit) {
     const { data, error } = await supabase.rpc('set_student_orbit_access', {
       p_student_id: studentId,
