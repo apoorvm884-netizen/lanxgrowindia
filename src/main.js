@@ -59,6 +59,7 @@ window.supabase = supabase;
 
 window.AppBranding = {
   settings: {},
+  _orbitAvatarSequence: 0,
 
   async load(profile = null) {
     try {
@@ -112,24 +113,98 @@ window.AppBranding = {
 
   orbitAvatar(size = 76, state = 'idle') {
     const customLogo = String(this.settings.orbitLogo || '').trim();
-    const safeState = ['idle', 'listening', 'thinking', 'happy', 'confused'].includes(state) ? state : 'idle';
-    if (customLogo) {
-      return `<div class="orbit-companion custom" data-orbit-state="${safeState}" style="width:${size}px;height:${size}px;" aria-label="Orbit AI is ${safeState}">
-        <img src="${AppUtils.escapeHtml(customLogo)}" alt="Orbit AI">
-      </div>`;
-    }
+    const safeState = ['idle', 'listening', 'thinking', 'speaking', 'happy', 'excited', 'confused'].includes(state) ? state : 'idle';
+    const avatarId = `orbit-${++this._orbitAvatarSequence}`;
+    const safeLogo = AppUtils.escapeHtml(customLogo);
+    const chestBadge = customLogo
+      ? `<image href="${safeLogo}" x="69" y="115" width="22" height="22" preserveAspectRatio="xMidYMid slice" clip-path="url(#${avatarId}-badge-clip)"/>`
+      : `<g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round">
+          <ellipse cx="80" cy="126" rx="8" ry="3.5" transform="rotate(-25 80 126)"/>
+          <circle cx="84" cy="123" r="2" fill="#fff" stroke="none"/>
+        </g>`;
     return `<div class="orbit-companion" data-orbit-state="${safeState}" style="width:${size}px;height:${size}px;" aria-label="Animated Orbit AI is ${safeState}">
-      <svg class="orbit-companion-shell" viewBox="0 0 80 80" role="img" aria-hidden="true">
-        <defs><linearGradient id="orbit-body" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6f7cff"/><stop offset="1" stop-color="#142cae"/></linearGradient></defs>
-        <ellipse cx="39" cy="70" rx="22" ry="5" fill="rgba(20,44,174,.12)"/>
-        <rect x="17" y="26" width="45" height="38" rx="16" fill="url(#orbit-body)"/>
-        <rect x="20" y="12" width="39" height="32" rx="14" fill="#fff" stroke="#142cae" stroke-width="3"/>
-        <path d="M39 12V7" stroke="#142cae" stroke-width="3" stroke-linecap="round"/><circle cx="39" cy="5" r="3" fill="#ffbd4a"/>
-        <g class="orbit-eye"><ellipse cx="32" cy="27" rx="4" ry="5" fill="#142cae"/><ellipse cx="47" cy="27" rx="4" ry="5" fill="#142cae"/></g>
-        <path d="M32 36c4 4 11 4 15 0" fill="none" stroke="#ff7b72" stroke-width="2.5" stroke-linecap="round"/>
-        <path d="M17 44c-7 1-8 10-3 15" fill="none" stroke="#142cae" stroke-width="6" stroke-linecap="round"/>
-        <g class="orbit-arm"><path d="M62 43c8-7 12-2 10 4" fill="none" stroke="#142cae" stroke-width="6" stroke-linecap="round"/><circle cx="72" cy="45" r="4" fill="#ffbd4a"/></g>
-        <circle cx="39" cy="53" r="5" fill="#ffbd4a"/><path d="M29 64v7M50 64v7" stroke="#142cae" stroke-width="6" stroke-linecap="round"/>
+      <svg class="orbit-companion-shell" viewBox="0 0 160 170" role="img" aria-hidden="true">
+        <defs>
+          <linearGradient id="${avatarId}-body" x1="30" y1="90" x2="125" y2="155" gradientUnits="userSpaceOnUse"><stop stop-color="#36c8f3"/><stop offset=".42" stop-color="#176ce5"/><stop offset="1" stop-color="#092b8f"/></linearGradient>
+          <linearGradient id="${avatarId}-white" x1="35" y1="20" x2="126" y2="99" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset=".72" stop-color="#eef8ff"/><stop offset="1" stop-color="#c9e8fb"/></linearGradient>
+          <radialGradient id="${avatarId}-face" cx=".5" cy=".25" r=".8"><stop stop-color="#184bd8"/><stop offset=".48" stop-color="#061c70"/><stop offset="1" stop-color="#020c32"/></radialGradient>
+          <radialGradient id="${avatarId}-eye" cx=".38" cy=".28" r=".75"><stop stop-color="#fff"/><stop offset=".48" stop-color="#a8f1ff"/><stop offset=".72" stop-color="#2baef2"/><stop offset="1" stop-color="#0b49bd"/></radialGradient>
+          <filter id="${avatarId}-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3.3"/></filter>
+          <clipPath id="${avatarId}-badge-clip"><circle cx="80" cy="126" r="10"/></clipPath>
+        </defs>
+
+        <ellipse cx="80" cy="157" rx="42" ry="7" fill="#1246bd" opacity=".13"/>
+        <g class="orbit-halo" fill="none" stroke="#27c9f6" stroke-width="2.2" opacity=".56">
+          <ellipse cx="80" cy="132" rx="59" ry="15" stroke-dasharray="6 8"/>
+          <circle cx="24" cy="136" r="3.5" fill="#fff"/>
+        </g>
+
+        <g class="orbit-left-arm">
+          <path d="M39 109C20 109 16 125 23 136" fill="none" stroke="url(#${avatarId}-body)" stroke-width="13" stroke-linecap="round"/>
+          <circle cx="23" cy="138" r="8" fill="url(#${avatarId}-white)" stroke="#1b83e8" stroke-width="3"/>
+        </g>
+        <g class="orbit-right-arm">
+          <path d="M121 109c18-12 27-1 24 10" fill="none" stroke="url(#${avatarId}-body)" stroke-width="13" stroke-linecap="round"/>
+          <circle cx="144" cy="119" r="8" fill="url(#${avatarId}-white)" stroke="#1b83e8" stroke-width="3"/>
+          <path d="M141 116l4-6M146 117l6-3M139 119l-5-3" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+        </g>
+
+        <path d="M45 96c-7 11-8 39 1 49 12 13 56 13 68 0 9-10 8-38 1-49z" fill="url(#${avatarId}-body)" stroke="#0f55ca" stroke-width="2"/>
+        <path d="M53 105c12 6 42 6 54 0" fill="none" stroke="#8deaff" stroke-width="2.2" opacity=".6"/>
+        <circle cx="80" cy="126" r="14" fill="#06359f" stroke="#61ddff" stroke-width="2"/>
+        ${chestBadge}
+        <path d="M59 145l-3 10M101 145l3 10" stroke="#0e4dbd" stroke-width="10" stroke-linecap="round"/>
+        <ellipse cx="55" cy="156" rx="13" ry="5.5" fill="url(#${avatarId}-white)" stroke="#1c7be0" stroke-width="2"/>
+        <ellipse cx="105" cy="156" rx="13" ry="5.5" fill="url(#${avatarId}-white)" stroke="#1c7be0" stroke-width="2"/>
+
+        <g class="orbit-head">
+          <path d="M80 27V17" stroke="#1677df" stroke-width="5" stroke-linecap="round"/>
+          <circle class="orbit-antenna-light" cx="80" cy="13" r="6" fill="#ffd257"/>
+          <circle cx="80" cy="13" r="10" fill="#37cbff" opacity=".3" filter="url(#${avatarId}-glow)"/>
+          <path d="M33 43c5-21 24-30 47-30s42 9 47 30l5 28c3 20-13 35-52 35S25 91 28 71z" fill="url(#${avatarId}-white)" stroke="#1684e7" stroke-width="3"/>
+          <path d="M37 49c4-15 18-22 43-22s39 7 43 22l2 20c2 17-13 27-45 27S33 86 35 69z" fill="url(#${avatarId}-face)"/>
+          <path d="M42 46c13-15 58-17 75 0" fill="none" stroke="#7ae8ff" stroke-width="2.6" opacity=".55"/>
+
+          <g class="orbit-listen-wave" fill="none" stroke="#35d7ff" stroke-width="3" stroke-linecap="round">
+            <path d="M25 54c-7 7-7 18 0 25"/><path d="M17 48c-12 12-12 31 0 43"/>
+            <path d="M135 54c7 7 7 18 0 25"/><path d="M143 48c12 12 12 31 0 43"/>
+          </g>
+          <g class="orbit-thought" fill="#35d7ff">
+            <circle cx="128" cy="31" r="3"/><circle cx="138" cy="22" r="5"/><circle cx="150" cy="10" r="8" opacity=".72"/>
+          </g>
+
+          <g class="orbit-eye">
+            <ellipse cx="59" cy="62" rx="15" ry="20" fill="url(#${avatarId}-eye)" stroke="#56dcff" stroke-width="2"/>
+            <ellipse cx="101" cy="62" rx="15" ry="20" fill="url(#${avatarId}-eye)" stroke="#56dcff" stroke-width="2"/>
+            <g class="orbit-pupil" fill="#031c73">
+              <ellipse cx="61" cy="65" rx="7.5" ry="10.5"/><ellipse cx="103" cy="65" rx="7.5" ry="10.5"/>
+              <circle cx="57" cy="59" r="3" fill="#fff"/><circle cx="99" cy="59" r="3" fill="#fff"/>
+            </g>
+          </g>
+          <g class="orbit-happy-eye" fill="none" stroke="#70e7ff" stroke-width="6" stroke-linecap="round">
+            <path d="M47 65c7-11 18-11 25 0"/><path d="M88 65c7-11 18-11 25 0"/>
+          </g>
+          <g class="orbit-star-eye" fill="#fff" stroke="#6ceaff" stroke-width="1.5">
+            <path d="M59 47l4 10 10 4-10 4-4 10-4-10-10-4 10-4z"/>
+            <path d="M101 47l4 10 10 4-10 4-4 10-4-10-10-4 10-4z"/>
+          </g>
+          <g class="orbit-brow orbit-brow-thinking" fill="none" stroke="#78e9ff" stroke-width="3.2" stroke-linecap="round">
+            <path d="M48 41c6-3 12-3 18 0"/><path d="M92 39c6-4 12-5 18-2"/>
+          </g>
+          <g class="orbit-brow orbit-brow-confused" fill="none" stroke="#78e9ff" stroke-width="3.2" stroke-linecap="round">
+            <path d="M47 39l19 5"/><path d="M92 44l19-5"/>
+          </g>
+
+          <ellipse class="orbit-cheek" cx="45" cy="81" rx="7" ry="3" fill="#ff91bb" opacity=".55"/>
+          <ellipse class="orbit-cheek" cx="115" cy="81" rx="7" ry="3" fill="#ff91bb" opacity=".55"/>
+          <path class="orbit-mouth orbit-mouth-idle" d="M69 79c6 7 16 7 22 0" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+          <ellipse class="orbit-mouth orbit-mouth-listening" cx="80" cy="82" rx="4.5" ry="5.5" fill="#fff"/>
+          <path class="orbit-mouth orbit-mouth-thinking" d="M74 82h12" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+          <ellipse class="orbit-mouth orbit-mouth-speaking" cx="80" cy="82" rx="8" ry="6" fill="#fff"/>
+          <path class="orbit-mouth orbit-mouth-happy" d="M66 78c7 14 21 14 28 0z" fill="#fff"/>
+          <path class="orbit-mouth orbit-mouth-excited" d="M65 77c6 18 24 18 30 0z" fill="#fff"/>
+          <path class="orbit-mouth orbit-mouth-confused" d="M70 84c6-5 14 5 20 0" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+        </g>
       </svg>
     </div>`;
   }
@@ -223,7 +298,7 @@ window.AppVoiceInput = {
             setStatus(result.language && result.language !== 'auto'
               ? `Detected ${result.language}. Sending your question…`
               : 'Voice understood. Sending your question…');
-            endState = 'happy';
+            endState = 'excited';
             await onTranscript?.(transcript);
           } catch (error) {
             setStatus('');
@@ -5358,13 +5433,13 @@ window.AppAiOrbit = {
   async _renderStudentChat(main, school) {
     const quota = await AiService.getQuota().catch(() => null);
     main.innerHTML = `<div class="fade-in" style="max-width:900px;margin:0 auto;">
-      <div class="page-header"><div style="display:flex;align-items:center;gap:14px;">${window.AppBranding.orbitAvatar(68)}<div><h1 class="page-title">Orbit</h1><p class="page-subtitle">Your education-only learning assistant</p></div></div>
+      <div class="page-header"><div style="display:flex;align-items:center;gap:14px;">${window.AppBranding.orbitAvatar(76)}<div><h1 class="page-title">Orbit</h1><p class="page-subtitle">Your education-only learning companion</p></div></div>
         <span id="orbit-general-quota" class="status-badge ${quota?.allowed ? 'status-active' : 'status-suspended'}">${quota?.unlimited ? 'Unlimited' : `${Math.max(0, quota?.remaining ?? 0)} questions left today`}</span>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
         <div id="orbit-general-messages" style="height:min(58vh,560px);overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;">
           <div style="margin:auto;text-align:center;max-width:460px;color:var(--text-secondary);">
-            <div style="display:flex;justify-content:center;margin-bottom:8px;">${window.AppBranding.orbitAvatar(88)}</div>
+            <div style="display:flex;justify-content:center;margin-bottom:12px;">${window.AppBranding.orbitAvatar(150)}</div>
             <h2 style="font-size:18px;color:var(--on-surface);">How can Orbit help you learn?</h2>
             <p style="font-size:13px;">Ask an education-related question. Video questions should be asked from that video's Orbit panel.</p>
           </div>
@@ -5412,14 +5487,15 @@ window.AppAiOrbit = {
         const quotaLabel = document.getElementById('orbit-general-quota');
         if (quotaLabel && result.quota) quotaLabel.textContent = result.quota.unlimited ? 'Unlimited' : `${Math.max(0, result.quota.remaining)} questions left today`;
         send.disabled = !result.quota?.allowed;
-        window.AppVoiceInput.setOrbitState(main, 'happy');
+        window.AppVoiceInput.setOrbitState(main, 'speaking');
+        setTimeout(() => window.AppVoiceInput.setOrbitState(main, 'happy'), 900);
       } catch (error) {
         messages.insertAdjacentHTML('beforeend', `<div style="align-self:flex-start;color:var(--danger);font-size:13px;">${AppUtils.escapeHtml(error.message)}</div>`);
         send.disabled = false;
         window.AppVoiceInput.setOrbitState(main, 'confused');
       }
       messages.scrollTop = messages.scrollHeight;
-      setTimeout(() => window.AppVoiceInput.setOrbitState(main, 'idle'), 1400);
+      setTimeout(() => window.AppVoiceInput.setOrbitState(main, 'idle'), 2800);
     };
     send?.addEventListener('click', submit);
     input?.addEventListener('keydown', event => {
@@ -6434,7 +6510,8 @@ window.AppVideoPlayer = {
               ${data.escalated ? '<div style="margin-top:6px;font-size:11px;color:#f59e0b;display:flex;align-items:center;gap:4px;"><span class="material-symbols-outlined" style="font-size:14px;">info</span> Your question has been forwarded to a teacher.</div>' : ''}
             </div>
           `);
-          window.AppVoiceInput.setOrbitState(askPanel, 'happy');
+          window.AppVoiceInput.setOrbitState(askPanel, 'speaking');
+          setTimeout(() => window.AppVoiceInput.setOrbitState(askPanel, 'happy'), 900);
         }
       } catch (err) {
         document.getElementById(typingId)?.remove();
@@ -6448,7 +6525,7 @@ window.AppVideoPlayer = {
 
       askMessages.scrollTop = askMessages.scrollHeight;
       initIcons();
-      setTimeout(() => window.AppVoiceInput.setOrbitState(askPanel, 'idle'), 1400);
+      setTimeout(() => window.AppVoiceInput.setOrbitState(askPanel, 'idle'), 2800);
     };
 
     askSend?.addEventListener('click', sendMessage);
