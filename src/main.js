@@ -110,14 +110,15 @@ window.AppBranding = {
     if (brandName) brandName.textContent = String(settings.companyName || 'LANXGROW');
   },
 
-  orbitAvatar(size = 76) {
+  orbitAvatar(size = 76, state = 'idle') {
     const customLogo = String(this.settings.orbitLogo || '').trim();
+    const safeState = ['idle', 'listening', 'thinking', 'happy', 'confused'].includes(state) ? state : 'idle';
     if (customLogo) {
-      return `<div class="orbit-companion custom" style="width:${size}px;height:${size}px;" aria-label="Orbit AI">
+      return `<div class="orbit-companion custom" data-orbit-state="${safeState}" style="width:${size}px;height:${size}px;" aria-label="Orbit AI is ${safeState}">
         <img src="${AppUtils.escapeHtml(customLogo)}" alt="Orbit AI">
       </div>`;
     }
-    return `<div class="orbit-companion" style="width:${size}px;height:${size}px;" aria-label="Animated Orbit AI">
+    return `<div class="orbit-companion" data-orbit-state="${safeState}" style="width:${size}px;height:${size}px;" aria-label="Animated Orbit AI is ${safeState}">
       <svg class="orbit-companion-shell" viewBox="0 0 80 80" role="img" aria-hidden="true">
         <defs><linearGradient id="orbit-body" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6f7cff"/><stop offset="1" stop-color="#142cae"/></linearGradient></defs>
         <ellipse cx="39" cy="70" rx="22" ry="5" fill="rgba(20,44,174,.12)"/>
@@ -131,6 +132,136 @@ window.AppBranding = {
         <circle cx="39" cy="53" r="5" fill="#ffbd4a"/><path d="M29 64v7M50 64v7" stroke="#142cae" stroke-width="6" stroke-linecap="round"/>
       </svg>
     </div>`;
+  }
+};
+
+window.AppVoiceInput = {
+  _activeStop: null,
+
+  setOrbitState(root, state) {
+    root?.querySelectorAll?.('.orbit-companion').forEach(avatar => {
+      avatar.dataset.orbitState = state;
+      avatar.setAttribute('aria-label', `Orbit AI is ${state}`);
+    });
+  },
+
+  bind({ button, input, status, root, onTranscript, maxSeconds = 60 }) {
+    if (!button || !input) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      button.disabled = true;
+      button.title = 'Voice input is not supported in this browser';
+      return;
+    }
+
+    let recorder = null;
+    let stream = null;
+    let chunks = [];
+    let timer = null;
+    let seconds = 0;
+
+    const setStatus = (text = '') => {
+      if (status) {
+        status.textContent = text;
+        status.hidden = !text;
+      }
+    };
+    const reset = (state = 'idle') => {
+      if (timer) clearInterval(timer);
+      timer = null;
+      stream?.getTracks().forEach(track => track.stop());
+      stream = null;
+      recorder = null;
+      button.classList.remove('is-recording');
+      button.setAttribute('aria-pressed', 'false');
+      button.querySelector('.material-symbols-outlined').textContent = 'mic';
+      this.setOrbitState(root, state);
+      if (this._activeStop === stop) this._activeStop = null;
+    };
+    const stop = () => {
+      if (recorder?.state === 'recording') recorder.stop();
+    };
+
+    button.addEventListener('click', async () => {
+      if (recorder?.state === 'recording') {
+        stop();
+        return;
+      }
+      try {
+        this._activeStop?.();
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        const mimeType = [
+          'audio/webm;codecs=opus',
+          'audio/ogg;codecs=opus',
+          'audio/mp4'
+        ].find(type => MediaRecorder.isTypeSupported(type));
+        recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        chunks = [];
+        seconds = 0;
+        recorder.addEventListener('dataavailable', event => {
+          if (event.data.size) chunks.push(event.data);
+        });
+        recorder.addEventListener('stop', async () => {
+          const blob = new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' });
+          let endState = 'idle';
+          button.disabled = true;
+          setStatus('Orbit is understanding your voice…');
+          this.setOrbitState(root, 'thinking');
+          stream?.getTracks().forEach(track => track.stop());
+          stream = null;
+          try {
+            const result = await AiService.transcribeVoice(blob);
+            const transcript = String(result.transcript || '').trim();
+            if (!transcript) throw new Error('No speech was detected. Please try again.');
+            input.value = transcript;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            setStatus(result.language && result.language !== 'auto'
+              ? `Detected ${result.language}. Sending your question…`
+              : 'Voice understood. Sending your question…');
+            endState = 'happy';
+            await onTranscript?.(transcript);
+          } catch (error) {
+            setStatus('');
+            endState = 'confused';
+            AppToast.show(error.message || 'Voice input failed. Please try again.', 'error');
+          } finally {
+            button.disabled = false;
+            setTimeout(() => {
+              setStatus('');
+              this.setOrbitState(root, 'idle');
+            }, 1800);
+            reset(endState);
+          }
+        });
+        recorder.start(250);
+        this._activeStop = stop;
+        button.classList.add('is-recording');
+        button.setAttribute('aria-pressed', 'true');
+        button.querySelector('.material-symbols-outlined').textContent = 'stop_circle';
+        setStatus(`Listening… ${maxSeconds}s remaining. Tap again to send.`);
+        this.setOrbitState(root, 'listening');
+        timer = setInterval(() => {
+          seconds += 1;
+          const remaining = Math.max(0, maxSeconds - seconds);
+          setStatus(`Listening… ${remaining}s remaining. Tap again to send.`);
+          if (remaining === 0) stop();
+        }, 1000);
+      } catch (error) {
+        reset('confused');
+        const denied = error?.name === 'NotAllowedError';
+        AppToast.show(
+          denied
+            ? 'Microphone permission was denied. Allow microphone access in your browser settings.'
+            : 'The microphone could not be started.',
+          'error'
+        );
+      }
+    });
   }
 };
 
@@ -5238,9 +5369,13 @@ window.AppAiOrbit = {
             <p style="font-size:13px;">Ask an education-related question. Video questions should be asked from that video's Orbit panel.</p>
           </div>
         </div>
-        <div style="padding:14px;border-top:1px solid var(--border);display:flex;gap:8px;">
-          <textarea id="orbit-general-input" class="form-input" rows="2" maxlength="2000" placeholder="Ask an education question..." ${quota?.allowed ? '' : 'disabled'} style="resize:none;"></textarea>
-          <button class="btn btn-primary" id="orbit-general-send" ${quota?.allowed ? '' : 'disabled'}><span class="material-symbols-outlined">send</span></button>
+        <div style="padding:14px;border-top:1px solid var(--border);">
+          <div style="display:flex;gap:8px;align-items:flex-end;">
+            <textarea id="orbit-general-input" class="form-input" rows="2" maxlength="2000" placeholder="Type or speak your education question..." ${quota?.allowed ? '' : 'disabled'} style="resize:none;"></textarea>
+            <button class="orbit-voice-button" id="orbit-general-mic" type="button" aria-label="Ask Orbit by voice" aria-pressed="false" title="Speak in English or an Indian language" ${quota?.allowed ? '' : 'disabled'}><span class="material-symbols-outlined">mic</span></button>
+            <button class="btn btn-primary" id="orbit-general-send" ${quota?.allowed ? '' : 'disabled'}><span class="material-symbols-outlined">send</span></button>
+          </div>
+          <div class="orbit-voice-status" id="orbit-general-voice-status" role="status" aria-live="polite" hidden></div>
         </div>
       </div>
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:10px;">Orbit can make mistakes. Verify important information with your counselor or teacher.</p>
@@ -5257,6 +5392,7 @@ window.AppAiOrbit = {
       messages.insertAdjacentHTML('beforeend', `<div style="align-self:flex-end;max-width:80%;background:var(--primary);color:white;padding:10px 13px;border-radius:14px 14px 3px 14px;">${AppUtils.escapeHtml(question)}</div>`);
       input.value = '';
       send.disabled = true;
+      window.AppVoiceInput.setOrbitState(main, 'thinking');
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const response = await fetch(`${supabase.supabaseUrl}/functions/v1/orbit-chat`, {
@@ -5276,11 +5412,14 @@ window.AppAiOrbit = {
         const quotaLabel = document.getElementById('orbit-general-quota');
         if (quotaLabel && result.quota) quotaLabel.textContent = result.quota.unlimited ? 'Unlimited' : `${Math.max(0, result.quota.remaining)} questions left today`;
         send.disabled = !result.quota?.allowed;
+        window.AppVoiceInput.setOrbitState(main, 'happy');
       } catch (error) {
         messages.insertAdjacentHTML('beforeend', `<div style="align-self:flex-start;color:var(--danger);font-size:13px;">${AppUtils.escapeHtml(error.message)}</div>`);
         send.disabled = false;
+        window.AppVoiceInput.setOrbitState(main, 'confused');
       }
       messages.scrollTop = messages.scrollHeight;
+      setTimeout(() => window.AppVoiceInput.setOrbitState(main, 'idle'), 1400);
     };
     send?.addEventListener('click', submit);
     input?.addEventListener('keydown', event => {
@@ -5288,6 +5427,13 @@ window.AppAiOrbit = {
         event.preventDefault();
         submit();
       }
+    });
+    window.AppVoiceInput.bind({
+      button: document.getElementById('orbit-general-mic'),
+      input,
+      status: document.getElementById('orbit-general-voice-status'),
+      root: main,
+      onTranscript: submit
     });
   },
 
@@ -6059,7 +6205,7 @@ window.AppVideoPlayer = {
         <div id="vp-ask-panel" style="width:340px;background:var(--surface, #fff);display:flex;flex-direction:column;border-left:1px solid var(--border, #e5e7eb);transition:width 0.3s,opacity 0.3s;">
           <!-- Panel header -->
           <div style="padding:14px 16px;border-bottom:1px solid var(--border, #e5e7eb);display:flex;align-items:center;gap:10px;">
-            <span class="material-symbols-outlined" style="font-size:22px;color:var(--primary, #1A56DB);">smart_toy</span>
+            ${window.AppBranding.orbitAvatar(44)}
             <div style="flex:1;">
               <div style="font-size:14px;font-weight:600;color:var(--text-primary, #111);">Orbit</div>
               <div id="vp-orbit-quota" style="font-size:11px;color:var(--text-secondary, #6b7280);">${quota?.unlimited ? 'Unlimited' : `${Math.max(0, quota?.remaining ?? 0)} of ${quota?.daily_limit ?? 10} questions left today`}</div>
@@ -6083,11 +6229,15 @@ window.AppVideoPlayer = {
           </div>
 
           <!-- Chat input -->
-          <div style="padding:12px 16px;border-top:1px solid var(--border, #e5e7eb);display:flex;gap:8px;align-items:flex-end;">
-            <textarea id="vp-ask-input" placeholder="Type your question..." rows="1" style="flex:1;border:1px solid var(--border, #e5e7eb);border-radius:8px;padding:8px 12px;font-size:13px;resize:none;font-family:inherit;min-height:38px;max-height:100px;outline:none;background:var(--card-bg, #fff);color:var(--text-primary, #111);"></textarea>
-            <button id="vp-ask-send" style="background:var(--primary, #1A56DB);border:none;color:white;width:38px;height:38px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity 0.15s;" title="Send">
-              <span class="material-symbols-outlined" style="font-size:20px;">send</span>
-            </button>
+          <div style="padding:12px 16px;border-top:1px solid var(--border, #e5e7eb);">
+            <div style="display:flex;gap:8px;align-items:flex-end;">
+              <textarea id="vp-ask-input" placeholder="Type or speak your question..." rows="1" style="flex:1;border:1px solid var(--border, #e5e7eb);border-radius:8px;padding:8px 12px;font-size:13px;resize:none;font-family:inherit;min-height:38px;max-height:100px;outline:none;background:var(--card-bg, #fff);color:var(--text-primary, #111);"></textarea>
+              <button class="orbit-voice-button" id="vp-ask-mic" type="button" aria-label="Ask about this video by voice" aria-pressed="false" title="Speak in English or an Indian language" style="width:38px;min-width:38px;height:38px;"><span class="material-symbols-outlined" style="font-size:20px;">mic</span></button>
+              <button id="vp-ask-send" style="background:var(--primary, #1A56DB);border:none;color:white;width:38px;height:38px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity 0.15s;" title="Send">
+                <span class="material-symbols-outlined" style="font-size:20px;">send</span>
+              </button>
+            </div>
+            <div class="orbit-voice-status" id="vp-voice-status" role="status" aria-live="polite" hidden></div>
           </div>
         </div>
       </div>
@@ -6222,6 +6372,7 @@ window.AppVideoPlayer = {
 
       askInput.value = '';
       askInput.style.height = '38px';
+      window.AppVoiceInput.setOrbitState(askPanel, 'thinking');
 
       // Show typing indicator
       const typingId = 'vp-typing-' + Date.now();
@@ -6263,6 +6414,7 @@ window.AppVideoPlayer = {
               ${AppUtils.escapeHtml(data.error)}
             </div>
           `);
+          window.AppVoiceInput.setOrbitState(askPanel, 'confused');
         } else {
           AppVideoPlayer._conversationId = data.conversation_id;
           const quotaElement = document.getElementById('vp-orbit-quota');
@@ -6282,6 +6434,7 @@ window.AppVideoPlayer = {
               ${data.escalated ? '<div style="margin-top:6px;font-size:11px;color:#f59e0b;display:flex;align-items:center;gap:4px;"><span class="material-symbols-outlined" style="font-size:14px;">info</span> Your question has been forwarded to a teacher.</div>' : ''}
             </div>
           `);
+          window.AppVoiceInput.setOrbitState(askPanel, 'happy');
         }
       } catch (err) {
         document.getElementById(typingId)?.remove();
@@ -6290,10 +6443,12 @@ window.AppVideoPlayer = {
             Unable to reach the AI service. Please try again later.
           </div>
         `);
+        window.AppVoiceInput.setOrbitState(askPanel, 'confused');
       }
 
       askMessages.scrollTop = askMessages.scrollHeight;
       initIcons();
+      setTimeout(() => window.AppVoiceInput.setOrbitState(askPanel, 'idle'), 1400);
     };
 
     askSend?.addEventListener('click', sendMessage);
@@ -6305,6 +6460,13 @@ window.AppVideoPlayer = {
     askInput?.addEventListener('input', () => {
       askInput.style.height = '38px';
       askInput.style.height = Math.min(askInput.scrollHeight, 100) + 'px';
+    });
+    window.AppVoiceInput.bind({
+      button: document.getElementById('vp-ask-mic'),
+      input: askInput,
+      status: document.getElementById('vp-voice-status'),
+      root: askPanel,
+      onTranscript: sendMessage
     });
 
     // Suggestion chips
