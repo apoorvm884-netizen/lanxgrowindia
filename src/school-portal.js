@@ -515,6 +515,7 @@ window.SchoolCounselors = {
 
   async render(main, data, school) {
     const schoolId = school.id;
+    const canManageAccounts = ['super_admin', 'company_admin', 'school_admin'].includes(AppRouter._currentProfile?.role);
     const q = (document.getElementById('sp-counselor-search')?.value || '').toLowerCase();
     const statusFilter = document.getElementById('sp-counselor-status')?.value || '';
     const deptFilter = document.getElementById('sp-counselor-dept')?.value || '';
@@ -575,7 +576,7 @@ window.SchoolCounselors = {
                 <button class="btn btn-ghost btn-sm" data-action="sp-view-counselor" data-id="${c.id}" title="View Profile"><span class="material-symbols-outlined" style="font-size:16px;">person</span></button>
                 <button class="btn btn-ghost btn-sm" data-action="sp-edit-counselor" data-id="${c.id}" title="Edit"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
                 <button class="btn btn-ghost btn-sm" data-action="sp-toggle-counselor-status" data-id="${c.id}" title="${c.status === 'active' ? 'Deactivate' : 'Activate'}"><span class="material-symbols-outlined" style="font-size:16px;">${c.status === 'active' ? 'toggle_off' : 'toggle_on'}</span></button>
-                <button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="sp-delete-counselor" data-id="${c.id}" title="Delete"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
+                ${canManageAccounts ? `<button class="btn btn-ghost btn-sm btn-danger-ghost" data-action="sp-delete-counselor" data-id="${c.id}" title="Delete counselor and revoke login"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>` : ''}
               </td>
             </tr>`;
           }).join('')}
@@ -669,6 +670,11 @@ window.SchoolCounselors = {
           <div class="form-group" style="margin-top:12px;"><label class="form-label">Status</label>
             <select class="form-select" id="sp-input-counselor-status"><option value="active" ${counselor.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${counselor.status === 'inactive' ? 'selected' : ''}>Inactive</option></select>
           </div>
+          ${['super_admin', 'company_admin', 'school_admin'].includes(AppRouter._currentProfile?.role) ? `
+          <div class="form-group" style="margin-top:12px;"><label class="form-label">New Login Password</label>
+            <input type="password" class="form-input" id="sp-input-counselor-password" minlength="8" autocomplete="new-password" placeholder="Leave blank to keep the current password">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">At least 8 characters. The existing password is never displayed.</div>
+          </div>` : ''}
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-close-modal="modal-counselor">Cancel</button>
@@ -689,6 +695,7 @@ window.SchoolCounselors = {
     const email = document.getElementById('sp-input-counselor-email')?.value?.trim() || null;
     const password = document.getElementById('sp-input-counselor-password')?.value || '';
     if (!isUpdate && (!email || password.length < 8)) { AppToast.show('Counselor login email and password (minimum 8 characters) are required.', 'error'); return; }
+    if (isUpdate && password && password.length < 8) { AppToast.show('New password must contain at least 8 characters.', 'error'); return; }
     const employeeId = document.getElementById('sp-input-counselor-empid')?.value?.trim() || null;
     const phone = document.getElementById('sp-input-counselor-phone')?.value?.trim() || null;
     const gender = document.getElementById('sp-input-counselor-gender')?.value || null;
@@ -703,8 +710,19 @@ window.SchoolCounselors = {
       const schoolId = AppRouter.currentSchoolId;
       const updates = { name, email, employeeId, phone, gender, dateOfBirth, qualification, experience, department, status };
       if (isUpdate) {
-        await window.CounselorService?.update(counselorId, updates);
-        AppToast.show('Counselor updated.', 'success');
+        const counselor = await window.CounselorService?.update(counselorId, updates);
+        if (password) {
+          await window.AccountService?.resetPassword({
+            userId: counselor.user_id || null,
+            email,
+            password,
+            fullName: name,
+            role: 'counselor',
+            schoolId,
+            counselorId
+          });
+        }
+        AppToast.show(password ? 'Counselor and login password updated.' : 'Counselor updated.', 'success');
       } else {
         const counselor = await window.CounselorService?.create({ ...updates, schoolId });
         try {
@@ -759,7 +777,7 @@ window.SchoolCounselors = {
         <div class="modal-body">
           <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#fef2f2;border-radius:8px;margin-bottom:12px;">
             <span class="material-symbols-outlined" style="font-size:24px;color:#ef4444;">warning</span>
-            <span style="font-size:13px;">Delete <strong>"${eh(counselor?.name || 'this counselor')}"</strong>? Students assigned to them will become unassigned.</span>
+            <span style="font-size:13px;">Delete <strong>"${eh(counselor?.name || 'this counselor')}"</strong>? Their login access will be revoked and assigned students will become unassigned.</span>
           </div>
         </div>
         <div class="modal-footer">

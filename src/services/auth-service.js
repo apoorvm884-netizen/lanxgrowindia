@@ -80,8 +80,12 @@ export const AuthService = {
   },
 
   async sendPasswordResetEmail(email) {
+    const isLocalHost = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
+    const recoveryOrigin = isLocalHost
+      ? 'https://lanxgrowindia.vercel.app'
+      : window.location.origin;
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin
+      redirectTo: `${recoveryOrigin}/?mode=recovery`
     });
     if (error) return { success: false, error: error.message };
     return { success: true, data };
