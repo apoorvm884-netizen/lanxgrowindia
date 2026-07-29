@@ -91,6 +91,33 @@ export const AuthService = {
     return { success: true, data };
   },
 
+  async updateEmail(email) {
+    const nextEmail = String(email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
+      return { success: false, error: 'Enter a valid email address.' };
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) {
+      return { success: false, error: userError?.message || 'Please sign in again.' };
+    }
+    if ((userData.user.email || '').toLowerCase() === nextEmail) {
+      return { success: false, error: 'This is already your login email.' };
+    }
+
+    const isLocalHost = /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
+    const confirmationOrigin = isLocalHost
+      ? 'https://lanxgrowindia.vercel.app'
+      : window.location.origin;
+    const { data, error } = await supabase.auth.updateUser(
+      { email: nextEmail },
+      { emailRedirectTo: `${confirmationOrigin}/?mode=email-change` }
+    );
+    if (error) return { success: false, error: error.message };
+    this._profileCache = null;
+    return { success: true, data, email: nextEmail };
+  },
+
   async getProfile(forceRefresh) {
     if (!forceRefresh && this._profileCache && (Date.now() - this._profileCacheTime) < this._profileCacheTTL) {
       return this._profileCache;

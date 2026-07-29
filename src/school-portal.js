@@ -163,7 +163,7 @@ window.SchoolStudents = {
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" id="sp-input-student-orbit-enabled" checked> General Orbit access</label>
-          <div class="form-group"><label class="form-label">Daily Orbit Limit</label><input type="number" class="form-input" id="sp-input-student-orbit-limit" min="0" max="200" placeholder="Use school limit"></div>
+          <div class="form-group"><label class="form-label">Base Daily Orbit Limit</label><input type="number" class="form-input" id="sp-input-student-orbit-limit" min="0" max="100" placeholder="Use school limit"></div>
         </div>
         <div class="form-group" style="margin-top:4px;"><label class="form-label">Notes</label><textarea class="form-input" id="sp-input-student-notes" placeholder="Optional notes..." style="height:50px;resize:vertical;"></textarea></div>
       </div>
@@ -184,6 +184,23 @@ window.SchoolStudents = {
       const data = await AppStorage.load();
       const school = data.schools.find(s => s.id === student.school_id);
       const counselors = schoolCounselorProfiles(data, student.school_id);
+      const orbitQuota = student.user_id
+        ? await window.AiService?.getManagedStudentQuota(student.id).catch(() => null)
+        : null;
+      const orbitMode = orbitQuota?.access_mode || 'restricted';
+      const schoolLimit = orbitQuota?.school_daily_limit ?? 100;
+      const orbitSummary = orbitQuota
+        ? orbitMode === 'unlimited'
+          ? `<div style="padding:12px;background:#ecfdf3;border:1px solid #bbf7d0;border-radius:8px;font-size:12px;color:#166534;">This school has unrestricted Orbit access. No daily grant is required.</div>`
+          : orbitMode === 'disabled'
+            ? `<div style="padding:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:12px;color:#991b1b;">Orbit is disabled at school level. A School Admin can enable it from Orbit Settings.</div>`
+            : `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px;background:var(--surface-low);border-radius:8px;margin-bottom:10px;">
+                <div><div style="font-size:10px;color:var(--text-muted);">SCHOOL MAX</div><strong>${orbitQuota.school_daily_limit}</strong></div>
+                <div><div style="font-size:10px;color:var(--text-muted);">USED TODAY</div><strong>${orbitQuota.used_today}</strong></div>
+                <div><div style="font-size:10px;color:var(--text-muted);">AVAILABLE NOW</div><strong>${orbitQuota.available_today}</strong></div>
+                <div><div style="font-size:10px;color:var(--text-muted);">CAN GRANT</div><strong>${orbitQuota.grantable_today}</strong></div>
+              </div>`
+        : '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Daily usage appears after the student login account is connected.</div>';
       const existing = document.getElementById('modal-student');
       if (existing) existing.remove();
       const overlay = document.createElement('div');
@@ -226,10 +243,18 @@ window.SchoolStudents = {
           <div class="form-group" style="margin-top:12px;"><label class="form-label">Status</label>
             <select class="form-select" id="sp-input-student-status"><option value="active" ${student.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${student.status === 'inactive' ? 'selected' : ''}>Inactive</option></select>
           </div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Orbit Allowance</div>
+          ${orbitSummary}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
             <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" id="sp-input-student-orbit-enabled" ${student.general_orbit_enabled !== false ? 'checked' : ''}> General Orbit access</label>
-            <div class="form-group"><label class="form-label">Daily Orbit Limit</label><input type="number" class="form-input" id="sp-input-student-orbit-limit" min="0" max="200" value="${student.general_orbit_daily_limit ?? ''}" placeholder="Use school limit"></div>
+            <div class="form-group"><label class="form-label">Base Daily Limit</label><input type="number" class="form-input" id="sp-input-student-orbit-limit" min="0" max="${schoolLimit}" value="${student.general_orbit_daily_limit ?? ''}" placeholder="Use school maximum" ${orbitMode === 'restricted' ? '' : 'disabled'}></div>
           </div>
+          ${orbitMode === 'restricted' && orbitQuota
+            ? `<div class="form-group" style="margin-top:8px;"><label class="form-label">Grant More Questions Today</label>
+                <input type="number" class="form-input" id="sp-input-student-orbit-grant" min="0" max="${orbitQuota.grantable_today}" value="0" ${orbitQuota.grantable_today > 0 ? '' : 'disabled'}>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">You can grant up to ${orbitQuota.grantable_today} more today, all at once or in smaller parts. Today-only grants reset at school midnight.</div>
+              </div>`
+            : ''}
           <div class="form-group" style="margin-top:8px;"><label class="form-label">Notes</label><textarea class="form-input" id="sp-input-student-notes" style="height:50px;resize:vertical;">${eh(student.notes || '')}</textarea></div>
         </div>
         <div class="modal-footer">
@@ -266,6 +291,16 @@ window.SchoolStudents = {
     const orbitEnabled = document.getElementById('sp-input-student-orbit-enabled')?.checked !== false;
     const orbitLimitValue = document.getElementById('sp-input-student-orbit-limit')?.value;
     const orbitLimit = orbitLimitValue === '' || orbitLimitValue == null ? null : Number(orbitLimitValue);
+    const orbitGrantValue = document.getElementById('sp-input-student-orbit-grant')?.value;
+    const orbitGrant = orbitGrantValue === '' || orbitGrantValue == null ? 0 : Number(orbitGrantValue);
+    if (orbitLimit != null && (!Number.isInteger(orbitLimit) || orbitLimit < 0 || orbitLimit > 100)) {
+      AppToast.show('Base Orbit limit must be a whole number between 0 and 100.', 'error');
+      return;
+    }
+    if (!Number.isInteger(orbitGrant) || orbitGrant < 0) {
+      AppToast.show('Today’s Orbit grant must be a positive whole number.', 'error');
+      return;
+    }
     const btn = document.getElementById('sp-btn-save-student');
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...'; }
     try {
@@ -274,7 +309,6 @@ window.SchoolStudents = {
       let savedStudent;
       if (isUpdate) {
         savedStudent = await window.StudentService?.update(studentId, updates);
-        AppToast.show('Student updated.', 'success');
       } else {
         const student = await window.StudentService?.create({ ...updates, schoolId });
         savedStudent = student;
@@ -296,10 +330,12 @@ window.SchoolStudents = {
             try { await window.NotificationService?.create('Student Created', `New student "${name}" has been assigned to you.`, counselorId); } catch (e) { console.warn('Failed to send notification:', e); }
           }
         }
-        AppToast.show(`Student "${name}" created.`, 'success');
       }
       if (savedStudent?.id) {
         await window.AiService?.setStudentAccess(savedStudent.id, orbitEnabled, orbitLimit);
+        if (isUpdate && orbitGrant > 0) {
+          await window.AiService?.grantStudentQuestions(savedStudent.id, orbitGrant);
+        }
         const { data: syncData, error: syncError } = await window.supabase.functions.invoke('drive-sync', {
           body: { student_id: savedStudent.id }
         });
@@ -309,6 +345,7 @@ window.SchoolStudents = {
           AppToast.show(`${syncData.videos || 0} Drive video(s) synced.`, 'success');
         }
       }
+      AppToast.show(isUpdate ? 'Student and Orbit allowance updated.' : `Student "${name}" created.`, 'success');
       AppModal.close('modal-student');
       AppStorage.invalidate();
       AppRouter.render();
@@ -1882,6 +1919,7 @@ window.SchoolProfile = {
           <div style="padding:12px 0;">
             <div style="display:grid;grid-template-columns:120px 1fr;gap:12px;font-size:13px;">
               <span style="color:var(--text-secondary);">Name:</span><span>${eh(profile?.name || '—')}</span>
+              <span style="color:var(--text-secondary);">Login Email:</span><span>${eh(profile?.email || '—')}</span>
               <span style="color:var(--text-secondary);">Role:</span><span><span class="status-badge" style="background:var(--primary-subtle);color:var(--primary);">${AppUtils.escapeHtml(window.ROLE_LABELS?.[profile?.role] || profile?.role || 'School Admin')}</span></span>
               <span style="color:var(--text-secondary);">School:</span><span>${eh(school.name)}</span>
               <span style="color:var(--text-secondary);">Principal:</span><span>${eh(school.principal_name || '—')}</span>
@@ -1890,6 +1928,7 @@ window.SchoolProfile = {
           </div>
           <div style="padding-top:16px;border-top:1px solid var(--border);">
             <button class="btn btn-secondary btn-sm" data-action="sp-edit-profile">Edit Name</button>
+            <button class="btn btn-secondary btn-sm" style="margin-left:8px;" data-action="sp-change-email">Change Email</button>
             <button class="btn btn-secondary btn-sm" style="margin-left:8px;" data-action="logout">Sign Out</button>
           </div>
         </div>
