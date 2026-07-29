@@ -24,21 +24,44 @@ export const NotificationService = {
     return count || 0;
   },
 
-  async create(title, message, userId, schoolId) {
+  async create(title, message, userId, schoolId, options = {}) {
     const { data, error } = await supabase.functions.invoke('send-notification', {
       body: {
         title,
         message: message || null,
         user_ids: userId ? [userId] : [],
-        school_id: schoolId || null
+        school_id: schoolId || null,
+        recipient_scope: options.recipientScope || null,
+        notification_type: options.type || 'general',
+        action_url: options.actionUrl || null
       }
     });
     if (error || data?.error) throw await edgeFunctionError(error, data, 'Notification failed.');
     return data;
   },
 
-  async broadcast(title, message, schoolId) {
-    return this.create(title, message, null, schoolId);
+  async broadcast(title, message, schoolId, options = {}) {
+    return this.create(title, message, null, schoolId, {
+      ...options,
+      recipientScope: options.recipientScope || 'all'
+    });
+  },
+
+  subscribe(userId, onChange) {
+    if (!userId || typeof onChange !== 'function') return null;
+    return supabase
+      .channel(`notifications-${userId}-${Date.now()}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`
+      }, onChange)
+      .subscribe();
+  },
+
+  unsubscribe(channel) {
+    if (channel) supabase.removeChannel(channel);
   },
 
   async markAsRead(id) {

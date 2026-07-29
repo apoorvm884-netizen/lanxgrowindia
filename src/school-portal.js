@@ -587,9 +587,6 @@ window.SchoolCounselors = {
   },
 
   async openAdd(schoolId) {
-    const data = await AppStorage.load();
-    const cats = (data.categories || []).filter(c => c.school_id === schoolId);
-    const subjects = (data.subjects || []).filter(s => s.school_id === schoolId);
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'modal-counselor';
@@ -617,14 +614,6 @@ window.SchoolCounselors = {
         <div class="form-group" style="margin-top:12px;"><label class="form-label">Department</label>
           <select class="form-select" id="sp-input-counselor-dept"><option value="">Select...</option><option value="Career Counseling">Career Counseling</option><option value="Academic Guidance">Academic Guidance</option><option value="Student Wellness">Student Wellness</option><option value="College Prep">College Prep</option></select>
         </div>
-        <div style="margin-top:12px;">
-          <label class="form-label">Assigned Categories</label>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">${cats.map(c => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-counselor-cat" value="${c.id}"> ${eh(c.name)}</label>`).join('')}</div>
-        </div>
-        <div style="margin-top:12px;">
-          <label class="form-label">Assigned Subjects</label>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">${subjects.map(s => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-counselor-sub" value="${s.id}"> ${eh(s.name)}</label>`).join('')}</div>
-        </div>
         <div class="form-group" style="margin-top:12px;"><label class="form-label">Status</label>
           <select class="form-select" id="sp-input-counselor-status"><option value="active" selected>Active</option><option value="inactive">Inactive</option></select>
         </div>
@@ -648,11 +637,6 @@ window.SchoolCounselors = {
       const data = await AppStorage.load();
       const counselor = (data.counselors || []).find(c => c.id === counselorId);
       if (!counselor) { AppToast.show('Counselor not found.', 'error'); return; }
-      const schoolId = counselor.school_id;
-      const cats = (data.categories || []).filter(c => c.school_id === schoolId);
-      const subjects = (data.subjects || []).filter(s => s.school_id === schoolId);
-      const assignedCats = counselor.assigned_categories || [];
-      const assignedSubs = counselor.assigned_subjects || [];
       const existing = document.getElementById('modal-counselor');
       if (existing) existing.remove();
       const overlay = document.createElement('div');
@@ -681,14 +665,6 @@ window.SchoolCounselors = {
           </div>
           <div class="form-group" style="margin-top:12px;"><label class="form-label">Department</label>
             <select class="form-select" id="sp-input-counselor-dept"><option value="">Select...</option><option value="Career Counseling" ${counselor.department === 'Career Counseling' ? 'selected' : ''}>Career Counseling</option><option value="Academic Guidance" ${counselor.department === 'Academic Guidance' ? 'selected' : ''}>Academic Guidance</option><option value="Student Wellness" ${counselor.department === 'Student Wellness' ? 'selected' : ''}>Student Wellness</option><option value="College Prep" ${counselor.department === 'College Prep' ? 'selected' : ''}>College Prep</option></select>
-          </div>
-          <div style="margin-top:12px;">
-            <label class="form-label">Assigned Categories</label>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">${cats.map(c => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-counselor-cat" value="${c.id}" ${assignedCats.includes(c.id) ? 'checked' : ''}> ${eh(c.name)}</label>`).join('')}</div>
-          </div>
-          <div style="margin-top:12px;">
-            <label class="form-label">Assigned Subjects</label>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">${subjects.map(s => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;"><input type="checkbox" class="sp-counselor-sub" value="${s.id}" ${assignedSubs.includes(s.id) ? 'checked' : ''}> ${eh(s.name)}</label>`).join('')}</div>
           </div>
           <div class="form-group" style="margin-top:12px;"><label class="form-label">Status</label>
             <select class="form-select" id="sp-input-counselor-status"><option value="active" ${counselor.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${counselor.status === 'inactive' ? 'selected' : ''}>Inactive</option></select>
@@ -721,13 +697,11 @@ window.SchoolCounselors = {
     const experience = parseInt(document.getElementById('sp-input-counselor-exp')?.value) || 0;
     const department = document.getElementById('sp-input-counselor-dept')?.value || null;
     const status = document.getElementById('sp-input-counselor-status')?.value || 'active';
-    const assignedCategories = [...document.querySelectorAll('.sp-counselor-cat:checked')].map(el => el.value);
-    const assignedSubjects = [...document.querySelectorAll('.sp-counselor-sub:checked')].map(el => el.value);
     const btn = document.getElementById('sp-btn-save-counselor');
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...'; }
     try {
       const schoolId = AppRouter.currentSchoolId;
-      const updates = { name, email, employeeId, phone, gender, dateOfBirth, qualification, experience, department, status, assignedCategories, assignedSubjects };
+      const updates = { name, email, employeeId, phone, gender, dateOfBirth, qualification, experience, department, status };
       if (isUpdate) {
         await window.CounselorService?.update(counselorId, updates);
         AppToast.show('Counselor updated.', 'success');
@@ -809,9 +783,6 @@ window.SchoolCounselors = {
       const enrollments = (data.enrollments || []).filter(e => students.some(s => s.id === e.student_id));
       const completedEnrollments = enrollments.filter(e => e.status === 'completed');
       const completionRate = enrollments.length ? Math.round(completedEnrollments.length / enrollments.length * 100) : 0;
-      const assignedCats = (counselor.assigned_categories || []).map(id => { const c = (data.categories || []).find(cat => cat.id === id); return c ? c.name : id; });
-      const assignedSubs = (counselor.assigned_subjects || []).map(id => { const s = (data.subjects || []).find(sub => sub.id === id); return s ? s.name : id; });
-
       const existing = document.getElementById('modal-counselor-profile');
       if (existing) existing.remove();
       const overlay = document.createElement('div');
@@ -866,8 +837,6 @@ window.SchoolCounselors = {
                 <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);"><span>Completed</span><span style="font-weight:600;">${completedEnrollments.length}</span></div>
                 <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Active</span><span style="font-weight:600;">${enrollments.filter(e => e.status === 'active').length}</span></div>
               </div>
-              ${assignedCats.length > 0 ? `<div style="margin-top:12px;"><div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px;">Categories</div><div style="display:flex;gap:4px;flex-wrap:wrap;">${assignedCats.map(n => `<span style="padding:2px 8px;background:var(--primary)12;color:var(--primary);border-radius:8px;font-size:11px;">${eh(n)}</span>`).join('')}</div></div>` : ''}
-              ${assignedSubs.length > 0 ? `<div style="margin-top:8px;"><div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:4px;">Subjects</div><div style="display:flex;gap:4px;flex-wrap:wrap;">${assignedSubs.map(n => `<span style="padding:2px 8px;background:#f0fdf4;color:#16a34a;border-radius:8px;font-size:11px;">${eh(n)}</span>`).join('')}</div></div>` : ''}
             </div>
           </div>
 
@@ -1647,25 +1616,33 @@ window.SchoolReports = {
 window.SchoolNotifications = {
   async render(main, data, school) {
     let notifications = [];
+    let profile = null;
     try {
-      const profile = await AuthService.getProfile();
+      profile = await AuthService.getProfile();
       if (profile) notifications = await window.NotificationService?.getByUser(profile.id) || [];
     } catch (e) { console.error('Failed in school-portal:', e); }
+    const senderRoles = ['super_admin', 'company_admin', 'school_admin', 'counselor', 'teacher'];
+    const canSend = senderRoles.includes(profile?.role);
+    const schoolName = school?.name || 'Platform';
+    const backRoute = school?.id ? 'school-dashboard' : 'company-dashboard';
     const filter = document.getElementById('sp-notif-filter')?.value || '';
     if (filter === 'unread') notifications = notifications.filter(n => !n.is_read);
     const unreadCount = notifications.filter(n => !n.is_read).length;
+    const sendButton = (compact = false) => canSend
+      ? `<button class="btn btn-primary${compact ? ' btn-sm' : ''}" ${compact ? 'style="height:34px;font-size:11px;"' : 'style="margin-top:12px;"'} data-action="sp-send-notification"><span class="material-symbols-outlined" style="font-size:${compact ? '14px' : '18px'};">send</span> Send Notification</button>`
+      : '';
 
     main.innerHTML = `<div class="fade-in">
       <div class="page-header">
         <div class="page-header-left">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-            <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="school-dashboard"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
-            <span style="font-size:12px;color:var(--text-secondary);">${eh(school.name)}</span>
+            <button class="btn btn-ghost btn-sm" style="height:28px;padding:0 4px;" data-action="navigate" data-route="${backRoute}"><span class="material-symbols-outlined" style="font-size:18px;">arrow_back</span></button>
+            <span style="font-size:12px;color:var(--text-secondary);">${eh(schoolName)}</span>
           </div>
-          <h1 class="page-title">Notifications</h1><p class="page-subtitle">Stay updated with platform activity.</p>
+          <h1 class="page-title">Notifications</h1><p class="page-subtitle">Messages, assignments, attendance, learning and system updates appear here.</p>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" style="height:34px;font-size:11px;" data-action="sp-send-notification"><span class="material-symbols-outlined" style="font-size:14px;">send</span> Send Notification</button>
+          ${sendButton(true)}
           ${unreadCount > 0 ? `<button class="btn btn-secondary btn-sm" style="height:34px;font-size:11px;" data-action="sp-mark-all-read"><span class="material-symbols-outlined" style="font-size:14px;">done_all</span> Mark All Read</button>` : ''}
           ${notifications.length > 0 ? `<button class="btn btn-ghost btn-sm btn-danger-ghost" style="height:34px;font-size:11px;" data-action="sp-delete-all-notifications"><span class="material-symbols-outlined" style="font-size:14px;">delete_sweep</span> Clear All</button>` : ''}
         </div>
@@ -1678,12 +1655,15 @@ window.SchoolNotifications = {
         <span style="font-size:11px;color:var(--text-muted);margin-left:auto;">${notifications.length} notification${notifications.length !== 1 ? 's' : ''}</span>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
-        ${notifications.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">notifications_off</span><h3>All caught up!</h3><p>${filter === 'unread' ? 'No unread notifications.' : 'No notifications yet.'}</p><button class="btn btn-primary" data-action="sp-send-notification" style="margin-top:12px;"><span class="material-symbols-outlined" style="font-size:18px;">send</span> Send Notification</button></div>`
+        ${notifications.length === 0 ? `<div class="empty-state"><span class="material-symbols-outlined" style="font-size:40px;">notifications_off</span><h3>All caught up!</h3><p>${filter === 'unread' ? 'No unread notifications.' : 'No notifications yet. New platform activity will appear here automatically.'}</p>${sendButton()}</div>`
         : `<div style="display:flex;flex-direction:column;">${notifications.map(n => `
           <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 20px;border-bottom:1px solid var(--border);${!n.is_read ? 'background:var(--primary-subtle);' : ''}">
             <div style="width:8px;height:8px;border-radius:50%;background:${n.is_read ? 'var(--border)' : 'var(--primary)'};margin-top:6px;flex-shrink:0;cursor:pointer;" data-action="sp-mark-notification-read" data-id="${n.id}" title="${n.is_read ? 'Read' : 'Mark as read'}"></div>
             <div style="flex:1;">
-              <div style="font-size:13px;font-weight:600;">${eh(n.title)}</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <div style="font-size:13px;font-weight:600;">${eh(n.title)}</div>
+                <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--surface-container);color:var(--text-secondary);text-transform:capitalize;">${eh((n.metadata?.notification_type || 'system').replaceAll('_', ' '))}</span>
+              </div>
               ${n.message ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${eh(n.message)}</div>` : ''}
               <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">${AppUtils.formatDate(n.created_at)}</div>
             </div>
@@ -1698,11 +1678,24 @@ window.SchoolNotifications = {
   },
 
   async openSend(schoolId) {
+    const profile = await AuthService.getProfile();
+    const senderRoles = ['super_admin', 'company_admin', 'school_admin', 'counselor', 'teacher'];
+    if (!senderRoles.includes(profile?.role)) {
+      AppToast.show('Students can receive notifications but cannot send them.', 'error');
+      return;
+    }
     const data = await AppStorage.load();
-    const recipients = [
-      ...(data.counselors || []).filter(c => c.school_id === schoolId && c.user_id).map(c => ({ id: c.user_id, name: c.name, role: 'counselor' })),
-      ...(data.users || []).filter(u => u.schoolId === schoolId && u.role === 'school_admin').map(u => ({ id: u.id, name: u.name, role: 'admin' })),
-    ];
+    const schools = (data.schools || []).filter(item =>
+      profile.role === 'super_admin' || !profile.company_id || item.company_id === profile.company_id
+    );
+    const recipients = (data.users || [])
+      .filter(user =>
+        user.status === 'active'
+        && user.role !== 'pending'
+        && (!schoolId || user.schoolId === schoolId)
+      )
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const showSchoolSelect = !schoolId && ['super_admin', 'company_admin'].includes(profile.role);
     const existing = document.getElementById('modal-send-notification');
     if (existing) existing.remove();
     const overlay = document.createElement('div');
@@ -1711,13 +1704,34 @@ window.SchoolNotifications = {
     overlay.innerHTML = `<div class="modal" style="max-width:500px;">
       <div class="modal-header"><h3 class="modal-title">Send Notification</h3><button class="modal-close" data-close-modal="modal-send-notification"><span class="material-symbols-outlined">close</span></button></div>
       <div class="modal-body">
+        ${showSchoolSelect ? `<div class="form-group"><label class="form-label">School</label>
+          <select class="form-select" id="sp-notif-school">
+            ${profile.role === 'super_admin' ? '<option value="">All Schools</option>' : '<option value="">Select school...</option>'}
+            ${schools.map(item => `<option value="${item.id}">${eh(item.name)}</option>`).join('')}
+          </select>
+        </div>` : ''}
         <div class="form-group"><label class="form-label">Recipient</label>
-          <select class="form-select" id="sp-notif-recipient"><option value="">All School Admins & Counselors</option>${recipients.map(r => `<option value="${r.id}">${eh(r.name)} (${r.role})</option>`).join('')}</select>
+          <select class="form-select" id="sp-notif-recipient">
+            <option value="scope:all">Everyone</option>
+            <option value="scope:students">All Students</option>
+            <option value="scope:counselors">All Counselors</option>
+            <option value="scope:teachers">All Teachers</option>
+            <option value="scope:admins">All School Admins</option>
+            ${recipients.length ? '<optgroup label="Individual users">' : ''}
+            ${recipients.map(r => `<option value="user:${r.id}">${eh(r.name || r.email || 'User')} (${eh(r.role.replaceAll('_', ' '))})</option>`).join('')}
+            ${recipients.length ? '</optgroup>' : ''}
+          </select>
         </div>
         <div class="form-group" style="margin-top:12px;"><label class="form-label">Title</label><input type="text" class="form-input" id="sp-notif-title" placeholder="Notification title"></div>
         <div class="form-group" style="margin-top:12px;"><label class="form-label">Message</label><textarea class="form-input" id="sp-notif-message" placeholder="Write your message..." style="height:100px;resize:vertical;"></textarea></div>
         <div class="form-group" style="margin-top:12px;"><label class="form-label">Type</label>
-          <select class="form-select" id="sp-notif-type"><option value="System Message">System Message</option><option value="Course Published">Course Published</option><option value="Assignment">Assignment</option></select>
+          <select class="form-select" id="sp-notif-type">
+            <option value="announcement">Announcement</option>
+            <option value="learning_update">Learning Update</option>
+            <option value="assignment">Assignment</option>
+            <option value="attendance">Attendance</option>
+            <option value="system">System Message</option>
+          </select>
         </div>
       </div>
       <div class="modal-footer">
@@ -1734,14 +1748,28 @@ window.SchoolNotifications = {
     const title = document.getElementById('sp-notif-title')?.value?.trim();
     if (!title) { AppToast.show('Title is required.', 'error'); return; }
     const message = document.getElementById('sp-notif-message')?.value?.trim() || null;
-    const recipientId = document.getElementById('sp-notif-recipient')?.value || null;
+    const recipientValue = document.getElementById('sp-notif-recipient')?.value || 'scope:all';
+    const recipientId = recipientValue.startsWith('user:') ? recipientValue.slice(5) : null;
+    const recipientScope = recipientValue.startsWith('scope:') ? recipientValue.slice(6) : null;
+    const notificationType = document.getElementById('sp-notif-type')?.value || 'announcement';
+    const selectedSchoolId = document.getElementById('sp-notif-school')?.value || AppRouter.currentSchoolId || null;
+    const profile = await AuthService.getProfile();
+    if (profile?.role === 'company_admin' && !selectedSchoolId) {
+      AppToast.show('Please select a school.', 'error');
+      return;
+    }
     const btn = document.getElementById('sp-btn-send-notification');
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Sending...'; }
     try {
       if (recipientId) {
-        await window.NotificationService?.create(title, message, recipientId, AppRouter.currentSchoolId);
+        await window.NotificationService?.create(title, message, recipientId, selectedSchoolId, {
+          type: notificationType
+        });
       } else {
-        await window.NotificationService?.broadcast(title, message, AppRouter.currentSchoolId);
+        await window.NotificationService?.broadcast(title, message, selectedSchoolId, {
+          recipientScope,
+          type: notificationType
+        });
       }
       AppToast.show('Notification sent.', 'success');
       AppModal.close('modal-send-notification');

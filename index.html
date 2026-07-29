@@ -336,8 +336,8 @@ tr:hover td { background: var(--surface-low); }
 .form-error.visible { display: block; }
 
 /* ====== MODALS ====== */
-.modal-overlay { position: fixed; inset: 0; background: rgba(21,27,41,0.4); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity var(--transition); }
-.modal-overlay.active { opacity: 1; pointer-events: auto; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(21,27,41,0.4); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 200ms ease, visibility 0s linear 200ms; }
+.modal-overlay.active { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
 .modal { background: var(--surface); border-radius: var(--radius-xl); width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
 .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 0; }
 .modal-title { font-size: 17px; font-weight: 600; color: var(--on-surface); }
@@ -581,9 +581,9 @@ tr:hover td { background: var(--surface-low); }
       <button class="btn-icon topnav-search-btn" id="btn-topnav-search" aria-label="Search" title="Search">
         <span class="material-symbols-outlined">search</span>
       </button>
-      <button class="btn-icon" id="btn-notifications" aria-label="Notifications" title="Notifications">
+      <button class="btn-icon" id="btn-notifications" aria-label="Notifications" title="Notifications" style="position:relative;">
         <span class="material-symbols-outlined">notifications</span>
-        <span class="badge-dot" style="position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--danger);border:2px solid var(--surface);"></span>
+        <span class="badge-dot" id="notification-count-badge" hidden style="position:absolute;top:1px;right:0;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--danger);color:#fff;border:2px solid var(--surface);font-size:9px;font-weight:700;line-height:12px;text-align:center;">0</span>
       </button>
       <button class="btn-icon" id="btn-theme-toggle" aria-label="Toggle theme" title="Toggle theme">
         <span class="material-symbols-outlined">dark_mode</span>
