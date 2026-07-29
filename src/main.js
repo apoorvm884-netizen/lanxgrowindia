@@ -4509,6 +4509,26 @@ document.addEventListener('click', async function (e) {
     return;
   }
 
+  if (action === 'sp-change-email') {
+    try {
+      const profile = await AuthService.getProfile(true);
+      const newEmail = prompt(
+        'Enter your new login email. A confirmation link will be sent to verify the change:',
+        profile?.email || ''
+      );
+      if (newEmail == null) return;
+      const result = await AuthService.updateEmail(newEmail);
+      if (!result.success) throw new Error(result.error);
+      AppToast.show(
+        `Confirmation sent to ${result.email}. Your login email will change after verification.`,
+        'success'
+      );
+    } catch (err) {
+      AppToast.show(err.message || 'Email change could not be started.', 'error');
+    }
+    return;
+  }
+
   // Logout
   if (action === 'logout') {
     try {
@@ -5091,7 +5111,8 @@ window.AppAiOrbit = {
       await this._renderStudentChat(main, school);
       return;
     }
-    const canConfigure = ['super_admin', 'company_admin'].includes(profile?.role);
+    const canConfigurePolicy = ['super_admin', 'company_admin', 'school_admin'].includes(profile?.role);
+    const canConfigureProviders = ['super_admin', 'company_admin'].includes(profile?.role);
     const [escalations, settings, conversations] = await Promise.all([
       AiService.getEscalations(schoolId).catch(() => []),
       AiService.getSchoolSettings(schoolId).catch(() => null),
@@ -5106,7 +5127,7 @@ window.AppAiOrbit = {
           <h1 class="page-title">Orbit</h1>
           <p class="page-subtitle">${AppUtils.escapeHtml(school.name)} — Student Q&A powered by AI</p>
         </div>
-        ${canConfigure ? '<button class="btn btn-secondary" id="btn-orbit-settings"><span class="material-symbols-outlined" style="font-size:18px;">settings</span> Settings</button>' : ''}
+        ${canConfigurePolicy ? '<button class="btn btn-secondary" id="btn-orbit-settings"><span class="material-symbols-outlined" style="font-size:18px;">settings</span> Settings</button>' : ''}
       </div>
 
       <!-- Stats -->
@@ -5117,7 +5138,7 @@ window.AppAiOrbit = {
         </div>
         <div class="metric-card">
           <div class="metric-icon" style="background:#FEF3C7;color:#D97706;"><span class="material-symbols-outlined">help</span></div>
-          <div><div class="metric-label">Daily Limit</div><div class="metric-value" style="font-size:18px;">${settings?.daily_question_limit || 10} / student</div></div>
+          <div><div class="metric-label">Daily Limit</div><div class="metric-value" style="font-size:18px;">${settings?.access_mode === 'unlimited' ? 'Unlimited' : `${settings?.daily_question_limit ?? 10} / student`}</div></div>
         </div>
         <div class="metric-card">
           <div class="metric-icon" style="background:#FEE2E2;color:#DC2626;"><span class="material-symbols-outlined">priority_high</span></div>
@@ -5133,7 +5154,7 @@ window.AppAiOrbit = {
       <div class="tabs" style="margin-bottom:20px;">
         <button class="tab active" data-orbit-tab="escalations">Escalation Queue (${openCount})</button>
         <button class="tab" data-orbit-tab="conversations">Recent Conversations</button>
-        ${canConfigure ? '<button class="tab" data-orbit-tab="providers">AI Providers</button>' : ''}
+        ${canConfigureProviders ? '<button class="tab" data-orbit-tab="providers">AI Providers</button>' : ''}
       </div>
 
       <!-- Escalation Queue -->
@@ -5167,7 +5188,7 @@ window.AppAiOrbit = {
       </div>
 
       <!-- Providers -->
-      ${canConfigure ? `<div id="orbit-tab-providers" class="card" style="padding:0;display:none;">
+      ${canConfigureProviders ? `<div id="orbit-tab-providers" class="card" style="padding:0;display:none;">
         <div style="padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
           <div style="font-size:13px;font-weight:600;">AI Provider Chain</div>
           <button class="btn btn-primary btn-sm" id="btn-add-provider"><span class="material-symbols-outlined" style="font-size:16px;">add</span> Add Provider</button>
@@ -5179,7 +5200,7 @@ window.AppAiOrbit = {
     </div>`;
     initIcons();
     this._bindEvents(schoolId, school);
-    if (canConfigure) this._loadProviders(schoolId);
+    if (canConfigureProviders) this._loadProviders(schoolId);
   },
 
   async _renderStudentChat(main, school) {
@@ -5357,7 +5378,8 @@ window.AppAiOrbit = {
             </select>
           </div>
           <div class="form-group"><label class="form-label">School Daily Maximum (Restricted mode)</label>
-            <input type="number" class="form-input" id="orbit-s-limit" value="${s.daily_question_limit || 10}" min="0" max="200">
+            <input type="number" class="form-input" id="orbit-s-limit" value="${s.daily_question_limit ?? 10}" min="0" max="100">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Maximum 100 questions per student per day. Counselors can grant unused capacity in smaller parts.</div>
           </div>
           <div style="padding:12px;background:var(--surface-low);border-radius:8px;font-size:12px;color:var(--text-secondary);">Video Orbit remains a separate limit of ${s.video_daily_question_limit || 10} questions per video per day and cannot be changed here.</div>
           <button class="btn btn-primary" id="btn-save-orbit-settings" style="width:100%;margin-top:16px;">Save Settings</button>
@@ -5370,6 +5392,9 @@ window.AppAiOrbit = {
       try {
         const mode = document.getElementById('orbit-s-mode').value;
         const limit = Number(document.getElementById('orbit-s-limit').value);
+        if (mode === 'restricted' && (!Number.isInteger(limit) || limit < 0 || limit > 100)) {
+          throw new Error('Restricted daily maximum must be a whole number between 0 and 100.');
+        }
         await AiService.setSchoolPolicy(schoolId, mode, mode === 'restricted' ? limit : null);
         AppToast.show('Settings saved');
         document.getElementById('modal-orbit-settings').classList.remove('active');
@@ -6582,6 +6607,31 @@ async function initApp() {
     const icon = document.querySelector('#btn-theme-toggle .material-symbols-outlined');
     if (icon) icon.textContent = isDark ? 'light_mode' : 'dark_mode';
     AppToast.show(isDark ? 'Dark mode enabled.' : 'Light mode enabled.');
+  });
+  const openEmailChange = async () => {
+    try {
+      const profile = await AuthService.getProfile(true);
+      const newEmail = prompt(
+        'Enter your new login email. A confirmation link will be sent to verify the change:',
+        profile?.email || ''
+      );
+      if (newEmail == null) return;
+      const result = await AuthService.updateEmail(newEmail);
+      if (!result.success) throw new Error(result.error);
+      AppToast.show(
+        `Confirmation sent to ${result.email}. Your login email will change after verification.`,
+        'success'
+      );
+    } catch (error) {
+      AppToast.show(error.message || 'Email change could not be started.', 'error');
+    }
+  };
+  document.getElementById('btn-account-email')?.addEventListener('click', openEmailChange);
+  document.getElementById('btn-account-email')?.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openEmailChange();
+    }
   });
 
   // Restore saved theme
