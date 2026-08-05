@@ -1015,7 +1015,7 @@ window.AppRouter = {
       const content = data.content.filter(c => c.school_id === schoolId);
       const schoolStudents = (data.students || []).filter(s => s.school_id === schoolId);
       const schoolCourses = (data.courses || []).filter(c => c.school_id === schoolId);
-      const schoolCounselors = (data.users || []).filter(c => c.schoolId === schoolId && (c.role === 'counselor' || c.role === 'school_admin'));
+      // Count only actual counselor accounts. School admins are separate staff and must not inflate the counselor metric.\n      const schoolCounselors = (data.users || []).filter(c => c.schoolId === schoolId && c.role === 'counselor');
       const schoolEnrollments = (data.enrollments || []).filter(e => schoolStudents.some(s => s.id === e.student_id));
       const schoolNotifications = (data.notifications || []).filter(n => n.user_id === (profile ? profile.id : ''));
       const avgAttendance = schoolStudents.length ? Math.round(schoolStudents.reduce((s, st) => s + (st.attendance || 0), 0) / schoolStudents.length) : 0;
