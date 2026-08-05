@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase.js';
 import { AuditLogService } from './audit-log-service.js';
+import { AdminAccessService } from './admin-access-service.js';
 
 export const StudentService = {
 
@@ -110,16 +111,14 @@ export const StudentService = {
   async delete(id) {
     const { data: item, error: fetchError } = await supabase
       .from('students')
-      .select('name')
+      .select('name, user_id')
       .eq('id', id)
       .single();
     if (fetchError) throw fetchError;
 
-    const { error } = await supabase
-      .from('students')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
+    // Permanent student deletion must revoke the linked Auth login as well.
+    // Otherwise the email remains reserved in auth.users and cannot be reused.
+    await AdminAccessService.deleteStudent(id);
 
     await AuditLogService.log('deleted', 'Student', item?.name || 'Unknown', `Student deleted`);
   }
