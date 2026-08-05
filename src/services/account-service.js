@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase.js';
 import { edgeFunctionError } from './edge-function-error.js';
 
 export const AccountService = {
-  async provision({ email, password, fullName, role, schoolId, studentId, counselorId, loginId }) {
+  async provision({ email, password, fullName, role, schoolId, studentId, counselorId }) {
     const { data, error } = await supabase.functions.invoke('provision-user', {
       body: {
         email,
@@ -11,8 +11,7 @@ export const AccountService = {
         role,
         school_id: schoolId || null,
         student_id: studentId || null,
-        counselor_id: counselorId || null,
-        login_id: loginId || null
+        counselor_id: counselorId || null
       }
     });
     if (error || data?.error) throw await edgeFunctionError(error, data, 'Could not create the login account.');
