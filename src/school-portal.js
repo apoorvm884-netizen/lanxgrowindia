@@ -273,7 +273,13 @@ window.SchoolStudents = {
   async save(isUpdate, studentId) {
     const name = document.getElementById('sp-input-student-name')?.value?.trim();
     if (!name) { AppToast.show('Name is required.', 'error'); return; }
-    const email = document.getElementById('sp-input-student-email')?.value?.trim().toLowerCase() || null;
+    // Read the email from the open student modal itself. Older cached bundles
+    // used `sp-input-student-login-email`; scoping the lookup to the modal
+    // keeps both versions working and prevents a blank value reaching the
+    // provision-user function when the field is visibly filled.
+    const studentModal = document.getElementById('modal-student');
+    const emailInput = studentModal?.querySelector('#sp-input-student-email, #sp-input-student-login-email, input[type="email"]');
+    const email = String(emailInput?.value || emailInput?.getAttribute('value') || '').trim().toLowerCase() || null;
     const password = document.getElementById('sp-input-student-password')?.value || '';
     const admissionNo = document.getElementById('sp-input-student-admission')?.value?.trim() || null;
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { AppToast.show('A valid student login email is required.', 'error'); return; }
