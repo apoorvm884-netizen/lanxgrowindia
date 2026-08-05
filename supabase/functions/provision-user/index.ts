@@ -97,10 +97,28 @@ Deno.serve(async request => {
     if (!userId) {
       const { data: existingProfile } = await admin
         .from('profiles')
-        .select('id')
+        .select('id, role')
         .ilike('email', email)
         .maybeSingle();
       userId = existingProfile?.id || null;
+
+      // A previous student deletion may have removed the public students row
+      // but left its Auth account behind. Reclaim only that known orphaned
+      // student account; never overwrite an active account or another role.
+      if (userId && action === 'create' && existingProfile?.role === 'student') {
+        const { count: linkedStudents, error: linkedStudentError } = await admin
+          .from('students')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId);
+        if (linkedStudentError) throw linkedStudentError;
+        if (linkedStudents === 0) {
+          const { error: orphanDeleteError } = await admin.auth.admin.deleteUser(userId);
+          if (orphanDeleteError && !/not found|does not exist|user.*missing/i.test(orphanDeleteError.message || '')) {
+            throw orphanDeleteError;
+          }
+          userId = null;
+        }
+      }
     }
 
     if (action === 'reset_password' || (action === 'set_login' && userId)) {
