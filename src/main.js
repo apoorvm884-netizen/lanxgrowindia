@@ -1015,7 +1015,9 @@ window.AppRouter = {
       const content = data.content.filter(c => c.school_id === schoolId);
       const schoolStudents = (data.students || []).filter(s => s.school_id === schoolId);
       const schoolCourses = (data.courses || []).filter(c => c.school_id === schoolId);
-      // Count only actual counselor accounts. School admins are separate staff and must not inflate the counselor metric.\n      const schoolCounselors = (data.users || []).filter(c => c.schoolId === schoolId && c.role === 'counselor');
+      // Count only actual counselor accounts. School admins are separate staff
+      // and must not inflate the counselor metric on the school dashboard.
+      const schoolCounselors = (data.users || []).filter(c => c.schoolId === schoolId && c.role === 'counselor');
       const schoolEnrollments = (data.enrollments || []).filter(e => schoolStudents.some(s => s.id === e.student_id));
       const schoolNotifications = (data.notifications || []).filter(n => n.user_id === (profile ? profile.id : ''));
       const avgAttendance = schoolStudents.length ? Math.round(schoolStudents.reduce((s, st) => s + (st.attendance || 0), 0) / schoolStudents.length) : 0;
@@ -6744,12 +6746,21 @@ async function initApp() {
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('login-email').value.trim();
+    const schoolCode = document.getElementById('login-school-code')?.value.trim();
+    const studentLoginId = document.getElementById('login-student-id')?.value.trim();
     const password = document.getElementById('login-password').value;
     const errorEl = document.getElementById('login-error');
 
-    if (!email || !password) { errorEl.textContent = 'Please enter email and password.'; return; }
+    if ((!email && !(schoolCode && studentLoginId)) || !password) {
+      errorEl.textContent = schoolCode || studentLoginId
+        ? 'Enter both school code and Student Login ID.'
+        : 'Enter an admin/counselor email or student school code and login ID.';
+      return;
+    }
 
-    const result = await AuthService.signInWithEmail(email, password);
+    const result = schoolCode && studentLoginId
+      ? await AuthService.signInAsStudent(schoolCode, studentLoginId, password)
+      : await AuthService.signInWithEmail(email, password);
     if (!result.success) {
       errorEl.textContent = result.error;
       return;
