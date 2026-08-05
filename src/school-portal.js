@@ -122,14 +122,14 @@ window.SchoolStudents = {
         <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Basic Information</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="sp-input-student-name" placeholder="Enter student name"></div>
-          <div class="form-group"><label class="form-label">Contact Email (optional)</label><input type="email" class="form-input" id="sp-input-student-email" placeholder="parent@example.com"></div>
+          <div class="form-group"><label class="form-label">Login Email</label><input type="email" class="form-input" id="sp-input-student-email" placeholder="student@example.com" required></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:8px;">
           <div class="form-group"><label class="form-label">Date of Birth</label><input type="date" class="form-input" id="sp-input-student-dob"></div>
           <div class="form-group"><label class="form-label">Gender</label>
             <select class="form-select" id="sp-input-student-gender"><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select>
           </div>
-          <div class="form-group"><label class="form-label">Student Login ID</label><input type="text" class="form-input" id="sp-input-student-admission" placeholder="e.g. STU-001" required></div>
+          <div class="form-group"><label class="form-label">Admission No. (optional)</label><input type="text" class="form-input" id="sp-input-student-admission" placeholder="e.g. ADM-001"></div>
         </div>
 
         <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Guardian Information</div>
@@ -212,14 +212,14 @@ window.SchoolStudents = {
           <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px;">Basic Information</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="sp-input-student-name" value="${eh(student.name)}"></div>
-            <div class="form-group"><label class="form-label">Contact Email (optional)</label><input type="email" class="form-input" id="sp-input-student-email" value="${eh(student.email || '')}"></div>
+            <div class="form-group"><label class="form-label">Login Email</label><input type="email" class="form-input" id="sp-input-student-email" value="${eh(student.email || '')}" required></div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:8px;">
             <div class="form-group"><label class="form-label">Date of Birth</label><input type="date" class="form-input" id="sp-input-student-dob" value="${eh(student.dob || '')}"></div>
             <div class="form-group"><label class="form-label">Gender</label>
               <select class="form-select" id="sp-input-student-gender"><option value="">Select...</option><option value="Male" ${student.gender === 'Male' ? 'selected' : ''}>Male</option><option value="Female" ${student.gender === 'Female' ? 'selected' : ''}>Female</option><option value="Other" ${student.gender === 'Other' ? 'selected' : ''}>Other</option></select>
             </div>
-            <div class="form-group"><label class="form-label">Student Login ID</label><input type="text" class="form-input" id="sp-input-student-admission" value="${eh(student.login_id || student.admission_no || '')}" ${student.user_id ? 'readonly' : ''} required></div>
+            <div class="form-group"><label class="form-label">Admission No. (optional)</label><input type="text" class="form-input" id="sp-input-student-admission" value="${eh(student.admission_no || '')}"></div>
           </div>
           <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;margin:16px 0 8px;">Guardian Information</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -273,10 +273,11 @@ window.SchoolStudents = {
   async save(isUpdate, studentId) {
     const name = document.getElementById('sp-input-student-name')?.value?.trim();
     if (!name) { AppToast.show('Name is required.', 'error'); return; }
-    const email = document.getElementById('sp-input-student-email')?.value?.trim() || null;
+    const email = document.getElementById('sp-input-student-email')?.value?.trim().toLowerCase() || null;
     const password = document.getElementById('sp-input-student-password')?.value || '';
     const admissionNo = document.getElementById('sp-input-student-admission')?.value?.trim() || null;
-    if (!isUpdate && (!admissionNo || password.length < 8)) { AppToast.show('Student Login ID and password (minimum 8 characters) are required.', 'error'); return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { AppToast.show('A valid student login email is required.', 'error'); return; }
+    if (!isUpdate && password.length < 8) { AppToast.show('Login password must be at least 8 characters.', 'error'); return; }
     const dob = document.getElementById('sp-input-student-dob')?.value || null;
     const gender = document.getElementById('sp-input-student-gender')?.value || null;
     const parentName = document.getElementById('sp-input-student-parent')?.value?.trim() || null;
@@ -305,7 +306,7 @@ window.SchoolStudents = {
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...'; }
     try {
       const schoolId = AppRouter.currentSchoolId;
-      const updates = { name, email, dob, gender, admissionNo, loginId: admissionNo, parentName, parentContact, driveFolderId, academicYear, counselorId, notes, status };
+      const updates = { name, email, dob, gender, admissionNo, parentName, parentContact, driveFolderId, academicYear, counselorId, notes, status };
       let savedStudent;
       if (isUpdate) {
         savedStudent = await window.StudentService?.update(studentId, updates);
@@ -316,7 +317,6 @@ window.SchoolStudents = {
           try {
             await window.AccountService?.provision({
               email,
-              loginId: admissionNo,
               password,
               fullName: name,
               role: 'student',
