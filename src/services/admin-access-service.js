@@ -26,5 +26,9 @@ export const AdminAccessService = {
 
   deleteCounselor(counselorId) {
     return invoke('delete_counselor', { counselor_id: counselorId });
+  },
+
+  deleteStudent(studentId) {
+    return invoke('delete_student', { student_id: studentId });
   }
 };
