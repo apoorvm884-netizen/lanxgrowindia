@@ -568,8 +568,15 @@ tr:hover td { background: var(--surface-low); }
       <form id="login-form" autocomplete="off">
         <div id="login-form-container">
           <div style="margin-bottom:16px;">
-            <label class="form-label" for="login-email">Email</label>
-            <input class="form-input" type="email" id="login-email" placeholder="Enter your email" required autocomplete="email">
+            <label class="form-label" for="login-email">Email (Admin / Counselor)</label>
+            <input class="form-input" type="email" id="login-email" placeholder="Enter your email" autocomplete="email">
+          </div>
+          <div style="margin-bottom:16px;padding:12px;background:var(--surface-low);border-radius:8px;">
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Students sign in with their school code and Student Login ID.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <input class="form-input" type="text" id="login-school-code" placeholder="School code" autocomplete="organization">
+              <input class="form-input" type="text" id="login-student-id" placeholder="Student Login ID" autocomplete="username">
+            </div>
           </div>
           <div style="margin-bottom:16px;">
             <label class="form-label" for="login-password">Password</label>
