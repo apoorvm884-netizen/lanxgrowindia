@@ -12,18 +12,6 @@ export const AuthService = {
     return { success: true, user: data.user, session: data.session };
   },
 
-  async signInAsStudent(schoolCode, loginId, password) {
-    this._profileCache = null;
-    const { data, error } = await supabase.functions.invoke('student-login', {
-      body: { school_code: schoolCode, login_id: loginId, password }
-    });
-    if (error || data?.error) return { success: false, error: data?.error || error?.message || 'Student login failed.' };
-    if (!data?.session?.access_token || !data?.session?.refresh_token) return { success: false, error: 'Student login session was not returned.' };
-    const sessionResult = await supabase.auth.setSession(data.session);
-    if (sessionResult.error) return { success: false, error: sessionResult.error.message };
-    return { success: true, user: sessionResult.data.user, session: sessionResult.data.session };
-  },
-
   getDeviceId() {
     const key = 'lanxgrow_device_id';
     let deviceId = window.localStorage.getItem(key);
