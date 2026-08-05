@@ -58,6 +58,7 @@ export const StudentService = {
         dob: item.dob || null,
         gender: item.gender || null,
         admission_no: item.admissionNo || null,
+        login_id: item.loginId || item.admissionNo || null,
         parent_name: item.parentName || null,
         parent_contact: item.parentContact || null,
         academic_year: item.academicYear || null,
@@ -83,6 +84,7 @@ export const StudentService = {
     if (updates.dob !== undefined) payload.dob = updates.dob;
     if (updates.gender !== undefined) payload.gender = updates.gender;
     if (updates.admissionNo !== undefined) payload.admission_no = updates.admissionNo;
+    if (updates.loginId !== undefined) payload.login_id = updates.loginId;
     if (updates.parentName !== undefined) payload.parent_name = updates.parentName;
     if (updates.parentContact !== undefined) payload.parent_contact = updates.parentContact;
     if (updates.academicYear !== undefined) payload.academic_year = updates.academicYear;
