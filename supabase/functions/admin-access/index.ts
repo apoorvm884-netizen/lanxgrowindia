@@ -53,6 +53,9 @@ Deno.serve(async request => {
     if (action === 'delete_counselor') {
       return await deleteCounselor(admin, actor as Actor, String(body.counselor_id || ''));
     }
+    if (action === 'delete_student') {
+      return await deleteStudent(admin, actor as Actor, String(body.student_id || ''));
+    }
     if (actor.role === 'school_admin') {
       return json({ error: 'School Admin access is limited to counselors in their own school' }, 403);
     }
@@ -114,6 +117,57 @@ async function deleteCounselor(admin: any, actor: Actor, counselorId: string) {
     ok: true,
     deleted: 'counselor',
     access_revoked: Boolean(counselor.user_id)
+  });
+}
+
+async function deleteStudent(admin: any, actor: Actor, studentId: string) {
+  if (!studentId) return json({ error: 'Student ID is required' }, 400);
+
+  const { data: student, error: studentLookupError } = await admin
+    .from('students')
+    .select('id, name, school_id, user_id')
+    .eq('id', studentId)
+    .single();
+  if (studentLookupError || !student) return json({ error: 'Student was not found' }, 404);
+
+  if (actor.role === 'school_admin' && student.school_id !== actor.school_id) {
+    return json({ error: 'Student is outside your school' }, 403);
+  }
+  if (actor.role === 'company_admin') {
+    const { data: school } = await admin
+      .from('schools')
+      .select('company_id')
+      .eq('id', student.school_id)
+      .single();
+    if (!school || school.company_id !== actor.company_id) {
+      return json({ error: 'Student is outside your company' }, 403);
+    }
+  }
+  if (!['super_admin', 'company_admin', 'school_admin'].includes(actor.role)) {
+    return json({ error: 'Only an authorized administrator can permanently delete students' }, 403);
+  }
+
+  // Delete the Auth account first so the login email is immediately reusable.
+  // A missing Auth account is treated as already cleaned up, allowing deletion
+  // of legacy/orphaned student rows created before this fix.
+  if (student.user_id) {
+    const { error: authError } = await admin.auth.admin.deleteUser(student.user_id);
+    if (authError && !/not found|does not exist|user.*missing/i.test(authError.message || '')) {
+      throw authError;
+    }
+  }
+
+  const { error: deleteError } = await admin
+    .from('students')
+    .delete()
+    .eq('id', student.id);
+  if (deleteError) throw deleteError;
+
+  return json({
+    ok: true,
+    deleted: 'student',
+    name: student.name,
+    access_revoked: Boolean(student.user_id)
   });
 }
 
