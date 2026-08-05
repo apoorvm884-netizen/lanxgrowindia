@@ -50,7 +50,7 @@ Deno.serve(async request => {
 
     const body = await request.json().catch(() => ({}));
     const action = String(body.action || 'create');
-    const contactEmail = String(body.email || '').trim().toLowerCase();
+    const contactEmail = normalizeEmail(body.email);
     const password = String(body.password || '');
     const fullName = String(body.full_name || '').trim();
     const role = String(body.role || '');
@@ -58,7 +58,7 @@ Deno.serve(async request => {
     const studentId = body.student_id ? String(body.student_id) : null;
     const counselorId = body.counselor_id ? String(body.counselor_id) : null;
     const email = contactEmail;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!isValidEmail(email)) {
       return json({ error: 'A valid login email is required' }, 400);
     }
     if (password.length < 8) {
@@ -194,4 +194,13 @@ function canManage(caller: Profile, role: string, schoolId: string) {
     return caller.school_id === schoolId && ['counselor', 'student'].includes(role);
   }
   return caller.role === 'counselor' && caller.school_id === schoolId && role === 'student';
+}
+
+
+function normalizeEmail(value: unknown) {
+  return String(value ?? '').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/[\u00A0\u202F]/g, ' ').trim().toLowerCase();
+}
+
+function isValidEmail(email: string) {
+  return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
