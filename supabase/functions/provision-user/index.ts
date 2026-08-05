@@ -50,15 +50,18 @@ Deno.serve(async request => {
 
     const body = await request.json().catch(() => ({}));
     const action = String(body.action || 'create');
-    const email = String(body.email || '').trim().toLowerCase();
+    const contactEmail = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
     const fullName = String(body.full_name || '').trim();
     const role = String(body.role || '');
     const schoolId = body.school_id ? String(body.school_id) : null;
     const studentId = body.student_id ? String(body.student_id) : null;
     const counselorId = body.counselor_id ? String(body.counselor_id) : null;
+    const loginId = body.login_id ? String(body.login_id).trim() : null;
+    if (role === 'student' && !loginId) return json({ error: 'Student Login ID is required' }, 400);
+    const email = role === 'student' ? syntheticStudentEmail(schoolId, loginId!) : contactEmail;
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (role !== 'student' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return json({ error: 'A valid login email is required' }, 400);
     }
     if (password.length < 8) {
@@ -84,8 +87,9 @@ Deno.serve(async request => {
 
     if (role === 'student') {
       if (!studentId) return json({ error: 'Student record is required' }, 400);
-      const { data: student } = await admin.from('students').select('id, school_id, user_id').eq('id', studentId).single();
+      const { data: student } = await admin.from('students').select('id, school_id, user_id, login_id').eq('id', studentId).single();
       if (!student || student.school_id !== schoolId) return json({ error: 'Student does not belong to this school' }, 400);
+      if (student.login_id && student.login_id.toLowerCase() !== loginId!.toLowerCase()) return json({ error: 'Student Login ID does not match this student record' }, 400);
     }
     if (role === 'counselor') {
       if (!counselorId) return json({ error: 'Counselor record is required' }, 400);
@@ -148,17 +152,17 @@ Deno.serve(async request => {
         email,
         password,
         email_confirm: true,
-        user_metadata: { full_name: fullName || email.split('@')[0] }
+        user_metadata: { full_name: fullName || loginId || email.split('@')[0], contact_email: contactEmail || null, student_login_id: loginId || null }
       });
       if (error || !created.user) throw error || new Error('Auth user was not created');
       userId = created.user.id;
       createdUserId = userId;
     }
 
-    const safeName = fullName || email.split('@')[0];
+    const safeName = fullName || loginId || email.split('@')[0];
     const { error: profileError } = await admin.from('profiles').upsert({
       id: userId,
-      email,
+      email: role === 'student' ? (contactEmail || null) : email,
       name: safeName,
       full_name: safeName,
       role,
@@ -171,15 +175,15 @@ Deno.serve(async request => {
     if (profileError) throw profileError;
 
     if (studentId) {
-      const { error } = await admin.from('students').update({ user_id: userId, email }).eq('id', studentId);
+      const { error } = await admin.from('students').update({ user_id: userId, email: contactEmail || null, login_id: loginId }).eq('id', studentId);
       if (error) throw error;
     }
     if (counselorId) {
-      const { error } = await admin.from('counselors').update({ user_id: userId, email }).eq('id', counselorId);
+      const { error } = await admin.from('counselors').update({ user_id: userId, email: contactEmail || email }).eq('id', counselorId);
       if (error) throw error;
     }
 
-    return json({ ok: true, user_id: userId, email, role }, createdUserId ? 201 : 200);
+    return json({ ok: true, user_id: userId, email: contactEmail || null, login_id: loginId, role }, createdUserId ? 201 : 200);
   } catch (error) {
     if (createdUserId) await admin.auth.admin.deleteUser(createdUserId).catch(() => undefined);
     console.error('Provisioning failed', { message: error instanceof Error ? error.message : String(error) });
@@ -194,4 +198,10 @@ function canManage(caller: Profile, role: string, schoolId: string) {
     return caller.school_id === schoolId && ['counselor', 'student'].includes(role);
   }
   return caller.role === 'counselor' && caller.school_id === schoolId && role === 'student';
+}
+
+function syntheticStudentEmail(schoolId: string | null, loginId: string) {
+  const schoolPart = String(schoolId || 'school').replace(/[^a-zA-Z0-9]/g, '').slice(0, 24);
+  const loginPart = loginId.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'student';
+  return `student-${schoolPart}-${loginPart}@accounts.lanxgrow.internal`;
 }
