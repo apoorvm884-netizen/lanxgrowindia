@@ -6743,6 +6743,33 @@ async function initApp() {
 
   // Login form
   const loginForm = document.getElementById('login-form');
+  let loginMethod = 'email';
+  const setLoginMethod = (method) => {
+    loginMethod = method === 'id' ? 'id' : 'email';
+    const emailMode = loginMethod === 'email';
+    const emailFields = document.getElementById('login-email-fields');
+    const idFields = document.getElementById('login-id-fields');
+    const emailButton = document.getElementById('btn-login-method-email');
+    const idButton = document.getElementById('btn-login-method-id');
+    if (emailFields) emailFields.style.display = emailMode ? '' : 'none';
+    if (idFields) idFields.style.display = emailMode ? 'none' : '';
+    if (emailButton) {
+      emailButton.className = emailMode ? 'btn btn-primary' : 'btn btn-ghost';
+      emailButton.setAttribute('aria-pressed', String(emailMode));
+    }
+    if (idButton) {
+      idButton.className = emailMode ? 'btn btn-ghost' : 'btn btn-primary';
+      idButton.setAttribute('aria-pressed', String(!emailMode));
+    }
+    const forgotRow = document.getElementById('forgot-password-row');
+    if (forgotRow) forgotRow.style.display = emailMode ? '' : 'none';
+    const errorEl = document.getElementById('login-error');
+    if (errorEl) errorEl.textContent = '';
+    document.getElementById(emailMode ? 'login-email' : 'login-school-code')?.focus();
+  };
+  document.getElementById('btn-login-method-email')?.addEventListener('click', () => setLoginMethod('email'));
+  document.getElementById('btn-login-method-id')?.addEventListener('click', () => setLoginMethod('id'));
+
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('login-email').value.trim();
@@ -6751,14 +6778,16 @@ async function initApp() {
     const password = document.getElementById('login-password').value;
     const errorEl = document.getElementById('login-error');
 
-    if ((!email && !(schoolCode && studentLoginId)) || !password) {
-      errorEl.textContent = schoolCode || studentLoginId
-        ? 'Enter both school code and Student Login ID.'
-        : 'Enter an admin/counselor email or student school code and login ID.';
+    if (loginMethod === 'email' && (!email || !password)) {
+      errorEl.textContent = 'Please enter email and password.';
+      return;
+    }
+    if (loginMethod === 'id' && (!schoolCode || !studentLoginId || !password)) {
+      errorEl.textContent = 'Please enter school code, Student Login ID and password.';
       return;
     }
 
-    const result = schoolCode && studentLoginId
+    const result = loginMethod === 'id'
       ? await AuthService.signInAsStudent(schoolCode, studentLoginId, password)
       : await AuthService.signInWithEmail(email, password);
     if (!result.success) {
