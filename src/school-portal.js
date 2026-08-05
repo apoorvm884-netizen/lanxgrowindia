@@ -279,7 +279,11 @@ window.SchoolStudents = {
     // provision-user function when the field is visibly filled.
     const studentModal = document.getElementById('modal-student');
     const emailInput = studentModal?.querySelector('#sp-input-student-email, #sp-input-student-login-email, input[type="email"]');
-    const email = String(emailInput?.value || emailInput?.getAttribute('value') || '').trim().toLowerCase() || null;
+    const email = String(emailInput?.value || emailInput?.getAttribute('value') || '')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/[\u00A0\u202F]/g, ' ')
+      .trim()
+      .toLowerCase() || null;
     const password = document.getElementById('sp-input-student-password')?.value || '';
     const admissionNo = document.getElementById('sp-input-student-admission')?.value?.trim() || null;
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { AppToast.show('A valid student login email is required.', 'error'); return; }
