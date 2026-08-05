@@ -567,12 +567,16 @@ tr:hover td { background: var(--surface-low); }
       <h2 style="font-size:18px;font-weight:600;margin-bottom:24px;color:var(--on-surface);text-align:center;">Sign in to your account</h2>
       <form id="login-form" autocomplete="off">
         <div id="login-form-container">
-          <div style="margin-bottom:16px;">
-            <label class="form-label" for="login-email">Email (Admin / Counselor)</label>
+          <div id="login-method-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;margin-bottom:18px;background:var(--surface-low);border-radius:10px;">
+            <button type="button" class="btn btn-primary" id="btn-login-method-email" aria-pressed="true">Login with Email</button>
+            <button type="button" class="btn btn-ghost" id="btn-login-method-id" aria-pressed="false">Login with ID</button>
+          </div>
+          <div id="login-email-fields" style="margin-bottom:16px;">
+            <label class="form-label" for="login-email">Email Address</label>
             <input class="form-input" type="email" id="login-email" placeholder="Enter your email" autocomplete="email">
           </div>
-          <div style="margin-bottom:16px;padding:12px;background:var(--surface-low);border-radius:8px;">
-            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Students sign in with their school code and Student Login ID.</div>
+          <div id="login-id-fields" style="display:none;margin-bottom:16px;padding:12px;background:var(--surface-low);border-radius:8px;">
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Enter the school code and Student Login ID provided by your school.</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
               <input class="form-input" type="text" id="login-school-code" placeholder="School code" autocomplete="organization">
               <input class="form-input" type="text" id="login-student-id" placeholder="Student Login ID" autocomplete="username">
@@ -582,7 +586,7 @@ tr:hover td { background: var(--surface-low); }
             <label class="form-label" for="login-password">Password</label>
             <input class="form-input" type="password" id="login-password" placeholder="Enter your password" required autocomplete="current-password">
           </div>
-          <div style="text-align:right;margin-bottom:4px;">
+          <div id="forgot-password-row" style="text-align:right;margin-bottom:4px;">
             <button type="button" id="btn-forgot-password" style="background:none;border:none;font-size:12px;color:var(--primary);cursor:pointer;font-weight:500;">Forgot Password?</button>
           </div>
           <button type="submit" class="btn btn-primary btn-full" style="margin-top:4px;">Sign In</button>
